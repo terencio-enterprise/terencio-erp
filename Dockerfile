@@ -1,8 +1,8 @@
 # ==============================================================================
 # STAGE 1: Build the Application
 # ==============================================================================
-# Using a Gradle image with JDK 25 support
-FROM gradle:8.7-jdk25 AS builder
+# Using a Gradle image with JDK 21
+FROM gradle:8.7-jdk21 AS builder
 
 WORKDIR /app
 
@@ -18,8 +18,8 @@ RUN gradle bootJar --no-daemon -x test
 # ==============================================================================
 # STAGE 2: Run the Application
 # ==============================================================================
-# Using a lightweight Java 25 runtime
-FROM eclipse-temurin:25-jre-alpine
+# Using a lightweight Java 21 runtime
+FROM eclipse-temurin:21-jre-alpine
 
 WORKDIR /app
 
@@ -32,9 +32,6 @@ COPY --from=builder /app/build/libs/*.jar app.jar
 
 # Expose the application port
 EXPOSE 8080
-
-# Enable preview features if you strictly need Java 25 preview capabilities
-# ENV JAVA_OPTS="--enable-preview"
 
 # Healthcheck configuration
 HEALTHCHECK --interval=30s --timeout=3s \

@@ -35,13 +35,23 @@ server:
   port: 8080
   shutdown: graceful
 
+# Actuator Configuration (for health checks and monitoring)
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: when-authorized
+
 # Logging Configuration
 logging:
   level:
     root: INFO
     org.springframework.web: INFO
     org.springframework.jdbc.core: INFO # Change to DEBUG to see SQL queries
-    com.terencio: DEBUG
+    es.terencio.erp: DEBUG
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
 
