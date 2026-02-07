@@ -30,7 +30,7 @@ services:
     image: postgres:16-alpine
     container_name: terencio-db
     ports:
-      - "5432:5432" # Exposed for local development tools (DBeaver, etc.)
+      - "5433:5432"
     environment:
       - POSTGRES_DB=${DB_NAME}
       - POSTGRES_USER=${DB_USER}

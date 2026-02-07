@@ -1,8 +1,6 @@
-import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
-
 plugins {
     java
-    id("org.springframework.boot") version "3.5.10" // Or latest stable
+    id("org.springframework.boot") version "3.4.1"
     id("io.spring.dependency-management") version "1.1.7"
 }
 
@@ -11,13 +9,7 @@ version = "0.0.1-SNAPSHOT"
 
 java {
     toolchain {
-        languageVersion = JavaLanguageVersion.of(25)
-    }
-}
-
-configurations {
-    compileOnly {
-        extendsFrom(configurations.annotationProcessor.get())
+        languageVersion = JavaLanguageVersion.of(21)
     }
 }
 
@@ -26,11 +18,11 @@ repositories {
 }
 
 dependencies {
-    // 1. WEB & VALIDATION (Infrastructure - Input Adapters)
+    // 1. WEB & VALIDATION
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-validation")
 
-    // 2. DATABASE (Infrastructure - Output Adapters)
+    // 2. DATABASE
     implementation("org.springframework.boot:spring-boot-starter-data-jdbc")
     implementation("org.flywaydb:flyway-core")
     implementation("org.flywaydb:flyway-database-postgresql")
@@ -51,7 +43,6 @@ tasks.withType<Test> {
     useJUnitPlatform()
 }
 
-// Optional: If using Java 25 Preview features
 tasks.withType<JavaCompile> {
-    options.compilerArgs.add("--enable-preview")
+    options.encoding = "UTF-8"
 }
