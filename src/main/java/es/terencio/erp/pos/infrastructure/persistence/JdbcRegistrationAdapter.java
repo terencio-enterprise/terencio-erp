@@ -1,5 +1,6 @@
 package es.terencio.erp.pos.infrastructure.persistence;
 
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
@@ -78,7 +79,7 @@ public class JdbcRegistrationAdapter implements RegistrationPort {
                 .param("code", code)
                 .param("storeId", storeId)
                 .param("posName", posName)
-                .param("expiresAt", expiresAt)
+                .param("expiresAt", Timestamp.from(expiresAt))
                 .update();
     }
 }

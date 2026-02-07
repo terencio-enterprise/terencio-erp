@@ -13,16 +13,22 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import es.terencio.erp.shared.exception.DomainException;
 import es.terencio.erp.shared.exception.RegistrationException;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * Global exception handler for REST controllers.
  * Provides consistent error responses across the application.
  */
+@Slf4j // Adds the 'log' object automatically (Lombok)
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
     @ExceptionHandler(RegistrationException.class)
     public ResponseEntity<ErrorResponse> handleRegistrationException(RegistrationException ex) {
+        // Log at WARN level because it's usually a user error (wrong code, expired,
+        // etc.)
+        log.warn("Registration failed: {}", ex.getMessage());
+
         ErrorResponse error = new ErrorResponse(
                 HttpStatus.BAD_REQUEST.value(),
                 ex.getMessage(),
@@ -32,6 +38,8 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(DomainException.class)
     public ResponseEntity<ErrorResponse> handleDomainException(DomainException ex) {
+        log.warn("Domain rule violation: {}", ex.getMessage());
+
         ErrorResponse error = new ErrorResponse(
                 HttpStatus.BAD_REQUEST.value(),
                 ex.getMessage(),
@@ -42,6 +50,9 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ValidationErrorResponse> handleValidationException(
             MethodArgumentNotValidException ex) {
+
+        // Log basic validation failure info
+        log.warn("Validation failed for request: {}", ex.getBindingResult().getObjectName());
 
         Map<String, String> errors = new HashMap<>();
         ex.getBindingResult().getAllErrors().forEach(error -> {
@@ -61,6 +72,9 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleGenericException(Exception ex) {
+        // CRITICAL: Log the full stack trace for unexpected 500 errors
+        log.error("Unexpected system error occurred", ex);
+
         ErrorResponse error = new ErrorResponse(
                 HttpStatus.INTERNAL_SERVER_ERROR.value(),
                 "An unexpected error occurred",
