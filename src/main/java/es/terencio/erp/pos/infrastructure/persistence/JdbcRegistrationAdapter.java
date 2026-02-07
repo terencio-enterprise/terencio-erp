@@ -1,5 +1,6 @@
 package es.terencio.erp.pos.infrastructure.persistence;
 
+import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -9,10 +10,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import es.terencio.erp.pos.application.port.out.RegistrationPort;
 
-/**
- * JDBC adapter implementing the RegistrationPort.
- * This is the infrastructure implementation of the output port.
- */
 @Repository
 public class JdbcRegistrationAdapter implements RegistrationPort {
 
@@ -68,5 +65,21 @@ public class JdbcRegistrationAdapter implements RegistrationPort {
                 .update();
 
         return deviceId;
+    }
+
+    // NEW IMPLEMENTATION
+    @Override
+    public void saveCode(String code, UUID storeId, String posName, Instant expiresAt) {
+        String sql = """
+                INSERT INTO registration_codes (code, store_id, preassigned_name, expires_at, is_used, created_at)
+                VALUES (:code, :storeId, :posName, :expiresAt, FALSE, NOW())
+                """;
+
+        jdbcClient.sql(sql)
+                .param("code", code)
+                .param("storeId", storeId)
+                .param("posName", posName)
+                .param("expiresAt", expiresAt)
+                .update();
     }
 }

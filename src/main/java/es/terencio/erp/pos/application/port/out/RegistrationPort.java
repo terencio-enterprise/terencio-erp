@@ -30,6 +30,8 @@ public interface RegistrationPort {
      */
     UUID registerDevice(String code, String hardwareId, UUID storeId, String serialCode);
 
+    void saveCode(String code, UUID storeId, String posName, Instant expiresAt);
+
     /**
      * Data structure for registration information.
      */
