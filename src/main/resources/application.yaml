@@ -24,7 +24,7 @@ spring:
   # Spring Data JDBC Configuration
   data:
     jdbc:
-      dialect: postgresql
+      dialect: postgresqlsd
 
   # Threading (Virtual Threads - Java 21+)
   threads:
@@ -35,23 +35,13 @@ server:
   port: 8080
   shutdown: graceful
 
-# Actuator Configuration (for health checks and monitoring)
-management:
-  endpoints:
-    web:
-      exposure:
-        include: health,info
-  endpoint:
-    health:
-      show-details: when-authorized
-
 # Logging Configuration
 logging:
   level:
     root: INFO
     org.springframework.web: INFO
     org.springframework.jdbc.core: INFO # Change to DEBUG to see SQL queries
-    es.terencio.erp: DEBUG
+    com.terencio: DEBUG
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
 
