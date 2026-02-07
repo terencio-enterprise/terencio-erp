@@ -67,7 +67,6 @@ public class JdbcRegistrationAdapter implements RegistrationPort {
         return deviceId;
     }
 
-    // NEW IMPLEMENTATION
     @Override
     public void saveCode(String code, UUID storeId, String posName, Instant expiresAt) {
         String sql = """
