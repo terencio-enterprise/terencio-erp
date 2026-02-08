@@ -40,7 +40,8 @@ public class SecurityConfig {
                         // Secure endpoints
                         .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
                         // Docs
-                        .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
+                        .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html", "/api-docs/**")
+                        .permitAll()
                         .anyRequest().authenticated())
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
