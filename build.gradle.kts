@@ -28,8 +28,9 @@ dependencies {
     runtimeOnly("io.jsonwebtoken:jjwt-impl:0.12.5")
     runtimeOnly("io.jsonwebtoken:jjwt-jackson:0.12.5")
     
-    // 3. ACTUATOR
+    // 3. ACTUATOR & DOCS
     implementation("org.springframework.boot:spring-boot-starter-actuator")
+    implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.3.0")
 
     // 4. DATABASE
     implementation("org.springframework.boot:spring-boot-starter-data-jdbc")
