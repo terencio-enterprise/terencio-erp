@@ -1,4 +1,4 @@
-﻿package es.terencio.erp.sync.infrastructure.persistence;
+package es.terencio.erp.sync.infrastructure.persistence;
 
 import java.sql.Timestamp;
 import java.time.Instant;

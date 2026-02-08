@@ -1,4 +1,4 @@
-﻿package es.terencio.erp.sync.application.port.in;
+package es.terencio.erp.sync.application.port.in;
 
 import es.terencio.erp.sync.application.dto.SyncRequest;
 import es.terencio.erp.sync.application.dto.SyncResponseDto;

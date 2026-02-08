@@ -1,4 +1,4 @@
-﻿package es.terencio.erp.sync.application.service;
+package es.terencio.erp.sync.application.service;
 
 import java.time.Instant;
 

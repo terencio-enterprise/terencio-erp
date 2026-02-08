@@ -1,4 +1,4 @@
-﻿package es.terencio.erp.sync.application.port.out;
+package es.terencio.erp.sync.application.port.out;
 
 import java.time.Instant;
 import java.util.UUID;

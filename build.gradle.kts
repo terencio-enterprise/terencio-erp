@@ -22,21 +22,28 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-validation")
     
-    // 2. ACTUATOR (for health checks and monitoring)
+    // 2. SECURITY (JWT)
+    implementation("org.springframework.boot:spring-boot-starter-security")
+    implementation("io.jsonwebtoken:jjwt-api:0.12.5")
+    runtimeOnly("io.jsonwebtoken:jjwt-impl:0.12.5")
+    runtimeOnly("io.jsonwebtoken:jjwt-jackson:0.12.5")
+    
+    // 3. ACTUATOR
     implementation("org.springframework.boot:spring-boot-starter-actuator")
 
-    // 3. DATABASE
+    // 4. DATABASE
     implementation("org.springframework.boot:spring-boot-starter-data-jdbc")
     implementation("org.flywaydb:flyway-core")
     implementation("org.flywaydb:flyway-database-postgresql")
     runtimeOnly("org.postgresql:postgresql")
 
-    // 4. UTILITIES
+    // 5. UTILITIES
     compileOnly("org.projectlombok:lombok")
     annotationProcessor("org.projectlombok:lombok")
 
-    // 5. TESTING
+    // 6. TESTING
     testImplementation("org.springframework.boot:spring-boot-starter-test")
+    testImplementation("org.springframework.security:spring-security-test")
     testImplementation("org.testcontainers:postgresql")
     testImplementation("org.testcontainers:junit-jupiter")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")

@@ -1,4 +1,4 @@
-﻿package es.terencio.erp.sync.application.dto;
+package es.terencio.erp.sync.application.dto;
 
 import java.math.BigDecimal;
 

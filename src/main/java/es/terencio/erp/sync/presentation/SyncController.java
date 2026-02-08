@@ -1,4 +1,4 @@
-﻿package es.terencio.erp.sync.presentation;
+package es.terencio.erp.sync.presentation;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CrossOrigin;
