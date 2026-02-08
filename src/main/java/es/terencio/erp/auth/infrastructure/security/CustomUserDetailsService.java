@@ -20,10 +20,10 @@ public class CustomUserDetailsService implements UserDetailsService {
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
         String sql = """
-            SELECT id, uuid, username, pin_hash, role, store_id
-            FROM users
-            WHERE username = :username AND is_active = TRUE
-        """;
+                    SELECT id, uuid, username, password_hash, role, store_id
+                    FROM users
+                    WHERE username = :username AND is_active = TRUE
+                """;
 
         return jdbcClient.sql(sql)
                 .param("username", username)
@@ -31,10 +31,9 @@ public class CustomUserDetailsService implements UserDetailsService {
                         rs.getLong("id"),
                         rs.getObject("uuid", UUID.class),
                         rs.getString("username"),
-                        rs.getString("pin_hash"), // Used as password
+                        rs.getString("password_hash"), // Backoffice password
                         rs.getString("role"),
-                        rs.getObject("store_id", UUID.class)
-                ))
+                        rs.getObject("store_id", UUID.class)))
                 .optional()
                 .orElseThrow(() -> new UsernameNotFoundException("User not found: " + username));
     }
