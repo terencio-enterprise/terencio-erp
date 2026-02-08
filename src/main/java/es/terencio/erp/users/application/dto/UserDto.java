@@ -9,7 +9,7 @@ public record UserDto(
     String fullName,
     String role,
     Integer isActive,
-    List<String> permissions, // Granular permissions
+    List<String> permissions, 
     Instant createdAt,
     Instant updatedAt
 ) {}

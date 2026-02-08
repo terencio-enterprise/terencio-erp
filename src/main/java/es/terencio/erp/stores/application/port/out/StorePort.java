@@ -12,5 +12,5 @@ public interface StorePort {
     Optional<StoreDto> findByCode(String code);
     void save(StoreDto store);
     void update(StoreDto store);
-    boolean hasDependencies(UUID id); // Check for linked Users or Devices
+    boolean hasDependencies(UUID id);
 }

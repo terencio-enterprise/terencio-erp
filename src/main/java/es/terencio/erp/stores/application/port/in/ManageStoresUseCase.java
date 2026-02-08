@@ -10,5 +10,5 @@ public interface ManageStoresUseCase {
     StoreDto getById(UUID id);
     StoreDto create(StoreDto request);
     StoreDto update(UUID id, StoreDto request);
-    void delete(UUID id); // Soft delete or hard delete depending on deps
+    void delete(UUID id);
 }

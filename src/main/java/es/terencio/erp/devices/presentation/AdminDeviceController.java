@@ -5,15 +5,11 @@ import java.util.UUID;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PatchMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
-import es.terencio.erp.devices.application.dto.DeviceDto;
+import es.terencio.erp.devices.application.dto.*;
 import es.terencio.erp.devices.application.port.in.ManageDevicesUseCase;
+import jakarta.validation.Valid;
 
 @RestController
 @RequestMapping("/api/v1/admin/devices")
@@ -33,13 +29,14 @@ public class AdminDeviceController {
 
     @PatchMapping("/{id}/status")
     public ResponseEntity<Void> updateStatus(@PathVariable UUID id, @RequestParam String action) {
-        if ("block".equalsIgnoreCase(action)) {
-            manageDevicesUseCase.blockDevice(id);
-        } else if ("unblock".equalsIgnoreCase(action)) {
-            manageDevicesUseCase.unblockDevice(id);
-        } else {
-            return ResponseEntity.badRequest().build();
-        }
+        if ("block".equalsIgnoreCase(action)) manageDevicesUseCase.blockDevice(id);
+        else if ("unblock".equalsIgnoreCase(action)) manageDevicesUseCase.unblockDevice(id);
+        else return ResponseEntity.badRequest().build();
         return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/codes")
+    public ResponseEntity<GeneratedCodeDto> generateCode(@Valid @RequestBody GenerateCodeRequest request) {
+        return ResponseEntity.ok(manageDevicesUseCase.generateRegistrationCode(request));
     }
 }

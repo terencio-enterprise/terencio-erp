@@ -1,6 +1,5 @@
 package es.terencio.erp.users.application.service;
 
-import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
 
@@ -32,14 +31,11 @@ public class UserService implements ManageUsersUseCase {
     }
 
     @Override
-    public List<UserDto> listAll() {
-        return userPort.findAll();
-    }
+    public List<UserDto> listAll() { return userPort.findAll(); }
 
     @Override
     public UserDto getById(Long id) {
-        return userPort.findById(id)
-                .orElseThrow(() -> new DomainException("User not found"));
+        return userPort.findById(id).orElseThrow(() -> new DomainException("User not found"));
     }
 
     @Override
@@ -48,40 +44,20 @@ public class UserService implements ManageUsersUseCase {
         if (userPort.findByUsername(request.username()).isPresent()) {
             throw new DomainException("Username already exists");
         }
-
         String pinHash = passwordEncoder.encode(request.posPin());
         String passwordHash = passwordEncoder.encode(request.backofficePassword());
         String permissionsJson = toJson(request.permissions() != null ? request.permissions() : Collections.emptyList());
 
-        Long id = userPort.save(
-            request.username(), 
-            request.fullName(), 
-            request.role(), 
-            pinHash, 
-            passwordHash,
-            request.storeId(),
-            permissionsJson
-        );
-        
+        Long id = userPort.save(request.username(), request.fullName(), request.role(), pinHash, passwordHash, request.storeId(), permissionsJson);
         return getById(id);
     }
 
     @Override
     @Transactional
     public UserDto update(Long id, UpdateUserRequest request) {
-        getById(id); // Check existence
-
+        getById(id);
         String permissionsJson = toJson(request.permissions() != null ? request.permissions() : Collections.emptyList());
-
-        userPort.update(
-            id,
-            request.fullName(),
-            request.role(),
-            request.storeId(),
-            request.isActive(),
-            permissionsJson
-        );
-        
+        userPort.update(id, request.fullName(), request.role(), request.storeId(), request.isActive(), permissionsJson);
         return getById(id);
     }
 

@@ -56,7 +56,6 @@ public class StoreService implements ManageStoresUseCase {
     public StoreDto update(UUID id, StoreDto request) {
         StoreDto existing = getById(id);
 
-        // Check code uniqueness if changed
         if (!existing.code().equals(request.code()) && storePort.findByCode(request.code()).isPresent()) {
             throw new DomainException("Store code already exists: " + request.code());
         }
@@ -79,9 +78,8 @@ public class StoreService implements ManageStoresUseCase {
     public void delete(UUID id) {
         StoreDto existing = getById(id);
         
-        // Logical check: Don't allow deleting/disabling a store if it has active entities
         if (existing.isActive() && storePort.hasDependencies(id)) {
-            throw new DomainException("Cannot delete Store: It has active Users or POS Devices associated with it. Please reassign or remove them first.");
+            throw new DomainException("Cannot delete Store: It has active Users or Devices.");
         }
 
         StoreDto deleted = new StoreDto(
@@ -90,7 +88,7 @@ public class StoreService implements ManageStoresUseCase {
                 existing.name(),
                 existing.address(),
                 existing.taxId(),
-                false // Soft delete
+                false 
         );
         storePort.update(deleted);
     }

@@ -33,41 +33,29 @@ public class AdminUserController {
     }
 
     @GetMapping
-    public ResponseEntity<List<UserDto>> list() {
-        return ResponseEntity.ok(manageUsersUseCase.listAll());
-    }
+    public ResponseEntity<List<UserDto>> list() { return ResponseEntity.ok(manageUsersUseCase.listAll()); }
 
     @GetMapping("/{id}")
-    public ResponseEntity<UserDto> get(@PathVariable Long id) {
-        return ResponseEntity.ok(manageUsersUseCase.getById(id));
-    }
+    public ResponseEntity<UserDto> get(@PathVariable Long id) { return ResponseEntity.ok(manageUsersUseCase.getById(id)); }
 
     @PostMapping
-    public ResponseEntity<UserDto> create(@Valid @RequestBody CreateUserRequest request) {
-        return ResponseEntity.ok(manageUsersUseCase.create(request));
-    }
+    public ResponseEntity<UserDto> create(@Valid @RequestBody CreateUserRequest request) { return ResponseEntity.ok(manageUsersUseCase.create(request)); }
 
     @PutMapping("/{id}")
-    public ResponseEntity<UserDto> update(@PathVariable Long id, @Valid @RequestBody UpdateUserRequest request) {
-        return ResponseEntity.ok(manageUsersUseCase.update(id, request));
-    }
+    public ResponseEntity<UserDto> update(@PathVariable Long id, @Valid @RequestBody UpdateUserRequest request) { return ResponseEntity.ok(manageUsersUseCase.update(id, request)); }
 
     @PatchMapping("/{id}/pin")
     public ResponseEntity<Void> changePosPin(@PathVariable Long id, @RequestBody Map<String, String> body) {
-        String newPin = body.get("pin");
-        manageUsersUseCase.changePosPin(id, newPin);
+        manageUsersUseCase.changePosPin(id, body.get("pin"));
         return ResponseEntity.noContent().build();
     }
 
     @PatchMapping("/{id}/password")
     public ResponseEntity<Void> changeBackofficePassword(@PathVariable Long id, @RequestBody Map<String, String> body) {
-        String newPassword = body.get("password");
-        manageUsersUseCase.changeBackofficePassword(id, newPassword);
+        manageUsersUseCase.changeBackofficePassword(id, body.get("password"));
         return ResponseEntity.noContent().build();
     }
     
     @GetMapping("/roles")
-    public ResponseEntity<Role[]> listRoles() {
-        return ResponseEntity.ok(Role.values());
-    }
+    public ResponseEntity<Role[]> listRoles() { return ResponseEntity.ok(Role.values()); }
 }
