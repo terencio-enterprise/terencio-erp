@@ -2,6 +2,7 @@ package es.terencio.erp.organization.infrastructure.persistence;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Timestamp;
 import java.util.Currency;
 import java.util.Optional;
 import java.util.UUID;
@@ -37,15 +38,6 @@ public class JdbcCompanyPersistenceAdapter implements CompanyRepository {
                     price_includes_tax, rounding_mode, is_active, created_at, updated_at, version)
                 VALUES (:id, :name, :taxId, :currency, :fiscalRegime, :priceIncludesTax,
                     :roundingMode, :isActive, :createdAt, :updatedAt, :version)
-                ON CONFLICT (id) DO UPDATE SET
-                    name = EXCLUDED.name,
-                    currency_code = EXCLUDED.currency_code,
-                    fiscal_regime = EXCLUDED.fiscal_regime,
-                    price_includes_tax = EXCLUDED.price_includes_tax,
-                    rounding_mode = EXCLUDED.rounding_mode,
-                    is_active = EXCLUDED.is_active,
-                    updated_at = EXCLUDED.updated_at,
-                    version = EXCLUDED.version
                 """)
                 .param("id", id)
                 .param("name", company.name())
@@ -55,8 +47,8 @@ public class JdbcCompanyPersistenceAdapter implements CompanyRepository {
                 .param("priceIncludesTax", company.priceIncludesTax())
                 .param("roundingMode", company.roundingMode().name())
                 .param("isActive", company.isActive())
-                .param("createdAt", company.createdAt())
-                .param("updatedAt", company.updatedAt())
+                .param("createdAt", Timestamp.from(company.createdAt()))
+                .param("updatedAt", Timestamp.from(company.updatedAt()))
                 .param("version", company.version())
                 .update();
 

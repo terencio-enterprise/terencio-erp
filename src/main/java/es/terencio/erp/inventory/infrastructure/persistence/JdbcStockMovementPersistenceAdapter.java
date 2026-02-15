@@ -3,6 +3,7 @@ package es.terencio.erp.inventory.infrastructure.persistence;
 import java.math.BigDecimal;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Timestamp;
 import java.util.List;
 import java.util.UUID;
 
@@ -60,7 +61,7 @@ public class JdbcStockMovementPersistenceAdapter implements StockMovementReposit
                 .param("referenceDocUuid",
                         movement.referenceDocUuid() != null ? movement.referenceDocUuid().value() : null)
                 .param("userId", movement.userId() != null ? movement.userId().value() : null)
-                .param("createdAt", movement.createdAt())
+                .param("createdAt", Timestamp.from(movement.createdAt()))
                 .update(keyHolder);
 
         Long generatedId = ((Number) keyHolder.getKeys().get("id")).longValue();

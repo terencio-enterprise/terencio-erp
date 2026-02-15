@@ -2,6 +2,7 @@ package es.terencio.erp.catalog.infrastructure.persistence;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Timestamp;
 import java.util.List;
 import java.util.Optional;
 
@@ -39,7 +40,7 @@ public class JdbcProductPricePersistenceAdapter implements ProductPriceRepositor
                 .param("tariffId", productPrice.tariffId())
                 .param("price", productPrice.price().cents())
                 .param("costPrice", productPrice.costPrice() != null ? productPrice.costPrice().cents() : null)
-                .param("updatedAt", productPrice.updatedAt())
+                .param("updatedAt", Timestamp.from(productPrice.updatedAt()))
                 .update();
     }
 

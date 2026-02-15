@@ -2,6 +2,7 @@ package es.terencio.erp.crm.infrastructure.persistence;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Timestamp;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -70,8 +71,8 @@ public class JdbcCustomerPersistenceAdapter implements CustomerRepository {
                 .param("surchargeApply", customer.surchargeApply())
                 .param("notes", customer.notes())
                 .param("active", customer.isActive())
-                .param("createdAt", customer.createdAt())
-                .param("updatedAt", customer.updatedAt())
+                .param("createdAt", Timestamp.from(customer.createdAt()))
+                .param("updatedAt", Timestamp.from(customer.updatedAt()))
                 .update(keyHolder);
 
         Long generatedId = ((Number) keyHolder.getKeys().get("id")).longValue();
@@ -134,7 +135,7 @@ public class JdbcCustomerPersistenceAdapter implements CustomerRepository {
                 .param("surchargeApply", customer.surchargeApply())
                 .param("notes", customer.notes())
                 .param("active", customer.isActive())
-                .param("updatedAt", customer.updatedAt())
+                .param("updatedAt", Timestamp.from(customer.updatedAt()))
                 .update();
 
         return customer;

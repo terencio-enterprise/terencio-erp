@@ -1,22 +1,24 @@
 package es.terencio.erp.catalog.infrastructure.persistence;
 
+import java.math.BigDecimal;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Timestamp;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
+import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.jdbc.support.GeneratedKeyHolder;
+import org.springframework.jdbc.support.KeyHolder;
+import org.springframework.stereotype.Repository;
+
 import es.terencio.erp.catalog.application.port.out.ProductRepository;
 import es.terencio.erp.catalog.domain.model.Product;
 import es.terencio.erp.catalog.domain.model.ProductType;
 import es.terencio.erp.shared.domain.identifier.CompanyId;
 import es.terencio.erp.shared.domain.identifier.ProductId;
 import es.terencio.erp.shared.domain.valueobject.Money;
-import org.springframework.jdbc.core.simple.JdbcClient;
-import org.springframework.jdbc.support.GeneratedKeyHolder;
-import org.springframework.jdbc.support.KeyHolder;
-import org.springframework.stereotype.Repository;
-
-import java.math.BigDecimal;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
 
 /**
  * JDBC adapter for Product persistence.
@@ -71,8 +73,8 @@ public class JdbcProductPersistenceAdapter implements ProductRepository {
                 .param("lastPurchaseCost", product.lastPurchaseCost().cents())
                 .param("imageUrl", product.imageUrl())
                 .param("active", product.isActive())
-                .param("createdAt", product.createdAt())
-                .param("updatedAt", product.updatedAt())
+                .param("createdAt", Timestamp.from(product.createdAt()))
+                .param("updatedAt", Timestamp.from(product.updatedAt()))
                 .param("version", product.version())
                 .update(keyHolder);
 
@@ -132,7 +134,7 @@ public class JdbcProductPersistenceAdapter implements ProductRepository {
                 .param("lastPurchaseCost", product.lastPurchaseCost().cents())
                 .param("imageUrl", product.imageUrl())
                 .param("active", product.isActive())
-                .param("updatedAt", product.updatedAt())
+                .param("updatedAt", Timestamp.from(product.updatedAt()))
                 .param("version", product.version())
                 .update();
 

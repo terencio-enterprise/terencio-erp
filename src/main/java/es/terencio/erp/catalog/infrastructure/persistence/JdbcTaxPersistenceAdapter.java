@@ -3,6 +3,7 @@ package es.terencio.erp.catalog.infrastructure.persistence;
 import java.math.BigDecimal;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Timestamp;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -52,7 +53,7 @@ public class JdbcTaxPersistenceAdapter implements TaxRepository {
                 .param("surcharge", tax.surcharge().rate())
                 .param("codeAeat", tax.codeAeat())
                 .param("active", tax.isActive())
-                .param("createdAt", tax.createdAt())
+                .param("createdAt", Timestamp.from(tax.createdAt()))
                 .update(keyHolder);
 
         Long generatedId = ((Number) keyHolder.getKeys().get("id")).longValue();

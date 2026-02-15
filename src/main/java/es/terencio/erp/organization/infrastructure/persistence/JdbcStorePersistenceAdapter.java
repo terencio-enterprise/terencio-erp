@@ -2,6 +2,7 @@ package es.terencio.erp.organization.infrastructure.persistence;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Timestamp;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
@@ -57,8 +58,8 @@ public class JdbcStorePersistenceAdapter implements StoreRepository {
                 .param("city", store.address() != null ? store.address().city() : null)
                 .param("isActive", store.isActive())
                 .param("timezone", store.timezone().getId())
-                .param("createdAt", store.createdAt())
-                .param("updatedAt", store.updatedAt())
+                .param("createdAt", Timestamp.from(store.createdAt()))
+                .param("updatedAt", Timestamp.from(store.updatedAt()))
                 .param("version", store.version())
                 .update();
 

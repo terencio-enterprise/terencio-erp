@@ -2,6 +2,7 @@ package es.terencio.erp.organization.infrastructure.persistence;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Timestamp;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -40,7 +41,7 @@ public class JdbcWarehousePersistenceAdapter implements WarehouseRepository {
                 .param("storeId", warehouse.storeId().value())
                 .param("name", warehouse.name())
                 .param("code", warehouse.code())
-                .param("createdAt", warehouse.createdAt())
+                .param("createdAt", Timestamp.from(warehouse.createdAt()))
                 .update();
 
         return new Warehouse(

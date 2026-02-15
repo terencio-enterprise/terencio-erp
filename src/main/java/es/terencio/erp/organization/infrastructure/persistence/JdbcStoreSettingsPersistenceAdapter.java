@@ -2,6 +2,7 @@ package es.terencio.erp.organization.infrastructure.persistence;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Timestamp;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -44,7 +45,7 @@ public class JdbcStoreSettingsPersistenceAdapter implements StoreSettingsReposit
                 .param("defaultTariffId", settings.defaultTariffId())
                 .param("printTicketAutomatically", settings.printTicketAutomatically())
                 .param("requireCustomerForLargeAmount", settings.requireCustomerForLargeAmount().cents())
-                .param("updatedAt", settings.updatedAt())
+                .param("updatedAt", Timestamp.from(settings.updatedAt()))
                 .update();
         return settings;
     }
