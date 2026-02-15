@@ -38,6 +38,16 @@ public class JdbcCompanyPersistenceAdapter implements CompanyRepository {
                     price_includes_tax, rounding_mode, is_active, created_at, updated_at, version)
                 VALUES (:id, :name, :taxId, :currency, :fiscalRegime, :priceIncludesTax,
                     :roundingMode, :isActive, :createdAt, :updatedAt, :version)
+                ON CONFLICT (id) DO UPDATE SET
+                    name = EXCLUDED.name,
+                    tax_id = EXCLUDED.tax_id,
+                    currency_code = EXCLUDED.currency_code,
+                    fiscal_regime = EXCLUDED.fiscal_regime,
+                    price_includes_tax = EXCLUDED.price_includes_tax,
+                    rounding_mode = EXCLUDED.rounding_mode,
+                    is_active = EXCLUDED.is_active,
+                    updated_at = EXCLUDED.updated_at,
+                    version = EXCLUDED.version
                 """)
                 .param("id", id)
                 .param("name", company.name())

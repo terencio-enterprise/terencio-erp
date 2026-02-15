@@ -3,6 +3,7 @@ package es.terencio.erp.inventory.infrastructure.persistence;
 import java.math.BigDecimal;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Timestamp;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -44,7 +45,7 @@ public class JdbcInventoryStockPersistenceAdapter implements InventoryStockRepos
                 .param("warehouseId", stock.warehouseId().value())
                 .param("companyId", stock.companyId().value())
                 .param("quantityOnHand", stock.quantityOnHand().value())
-                .param("lastUpdatedAt", stock.lastUpdatedAt())
+                .param("lastUpdatedAt", Timestamp.from(stock.lastUpdatedAt()))
                 .param("version", stock.version())
                 .update();
         return stock;

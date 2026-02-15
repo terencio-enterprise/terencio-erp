@@ -40,6 +40,7 @@ class CrmIntegrationTest extends AbstractIntegrationTest {
         jdbcClient.sql("DELETE FROM customer_product_prices").update();
         jdbcClient.sql("DELETE FROM customers").update();
         jdbcClient.sql("DELETE FROM products").update();
+        jdbcClient.sql("DELETE FROM taxes").update();
         jdbcClient.sql("DELETE FROM tariffs").update();
         jdbcClient.sql("DELETE FROM companies").update();
 
@@ -312,7 +313,19 @@ class CrmIntegrationTest extends AbstractIntegrationTest {
                 .param(anotherCompanyId)
                 .update();
 
-        createTestCustomer("Other Company Customer", "B88888888");
+        // Create customer for the other company
+        UUID otherCustomerUuid = UUID.randomUUID();
+        jdbcClient.sql("""
+                INSERT INTO customers (uuid, company_id, tax_id, legal_name, commercial_name,
+                    country, allow_credit, credit_limit, surcharge_apply, active, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, 'ES', FALSE, 0, FALSE, TRUE, NOW(), NOW())
+                """)
+                .param(otherCustomerUuid)
+                .param(anotherCompanyId)
+                .param("B88888888")
+                .param("Other Company Customer")
+                .param("Other Company Customer")
+                .update();
 
         // When - List customers for test company only
         ResponseEntity<Map[]> response = restTemplate.getForEntity(

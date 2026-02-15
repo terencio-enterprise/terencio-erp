@@ -41,8 +41,8 @@ public class JdbcCustomerProductPricePersistenceAdapter implements CustomerProdu
                 .param("customerId", price.customerId().value())
                 .param("productId", price.productId().value())
                 .param("customPrice", price.customPrice().cents())
-                .param("validFrom", price.validFrom())
-                .param("validUntil", price.validUntil())
+                .param("validFrom", Timestamp.from(price.validFrom()))
+                .param("validUntil", price.validUntil() != null ? Timestamp.from(price.validUntil()) : null)
                 .param("createdAt", Timestamp.from(price.createdAt()))
                 .update();
     }

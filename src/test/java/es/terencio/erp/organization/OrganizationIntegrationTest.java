@@ -144,7 +144,7 @@ class OrganizationIntegrationTest extends AbstractIntegrationTest {
         // Then
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).isNotNull();
-        assertThat(response.getBody().get("code")).isEqualTo("STORE001");
+        assertThat(response.getBody().get("storeCode")).isEqualTo("STORE001");
 
         UUID storeId = UUID.fromString((String) response.getBody().get("storeId"));
         UUID warehouseId = UUID.fromString((String) response.getBody().get("warehouseId"));

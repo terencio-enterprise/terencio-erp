@@ -37,6 +37,7 @@ class InventoryIntegrationTest extends AbstractIntegrationTest {
         jdbcClient.sql("DELETE FROM stock_movements").update();
         jdbcClient.sql("DELETE FROM inventory_stock").update();
         jdbcClient.sql("DELETE FROM products").update();
+        jdbcClient.sql("DELETE FROM taxes").update();
         jdbcClient.sql("DELETE FROM warehouses").update();
         jdbcClient.sql("DELETE FROM stores").update();
         jdbcClient.sql("DELETE FROM companies").update();
@@ -113,7 +114,7 @@ class InventoryIntegrationTest extends AbstractIntegrationTest {
         // Then
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).isNotNull();
-        assertThat(response.getBody().get("previousBalance")).isEqualTo(0);
+        assertThat(response.getBody().get("previousBalance")).isEqualTo(0.0);
         assertThat(response.getBody().get("newBalance")).isEqualTo(100.0);
 
         // Verify stock movement created
