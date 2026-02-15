@@ -1,9 +1,9 @@
 -- ==================================================================================
 -- PROJECT: TERENCIO POS - ENTERPRISE CORE (Unified V1)
--- SCOPE: Multi-Company, Multi-Store, VeriFactu, CRM, Inventory, Purchasing
+-- SCOPE: Multi-Company, Multi-Store, VeriFactu, CRM, Inventory, Purchasing, Accounting
 -- ENGINE: PostgreSQL 16+
 -- STATUS: ENTERPRISE GRADE (Hardened Fiscal Audit, Rectification Snapshots, Strict Sequence)
--- VERSION: 1.3 (Purchasing Lines, Cost Control, Sync Logs, Delete Protection)
+-- VERSION: 1.5 (Accounting Integrity, Price Overlap Protection, Multi-Tenant Isolation)
 -- ==================================================================================
 
 -- Enable UUID extension
@@ -22,8 +22,10 @@ CREATE TABLE companies (
     tax_id VARCHAR(50) NOT NULL, -- CIF/NIF
     currency_code VARCHAR(3) DEFAULT 'EUR',
     
-    -- Fiscal Configuration
+    -- Fiscal Configuration (Point 4)
     fiscal_regime VARCHAR(50) DEFAULT 'COMMON', -- COMMON, SII, CANARY_IGIC
+    price_includes_tax BOOLEAN DEFAULT TRUE,
+    rounding_mode VARCHAR(20) DEFAULT 'LINE', -- LINE, TOTAL
     
     is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -53,6 +55,16 @@ CREATE TABLE stores (
     version BIGINT DEFAULT 1,
     
     UNIQUE(company_id, code)
+);
+
+-- Store Settings (Point 6 - Configuration per Store)
+CREATE TABLE store_settings (
+    store_id UUID PRIMARY KEY REFERENCES stores(id),
+    allow_negative_stock BOOLEAN DEFAULT FALSE,
+    default_tariff_id BIGINT, -- FK added later or handled logically to avoid circular dep
+    print_ticket_automatically BOOLEAN DEFAULT TRUE,
+    require_customer_for_large_amount DECIMAL(15,2),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- Warehouses (Almacenes) - Can be physical store or logic warehouse
@@ -211,7 +223,7 @@ CREATE TABLE products (
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
     deleted_at TIMESTAMPTZ,
-    version BIGINT DEFAULT 1,
+    version BIGINT DEFAULT 1, -- Optimistic Locking
     
     UNIQUE(company_id, reference)
 );
@@ -236,7 +248,8 @@ CREATE TABLE tariffs (
     price_type VARCHAR(20) DEFAULT 'RETAIL', -- RETAIL, WHOLESALE, PREMIUM
     
     is_default BOOLEAN DEFAULT FALSE,
-    active BOOLEAN DEFAULT TRUE
+    active BOOLEAN DEFAULT TRUE,
+    version BIGINT DEFAULT 1 -- Optimistic Locking (Point 8)
 );
 
 -- Prices (Standard List Prices)
@@ -249,6 +262,35 @@ CREATE TABLE product_prices (
     
     updated_at TIMESTAMPTZ DEFAULT NOW(),
     PRIMARY KEY (product_id, tariff_id)
+);
+
+-- Product Price History (Point 1 - Critical Audit)
+CREATE TABLE product_price_history (
+    id BIGSERIAL PRIMARY KEY,
+    product_id BIGINT NOT NULL REFERENCES products(id),
+    tariff_id BIGINT NOT NULL REFERENCES tariffs(id),
+    
+    price DECIMAL(15,4) NOT NULL,
+    
+    valid_from TIMESTAMPTZ NOT NULL,
+    valid_until TIMESTAMPTZ,
+    changed_by BIGINT REFERENCES users(id),
+    reason VARCHAR(255),
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Product Cost History (Point 1 - Critical Audit)
+CREATE TABLE product_cost_history (
+    id BIGSERIAL PRIMARY KEY,
+    product_id BIGINT NOT NULL REFERENCES products(id),
+    
+    cost DECIMAL(15,4) NOT NULL,
+    source VARCHAR(50), -- PURCHASE, ADJUSTMENT, MANUAL
+    reference_uuid UUID,
+    
+    valid_from TIMESTAMPTZ NOT NULL,
+    valid_until TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- Payment Methods (Configuration)
@@ -331,10 +373,22 @@ CREATE TABLE pricing_rules (
     
     priority INT DEFAULT 10,
     active BOOLEAN DEFAULT TRUE,
+    version BIGINT DEFAULT 1, -- Optimistic Locking (Point 8)
     
     start_date TIMESTAMPTZ,
     end_date TIMESTAMPTZ,
     
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Customer Account Ledger (Point 9 - B2B Professional)
+CREATE TABLE customer_account_movements (
+    id BIGSERIAL PRIMARY KEY,
+    customer_id BIGINT NOT NULL REFERENCES customers(id) ON DELETE RESTRICT,
+    reference_uuid UUID, -- Sale UUID or Payment UUID
+    type VARCHAR(20) NOT NULL, -- INVOICE, PAYMENT, REFUND, ADJUSTMENT
+    amount DECIMAL(15,2) NOT NULL, -- Positive (Debit/Owe), Negative (Credit/Pay)
+    balance_after DECIMAL(15,2),
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -385,10 +439,9 @@ CREATE TABLE inventory_stock (
     last_updated_at TIMESTAMPTZ DEFAULT NOW(),
     version BIGINT DEFAULT 1, -- Optimistic Locking
     
-    PRIMARY KEY (product_id, warehouse_id),
+    PRIMARY KEY (product_id, warehouse_id)
     
-    -- Concurrency Safety (Point 2)
-    CONSTRAINT chk_positive_stock CHECK (quantity_on_hand >= 0)
+    -- Removed rigid constraint chk_positive_stock as per user request (allow negative stock logic)
 );
 
 -- Stock Movements (The Truth Ledger)
@@ -411,11 +464,53 @@ CREATE TABLE stock_movements (
     
     -- Context
     reason VARCHAR(255),
-    reference_doc_type VARCHAR(50), -- SALE_UUID, PO_UUID
+    reference_doc_type VARCHAR(50), -- SALE_UUID, PO_UUID, TRANSFER_UUID
     reference_doc_uuid UUID,
     
     user_id BIGINT REFERENCES users(id),
     created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Stock Transfers (Point 2 - Warehouse Management)
+CREATE TABLE stock_transfers (
+    id BIGSERIAL PRIMARY KEY,
+    uuid UUID UNIQUE DEFAULT uuid_generate_v4(),
+    company_id UUID NOT NULL REFERENCES companies(id),
+    from_warehouse_id UUID NOT NULL REFERENCES warehouses(id),
+    to_warehouse_id UUID NOT NULL REFERENCES warehouses(id),
+    status VARCHAR(20) DEFAULT 'DRAFT', -- DRAFT, IN_TRANSIT, COMPLETED, CANCELLED
+    created_by BIGINT REFERENCES users(id),
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    completed_at TIMESTAMPTZ,
+    
+    -- Self-transfer prevention (Point 5)
+    CONSTRAINT chk_transfer_diff CHECK (from_warehouse_id <> to_warehouse_id)
+);
+
+CREATE TABLE stock_transfer_lines (
+    id BIGSERIAL PRIMARY KEY,
+    transfer_id BIGINT REFERENCES stock_transfers(id) ON DELETE CASCADE,
+    product_id BIGINT NOT NULL REFERENCES products(id),
+    quantity DECIMAL(15,3) NOT NULL
+);
+
+-- Stock Counts / Inventarios Físicos (Point 2)
+CREATE TABLE stock_counts (
+    id BIGSERIAL PRIMARY KEY,
+    company_id UUID NOT NULL REFERENCES companies(id), -- Point 10: Multi-tenant isolation
+    warehouse_id UUID NOT NULL REFERENCES warehouses(id),
+    status VARCHAR(20) DEFAULT 'DRAFT', -- DRAFT, COMPLETED
+    created_by BIGINT REFERENCES users(id),
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    applied_at TIMESTAMPTZ
+);
+
+CREATE TABLE stock_count_lines (
+    id BIGSERIAL PRIMARY KEY,
+    stock_count_id BIGINT REFERENCES stock_counts(id) ON DELETE CASCADE,
+    product_id BIGINT NOT NULL REFERENCES products(id),
+    expected_qty DECIMAL(15,3),
+    counted_qty DECIMAL(15,3)
 );
 
 -- Purchase Orders (To Suppliers)
@@ -719,7 +814,51 @@ CREATE TABLE fiscal_audit_log (
 );
 
 -- ==================================================================================
--- 8. DOMAIN EVENTS (For BI / Async)
+-- 8. ACCOUNTING & AUDIT (Point 3 & 10)
+-- ==================================================================================
+
+-- Accounting Entries (Asientos)
+CREATE TABLE accounting_entries (
+    id BIGSERIAL PRIMARY KEY,
+    company_id UUID NOT NULL REFERENCES companies(id),
+    
+    reference_type VARCHAR(50), -- SALE, PURCHASE, PAYMENT
+    reference_uuid UUID,
+    
+    entry_date DATE NOT NULL,
+    description TEXT,
+    
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE accounting_entry_lines (
+    id BIGSERIAL PRIMARY KEY,
+    entry_id BIGINT REFERENCES accounting_entries(id) ON DELETE CASCADE,
+    
+    account_code VARCHAR(20) NOT NULL,
+    debit DECIMAL(15,2) DEFAULT 0,
+    credit DECIMAL(15,2) DEFAULT 0,
+
+    -- Accounting Integrity (Point 1: Debit OR Credit, never both active)
+    CONSTRAINT chk_debit_credit_exclusive CHECK (
+        (debit = 0 AND credit > 0) OR (credit = 0 AND debit > 0)
+    )
+);
+
+-- Audit Log (Security)
+CREATE TABLE audit_user_actions (
+    id BIGSERIAL PRIMARY KEY,
+    user_id BIGINT REFERENCES users(id),
+    action VARCHAR(100) NOT NULL, -- LOGIN_FAILED, PRICE_CHANGED, STOCK_ADJUSTED
+    entity VARCHAR(50),
+    entity_id VARCHAR(100),
+    payload JSONB,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+
+-- ==================================================================================
+-- 9. DOMAIN EVENTS (For BI / Async)
 -- ==================================================================================
 CREATE TABLE domain_events (
     id BIGSERIAL PRIMARY KEY,
@@ -736,7 +875,7 @@ CREATE TABLE domain_events (
 );
 
 -- ==================================================================================
--- 9. INDEXES & OPTIMIZATIONS
+-- 10. INDEXES & OPTIMIZATIONS
 -- ==================================================================================
 
 -- Performance Indexes
@@ -766,9 +905,26 @@ CREATE INDEX idx_sale_lines_product ON sale_lines(product_id);
 CREATE INDEX idx_fiscal_device_created ON fiscal_audit_log(device_id, created_at);
 CREATE INDEX idx_customer_product_price_lookup ON customer_product_prices(customer_id, product_id);
 
+-- Multi-Tenancy & Isolation Optimization (Point 5)
+CREATE INDEX idx_sales_company_date ON sales(company_id, issued_at_pos);
+CREATE INDEX idx_products_company_active ON products(company_id, active);
+
+-- Soft Delete Optimization (Point 7)
+CREATE INDEX idx_products_active_only ON products(company_id, reference) WHERE deleted_at IS NULL;
+CREATE INDEX idx_customers_active_only ON customers(company_id, tax_id) WHERE deleted_at IS NULL;
+
+-- NEW INDEXES (Version 1.5 - Point 4, 8, 9, 11)
+CREATE INDEX idx_price_history_lookup ON product_price_history(product_id, tariff_id, valid_from, valid_until);
+CREATE INDEX idx_cost_history_lookup ON product_cost_history(product_id, valid_from, valid_until);
+CREATE INDEX idx_customer_ledger ON customer_account_movements(customer_id, created_at);
+CREATE INDEX idx_accounting_company_date ON accounting_entries(company_id, entry_date);
+
+-- UNIQUE ACTIVE PRICE (Point 11 - Prevent double active price)
+CREATE UNIQUE INDEX uniq_price_active ON product_price_history(product_id, tariff_id) WHERE valid_until IS NULL;
+
 
 -- ==================================================================================
--- 10. TRIGGERS & SECURITY
+-- 11. TRIGGERS & SECURITY
 -- ==================================================================================
 
 -- Function to prevent updates/deletes on fiscal log
@@ -858,8 +1014,29 @@ FOR EACH ROW EXECUTE FUNCTION prevent_change_fiscalized_sales();
 CREATE TRIGGER trg_protect_pay_del BEFORE DELETE OR UPDATE ON payments
 FOR EACH ROW EXECUTE FUNCTION prevent_change_fiscalized_sales();
 
+
 -- ==================================================================================
--- 11. SEED DATA (Bootstrap)
+-- TRIGGER: PROTECT COMPLETED STOCK DOCS (Point 7)
+-- ==================================================================================
+CREATE OR REPLACE FUNCTION prevent_change_completed_stock()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF OLD.status = 'COMPLETED' THEN
+        RAISE EXCEPTION 'Operation Denied: Cannot DELETE or UPDATE a COMPLETED stock document.';
+    END IF;
+    RETURN OLD;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_protect_transfer_del BEFORE DELETE OR UPDATE ON stock_transfers
+FOR EACH ROW EXECUTE FUNCTION prevent_change_completed_stock();
+
+CREATE TRIGGER trg_protect_count_del BEFORE DELETE OR UPDATE ON stock_counts
+FOR EACH ROW EXECUTE FUNCTION prevent_change_completed_stock();
+
+
+-- ==================================================================================
+-- 12. SEED DATA (Bootstrap)
 -- ==================================================================================
 
 -- 1. Create Default Company
