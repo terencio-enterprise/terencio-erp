@@ -1,5 +1,6 @@
 package es.terencio.erp.catalog.application.port.out;
 
+import java.util.List;
 import java.util.Optional;
 
 import es.terencio.erp.catalog.domain.model.ProductPrice;
@@ -10,7 +11,9 @@ import es.terencio.erp.shared.domain.identifier.ProductId;
  */
 public interface ProductPriceRepository {
 
-    ProductPrice save(ProductPrice productPrice);
+    void save(ProductPrice productPrice);
 
     Optional<ProductPrice> findByProductAndTariff(ProductId productId, Long tariffId);
+
+    List<ProductPrice> findByProductId(ProductId productId);
 }

@@ -1,0 +1,87 @@
+package es.terencio.erp.organization.presentation;
+
+import java.util.UUID;
+
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import es.terencio.erp.organization.application.port.in.CreateCompanyUseCase;
+import es.terencio.erp.organization.application.port.out.CompanyRepository;
+import es.terencio.erp.organization.application.usecase.CreateCompanyCommand;
+import es.terencio.erp.organization.application.usecase.CreateCompanyResult;
+import es.terencio.erp.organization.application.usecase.UpdateFiscalSettingsCommand;
+import es.terencio.erp.organization.application.usecase.UpdateFiscalSettingsResult;
+import es.terencio.erp.organization.application.usecase.UpdateFiscalSettingsService;
+import es.terencio.erp.organization.domain.model.Company;
+import es.terencio.erp.shared.domain.identifier.CompanyId;
+import jakarta.validation.Valid;
+
+/**
+ * REST controller for Company management (Organization module).
+ */
+@RestController
+@RequestMapping("/api/v1/companies")
+@PreAuthorize("hasRole('ADMIN')")
+public class CompanyController {
+
+    private final CreateCompanyUseCase createCompanyUseCase;
+    private final UpdateFiscalSettingsService updateFiscalSettingsService;
+    private final CompanyRepository companyRepository;
+
+    public CompanyController(
+            CreateCompanyUseCase createCompanyUseCase,
+            UpdateFiscalSettingsService updateFiscalSettingsService,
+            CompanyRepository companyRepository) {
+        this.createCompanyUseCase = createCompanyUseCase;
+        this.updateFiscalSettingsService = updateFiscalSettingsService;
+        this.companyRepository = companyRepository;
+    }
+
+    @PostMapping
+    public ResponseEntity<CreateCompanyResult> createCompany(@Valid @RequestBody CreateCompanyCommand command) {
+        CreateCompanyResult result = createCompanyUseCase.execute(command);
+        return ResponseEntity.ok(result);
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<CompanyResponse> getCompany(@PathVariable UUID id) {
+        Company company = companyRepository.findById(new CompanyId(id))
+                .orElseThrow(() -> new RuntimeException("Company not found"));
+
+        return ResponseEntity.ok(new CompanyResponse(
+                company.id().value(),
+                company.name(),
+                company.taxId().value(),
+                company.currencyCode(),
+                company.fiscalRegime().name(),
+                company.priceIncludesTax(),
+                company.roundingMode().name(),
+                company.isActive()));
+    }
+
+    @PutMapping("/{id}/fiscal-settings")
+    public ResponseEntity<UpdateFiscalSettingsResult> updateFiscalSettings(
+            @PathVariable UUID id,
+            @Valid @RequestBody UpdateFiscalSettingsCommand command) {
+        UpdateFiscalSettingsResult result = updateFiscalSettingsService.execute(id, command);
+        return ResponseEntity.ok(result);
+    }
+
+    public record CompanyResponse(
+            UUID id,
+            String name,
+            String taxId,
+            String currencyCode,
+            String fiscalRegime,
+            boolean priceIncludesTax,
+            String roundingMode,
+            boolean active) {
+    }
+}
