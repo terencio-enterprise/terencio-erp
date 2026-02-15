@@ -25,7 +25,7 @@ public abstract class AbstractIntegrationTest {
 
     @Container
     static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>(
-            DockerImageName.parse("postgres:17-alpine")).withReuse(true);
+            DockerImageName.parse("postgres:17-alpine"));
 
     @DynamicPropertySource
     static void configureProperties(DynamicPropertyRegistry registry) {
