@@ -60,7 +60,7 @@ CREATE TABLE store_settings (
     allow_negative_stock BOOLEAN DEFAULT FALSE, -- ¿Permitir vender sin stock?
     default_tariff_id BIGINT, 
     print_ticket_automatically BOOLEAN DEFAULT TRUE,
-    require_customer_for_large_amount DECIMAL(15,2), -- Ley antifraude (ej: > 1000€ requiere NIF)
+    require_customer_for_large_amount BIGINT, -- Ley antifraude (ej: > 1000€ requiere NIF) - stored in cents
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -190,8 +190,8 @@ CREATE TABLE products (
     is_inventoriable BOOLEAN DEFAULT TRUE, -- ¿Controla stock?
     
     min_stock_alert DECIMAL(15,3) DEFAULT 0,
-    average_cost DECIMAL(15,4) DEFAULT 0, -- PMP (Precio Medio Ponderado)
-    last_purchase_cost DECIMAL(15,4) DEFAULT 0,
+    average_cost BIGINT DEFAULT 0, -- PMP (Precio Medio Ponderado) - stored in cents
+    last_purchase_cost BIGINT DEFAULT 0, -- stored in cents
     
     image_url TEXT,
     active BOOLEAN DEFAULT TRUE,
@@ -228,8 +228,8 @@ CREATE TABLE tariffs (
 CREATE TABLE product_prices (
     product_id BIGINT NOT NULL REFERENCES products(id),
     tariff_id BIGINT NOT NULL REFERENCES tariffs(id),
-    price DECIMAL(15,4) NOT NULL, -- Precio base
-    cost_price DECIMAL(15,4), -- Coste de referencia al fijar precio
+    price BIGINT NOT NULL, -- Precio base - stored in cents
+    cost_price BIGINT, -- Coste de referencia al fijar precio - stored in cents
     updated_at TIMESTAMPTZ DEFAULT NOW(),
     PRIMARY KEY (product_id, tariff_id)
 );
@@ -274,7 +274,7 @@ CREATE TABLE customers (
     
     tariff_id BIGINT REFERENCES tariffs(id), -- Tarifa especial asignada
     allow_credit BOOLEAN DEFAULT FALSE, -- ¿Permite pago diferido?
-    credit_limit DECIMAL(15,2) DEFAULT 0,
+    credit_limit BIGINT DEFAULT 0, -- stored in cents
     surcharge_apply BOOLEAN DEFAULT FALSE, -- ¿Aplica Recargo de Equivalencia?
     
     notes TEXT,
@@ -288,7 +288,7 @@ CREATE TABLE customers (
 CREATE TABLE customer_product_prices (
     customer_id BIGINT NOT NULL REFERENCES customers(id) ON DELETE RESTRICT,
     product_id BIGINT NOT NULL REFERENCES products(id) ON DELETE RESTRICT,
-    custom_price DECIMAL(15,4) NOT NULL,
+    custom_price BIGINT NOT NULL, -- stored in cents
     valid_from TIMESTAMPTZ DEFAULT NOW(),
     valid_until TIMESTAMPTZ,
     created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -317,8 +317,8 @@ CREATE TABLE customer_account_movements (
     customer_id BIGINT NOT NULL REFERENCES customers(id) ON DELETE RESTRICT,
     reference_uuid UUID, -- ID de Venta o Pago
     type VARCHAR(20) NOT NULL, -- INVOICE (Debe), PAYMENT (Haber)
-    amount DECIMAL(15,2) NOT NULL,
-    balance_after DECIMAL(15,2),
+    amount BIGINT NOT NULL, -- stored in cents
+    balance_after BIGINT, -- stored in cents
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -354,7 +354,7 @@ CREATE TABLE stock_movements (
     previous_balance DECIMAL(15,3) NOT NULL,
     new_balance DECIMAL(15,3) NOT NULL,
     
-    cost_unit DECIMAL(15,4), -- Coste unitario en el momento del movimiento
+    cost_unit BIGINT, -- Coste unitario en el momento del movimiento - stored in cents
     
     reason VARCHAR(255),
     
@@ -391,10 +391,10 @@ CREATE TABLE shifts (
     opened_at TIMESTAMPTZ NOT NULL,
     closed_at TIMESTAMPTZ,
     
-    amount_initial DECIMAL(15,2) DEFAULT 0, -- Fondo de caja
-    amount_system DECIMAL(15,2) DEFAULT 0, -- Teórico calculado por sistema
-    amount_counted DECIMAL(15,2), -- Real contado por usuario
-    amount_diff DECIMAL(15,2), -- Descuadre
+    amount_initial BIGINT DEFAULT 0, -- Fondo de caja - stored in cents
+    amount_system BIGINT DEFAULT 0, -- Teórico calculado por sistema - stored in cents
+    amount_counted BIGINT, -- Real contado por usuario - stored in cents
+    amount_diff BIGINT, -- Descuadre - stored in cents
     
     status VARCHAR(20) DEFAULT 'OPEN',
     z_count INT, -- Número de informe Z
@@ -407,7 +407,7 @@ CREATE TABLE cash_movements (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     shift_id UUID NOT NULL REFERENCES shifts(id),
     type VARCHAR(20) NOT NULL, -- DROP (Retirada), FLOAT (Ingreso)
-    amount DECIMAL(15,2) NOT NULL,
+    amount BIGINT NOT NULL, -- stored in cents
     reason TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -451,11 +451,11 @@ CREATE TABLE sales (
     sync_batch_id UUID,
     is_offline BOOLEAN DEFAULT FALSE,
     
-    -- Totales
-    total_net DECIMAL(15,2) DEFAULT 0, -- Base Imponible
-    total_tax DECIMAL(15,2) DEFAULT 0, -- Cuota IVA
-    total_surcharge DECIMAL(15,2) DEFAULT 0, -- Cuota Recargo
-    total_amount DECIMAL(15,2) DEFAULT 0, -- Total a Pagar
+    -- Totales (stored in cents)
+    total_net BIGINT DEFAULT 0, -- Base Imponible - stored in cents
+    total_tax BIGINT DEFAULT 0, -- Cuota IVA - stored in cents
+    total_surcharge BIGINT DEFAULT 0, -- Cuota Recargo - stored in cents
+    total_amount BIGINT DEFAULT 0, -- Total a Pagar - stored in cents
     
     -- Enlaces Rectificativas (Factura de Abono)
     original_sale_uuid UUID REFERENCES sales(uuid),
@@ -472,9 +472,9 @@ CREATE TABLE sales (
     UNIQUE(store_id, full_reference),
     UNIQUE(device_id, series, number), -- Unicidad estricta por serie/número
     
-    -- VALIDACIÓN MATEMÁTICA (Integridad de Datos)
+    -- VALIDACIÓN MATEMÁTICA (Integridad de Datos) - using cents (tolerance of 1 cent)
     CONSTRAINT chk_sales_totals CHECK (
-        ABS(total_amount - (total_net + total_tax + total_surcharge)) < 0.05
+        ABS(total_amount - (total_net + total_tax + total_surcharge)) <= 1
     ),
     -- LÓGICA DE ABONO
     CONSTRAINT chk_credit_note_logic CHECK (
@@ -491,21 +491,21 @@ CREATE TABLE sale_lines (
     description VARCHAR(255) NOT NULL, -- Nombre del producto en el momento de venta
     
     quantity DECIMAL(15,3) NOT NULL,
-    unit_price DECIMAL(15,4) NOT NULL, -- Precio unitario
+    unit_price BIGINT NOT NULL, -- Precio unitario - stored in cents
     
     discount_percent DECIMAL(5,2) DEFAULT 0,
-    discount_amount DECIMAL(15,2) DEFAULT 0,
+    discount_amount BIGINT DEFAULT 0, -- stored in cents
     
     -- Desglose Impuestos Línea
     tax_id BIGINT REFERENCES taxes(id),
     tax_rate DECIMAL(10,4) NOT NULL,
-    tax_amount DECIMAL(15,4) NOT NULL,
+    tax_amount BIGINT NOT NULL, -- stored in cents
     
-    total_line DECIMAL(15,2) NOT NULL,
+    total_line BIGINT NOT NULL, -- stored in cents
     pricing_context JSONB, -- Traza de por qué se aplicó este precio (oferta, tarifa, etc)
     
     CONSTRAINT chk_line_totals CHECK (
-        ABS(total_line - ((quantity * unit_price) - discount_amount + tax_amount)) < 0.05
+        ABS(total_line - ((quantity * unit_price) - discount_amount + tax_amount)) <= quantity::DECIMAL
     )
 );
 
@@ -517,10 +517,10 @@ CREATE TABLE sale_taxes (
     
     tax_name VARCHAR(100) NOT NULL,
     tax_rate DECIMAL(10,4) NOT NULL,
-    taxable_base DECIMAL(15,2) NOT NULL,
-    tax_amount DECIMAL(15,2) NOT NULL,
+    taxable_base BIGINT NOT NULL, -- stored in cents
+    tax_amount BIGINT NOT NULL, -- stored in cents
     surcharge_rate DECIMAL(10,4) DEFAULT 0,
-    surcharge_amount DECIMAL(15,2) DEFAULT 0,
+    surcharge_amount BIGINT DEFAULT 0, -- stored in cents
     
     UNIQUE(sale_uuid, tax_rate, surcharge_rate) -- Evita duplicados por tipo impositivo
 );
@@ -532,7 +532,7 @@ CREATE TABLE payments (
     sale_uuid UUID NOT NULL REFERENCES sales(uuid) ON DELETE RESTRICT,
     
     payment_method_id BIGINT REFERENCES payment_methods(id) ON DELETE RESTRICT,
-    amount DECIMAL(15,2) NOT NULL,
+    amount BIGINT NOT NULL, -- stored in cents
     currency VARCHAR(3) DEFAULT 'EUR',
     exchange_rate DECIMAL(10,4) DEFAULT 1,
     
@@ -570,7 +570,7 @@ CREATE TABLE fiscal_audit_log (
     certification_reference VARCHAR(100),
     
     -- Datos Auditados
-    invoice_amount DECIMAL(15,2) NOT NULL,
+    invoice_amount BIGINT NOT NULL, -- stored in cents
     invoice_date TIMESTAMPTZ NOT NULL,
     
     -- Comunicación AEAT
@@ -609,8 +609,8 @@ CREATE TABLE accounting_entry_lines (
     id BIGSERIAL PRIMARY KEY,
     entry_id BIGINT REFERENCES accounting_entries(id) ON DELETE CASCADE,
     account_code VARCHAR(20) NOT NULL, -- Ej: '430000', '700000'
-    debit DECIMAL(15,2) DEFAULT 0, -- Debe
-    credit DECIMAL(15,2) DEFAULT 0, -- Haber
+    debit BIGINT DEFAULT 0, -- Debe - stored in cents
+    credit BIGINT DEFAULT 0, -- Haber - stored in cents
     
     -- Regla Contable: Una línea va al Debe O al Haber, no ambos (o cero)
     CONSTRAINT chk_debit_credit_exclusive CHECK (

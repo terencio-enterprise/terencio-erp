@@ -20,6 +20,7 @@ public class DataInitializer implements CommandLineRunner {
 
     private final UserPort userPort;
     private final PasswordEncoder passwordEncoder;
+    @SuppressWarnings("unused") // Injection dependency to ensure Flyway runs first
     private final FlywayMigrationInitializer flywayInitializer;
 
     // Default IDs from seed data in migration file (lines 697-704)

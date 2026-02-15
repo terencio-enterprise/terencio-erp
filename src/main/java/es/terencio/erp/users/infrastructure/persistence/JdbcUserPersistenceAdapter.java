@@ -67,7 +67,10 @@ public class JdbcUserPersistenceAdapter implements UserPort {
                 .param("pinHash", pinHash).param("passwordHash", passwordHash)
                 .param("companyId", companyId).param("storeId", storeId)
                 .param("permissionsJson", permissionsJson).update(keyHolder);
-        return (Long) keyHolder.getKeys().get("id");
+
+        @SuppressWarnings("null")
+        Long generatedId = (Long) keyHolder.getKeys().get("id");
+        return generatedId;
     }
 
     @Override
