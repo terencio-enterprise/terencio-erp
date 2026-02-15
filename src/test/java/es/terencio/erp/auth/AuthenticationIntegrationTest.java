@@ -52,10 +52,7 @@ class AuthenticationIntegrationTest extends AbstractIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        // Clean up any existing test data
-        jdbcClient.sql("DELETE FROM users").update();
-        jdbcClient.sql("DELETE FROM stores").update();
-        jdbcClient.sql("DELETE FROM companies").update();
+        cleanDatabase();
 
         // Create test company
         testCompanyId = UUID.randomUUID();
@@ -161,10 +158,12 @@ class AuthenticationIntegrationTest extends AbstractIntegrationTest {
         LoginRequest loginRequest = new LoginRequest("admin", "wrongpassword");
 
         // When
-        ResponseEntity<LoginResponse> response = restTemplate.postForEntity(
+        ResponseEntity<ApiResponse<LoginResponse>> response = restTemplate.exchange(
                 "/api/v1/auth/login",
-                loginRequest,
-                LoginResponse.class);
+                HttpMethod.POST,
+                new HttpEntity<>(loginRequest),
+                new ParameterizedTypeReference<ApiResponse<LoginResponse>>() {
+                });
 
         // Then
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
@@ -176,10 +175,12 @@ class AuthenticationIntegrationTest extends AbstractIntegrationTest {
         LoginRequest loginRequest = new LoginRequest("nonexistent", "password");
 
         // When
-        ResponseEntity<LoginResponse> response = restTemplate.postForEntity(
+        ResponseEntity<ApiResponse<LoginResponse>> response = restTemplate.exchange(
                 "/api/v1/auth/login",
-                loginRequest,
-                LoginResponse.class);
+                HttpMethod.POST,
+                new HttpEntity<>(loginRequest),
+                new ParameterizedTypeReference<ApiResponse<LoginResponse>>() {
+                });
 
         // Then
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);

@@ -2,6 +2,7 @@ package es.terencio.erp.devices;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.List;
 import java.util.UUID;
 
 import org.junit.jupiter.api.AfterEach;
@@ -10,6 +11,7 @@ import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.web.client.TestRestTemplate;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -22,10 +24,12 @@ import es.terencio.erp.AbstractIntegrationTest;
 import es.terencio.erp.auth.application.dto.LoginRequest;
 import es.terencio.erp.auth.application.dto.LoginResponse;
 import es.terencio.erp.devices.application.dto.DeviceContextDto;
+import es.terencio.erp.devices.application.dto.DeviceDto;
 import es.terencio.erp.devices.application.dto.GenerateCodeRequest;
 import es.terencio.erp.devices.application.dto.GeneratedCodeDto;
 import es.terencio.erp.devices.application.dto.SetupPreviewDto;
 import es.terencio.erp.devices.application.dto.SetupResultDto;
+import es.terencio.erp.shared.presentation.ApiResponse;
 
 /**
  * Integration test for the complete device registration flow.
@@ -56,6 +60,8 @@ class DeviceRegistrationIntegrationTest extends AbstractIntegrationTest {
 
     @BeforeEach
     void setUp() {
+        cleanDatabase();
+
         // Create test company
         testCompanyId = UUID.randomUUID();
         jdbcClient.sql("""
@@ -123,23 +129,24 @@ class DeviceRegistrationIntegrationTest extends AbstractIntegrationTest {
 
         // Authenticate as admin and get JWT token
         LoginRequest loginRequest = new LoginRequest("admindev", "admin123");
-        ResponseEntity<LoginResponse> loginResponse = restTemplate.postForEntity(
+        ResponseEntity<ApiResponse<LoginResponse>> loginResponse = restTemplate.exchange(
                 "/api/v1/auth/login",
-                loginRequest,
-                LoginResponse.class);
+                HttpMethod.POST,
+                new HttpEntity<>(loginRequest),
+                new ParameterizedTypeReference<ApiResponse<LoginResponse>>() {
+                });
 
         assertThat(loginResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(loginResponse.getBody()).isNotNull();
-        adminToken = loginResponse.getBody().token();
+        assertThat(loginResponse.getBody().isSuccess()).isTrue();
+        adminToken = loginResponse.getBody().getData().token();
         assertThat(adminToken).isNotBlank();
     }
 
     @AfterEach
     void cleanup() {
-        // Use TRUNCATE CASCADE to automatically handle all foreign key constraints
-        jdbcClient.sql(
-                "TRUNCATE TABLE devices, registration_codes, users, store_settings, warehouses, stores, companies CASCADE")
-                .update();
+        // Cleanup is handled by @BeforeEach cleanDatabase() in the next test
+        // No need for explicit @AfterEach cleanup
     }
 
     @Test
@@ -157,27 +164,34 @@ class DeviceRegistrationIntegrationTest extends AbstractIntegrationTest {
         adminHeaders.setBearerAuth(adminToken);
         HttpEntity<GenerateCodeRequest> codeRequestEntity = new HttpEntity<>(codeRequest, adminHeaders);
 
-        ResponseEntity<GeneratedCodeDto> codeResponse = restTemplate.exchange(
+        ResponseEntity<ApiResponse<GeneratedCodeDto>> codeResponse = restTemplate.exchange(
                 "/api/v1/admin/devices/generate-code",
                 HttpMethod.POST,
                 codeRequestEntity,
-                GeneratedCodeDto.class);
+                new ParameterizedTypeReference<ApiResponse<GeneratedCodeDto>>() {
+                });
 
         assertThat(codeResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(codeResponse.getBody()).isNotNull();
-        String registrationCode = codeResponse.getBody().code();
+        assertThat(codeResponse.getBody().isSuccess()).isTrue();
+        String registrationCode = codeResponse.getBody().getData().code();
         assertThat(registrationCode).isNotBlank();
 
         // ============================================================
         // Step 2: Public client calls previewSetup
         // ============================================================
-        ResponseEntity<SetupPreviewDto> previewResponse = restTemplate.getForEntity(
+        ResponseEntity<ApiResponse<SetupPreviewDto>> previewResponse = restTemplate.exchange(
                 "/api/v1/public/devices/preview/" + registrationCode,
-                SetupPreviewDto.class);
+                HttpMethod.GET,
+                null,
+                new ParameterizedTypeReference<ApiResponse<SetupPreviewDto>>() {
+                });
 
         assertThat(previewResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(previewResponse.getBody()).isNotNull();
-        SetupPreviewDto preview = previewResponse.getBody();
+        assertThat(previewResponse.getBody().isSuccess()).isTrue();
+
+        SetupPreviewDto preview = previewResponse.getBody().getData();
         assertThat(preview.storeName()).isEqualTo("Test Store Madrid");
         assertThat(preview.users()).hasSize(2);
         assertThat(preview.users()).extracting("username").contains("cashier1", "manager1");
@@ -188,14 +202,18 @@ class DeviceRegistrationIntegrationTest extends AbstractIntegrationTest {
         String hardwareId = "TEST-HARDWARE-" + UUID.randomUUID();
         String confirmUrl = "/api/v1/public/devices/confirm/" + registrationCode + "?hardwareId=" + hardwareId;
 
-        ResponseEntity<SetupResultDto> setupResponse = restTemplate.postForEntity(
+        ResponseEntity<ApiResponse<SetupResultDto>> setupResponse = restTemplate.exchange(
                 confirmUrl,
+                HttpMethod.POST,
                 null,
-                SetupResultDto.class);
+                new ParameterizedTypeReference<ApiResponse<SetupResultDto>>() {
+                });
 
         assertThat(setupResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(setupResponse.getBody()).isNotNull();
-        SetupResultDto setup = setupResponse.getBody();
+        assertThat(setupResponse.getBody().isSuccess()).isTrue();
+
+        SetupResultDto setup = setupResponse.getBody().getData();
         assertThat(setup.apiKey()).isNotBlank();
         UUID deviceId = setup.deviceId();
         String apiKey = setup.apiKey();
@@ -207,19 +225,21 @@ class DeviceRegistrationIntegrationTest extends AbstractIntegrationTest {
         headers.set("X-API-Key", apiKey);
         HttpEntity<Void> entity = new HttpEntity<>(headers);
 
-        ResponseEntity<DeviceContextDto> contextResponse = restTemplate.exchange(
+        ResponseEntity<ApiResponse<DeviceContextDto>> contextResponse = restTemplate.exchange(
                 "/api/v1/pos/sync/context",
                 HttpMethod.GET,
                 entity,
-                DeviceContextDto.class);
+                new ParameterizedTypeReference<ApiResponse<DeviceContextDto>>() {
+                });
 
         assertThat(contextResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(contextResponse.getBody()).isNotNull();
+        assertThat(contextResponse.getBody().isSuccess()).isTrue();
 
         // ============================================================
         // Step 5: Assert that the context returns the correct Store and Users
         // ============================================================
-        DeviceContextDto context = contextResponse.getBody();
+        DeviceContextDto context = contextResponse.getBody().getData();
 
         // Verify Store information
         assertThat(context.store()).isNotNull();
@@ -265,11 +285,12 @@ class DeviceRegistrationIntegrationTest extends AbstractIntegrationTest {
         headers.set("X-API-Key", "fake-api-key");
         HttpEntity<Void> entity = new HttpEntity<>(headers);
 
-        ResponseEntity<DeviceContextDto> contextResponse = restTemplate.exchange(
+        ResponseEntity<ApiResponse<DeviceContextDto>> contextResponse = restTemplate.exchange(
                 "/api/v1/pos/sync/context",
                 HttpMethod.GET,
                 entity,
-                DeviceContextDto.class);
+                new ParameterizedTypeReference<ApiResponse<DeviceContextDto>>() {
+                });
 
         // Should return 401 Unauthorized because the API key is invalid
         assertThat(contextResponse.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
@@ -278,9 +299,12 @@ class DeviceRegistrationIntegrationTest extends AbstractIntegrationTest {
     @Test
     void testInvalidCodePreview() {
         // Try to preview with invalid code
-        ResponseEntity<SetupPreviewDto> response = restTemplate.getForEntity(
+        ResponseEntity<ApiResponse<SetupPreviewDto>> response = restTemplate.exchange(
                 "/api/v1/public/devices/preview/INVALID999",
-                SetupPreviewDto.class);
+                HttpMethod.GET,
+                null,
+                new ParameterizedTypeReference<ApiResponse<SetupPreviewDto>>() {
+                });
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
     }
@@ -297,25 +321,37 @@ class DeviceRegistrationIntegrationTest extends AbstractIntegrationTest {
         adminHeaders.setBearerAuth(adminToken);
         HttpEntity<GenerateCodeRequest> codeRequestEntity = new HttpEntity<>(codeRequest, adminHeaders);
 
-        ResponseEntity<GeneratedCodeDto> codeResponse = restTemplate.exchange(
+        ResponseEntity<ApiResponse<GeneratedCodeDto>> codeResponse = restTemplate.exchange(
                 "/api/v1/admin/devices/generate-code",
                 HttpMethod.POST,
                 codeRequestEntity,
-                GeneratedCodeDto.class);
+                new ParameterizedTypeReference<ApiResponse<GeneratedCodeDto>>() {
+                });
 
         assertThat(codeResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
-        String code = codeResponse.getBody().code();
+        String code = codeResponse.getBody().getData().code();
 
         // Use the code once
         String hardwareId1 = "HW-001";
         String confirmUrl1 = "/api/v1/public/devices/confirm/" + code + "?hardwareId=" + hardwareId1;
-        ResponseEntity<SetupResultDto> setup1 = restTemplate.postForEntity(confirmUrl1, null, SetupResultDto.class);
+        ResponseEntity<ApiResponse<SetupResultDto>> setup1 = restTemplate.exchange(
+                confirmUrl1,
+                HttpMethod.POST,
+                null,
+                new ParameterizedTypeReference<ApiResponse<SetupResultDto>>() {
+                });
         assertThat(setup1.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(setup1.getBody().isSuccess()).isTrue();
 
         // Try to use the same code again
         String hardwareId2 = "HW-002";
         String confirmUrl2 = "/api/v1/public/devices/confirm/" + code + "?hardwareId=" + hardwareId2;
-        ResponseEntity<SetupResultDto> setup2 = restTemplate.postForEntity(confirmUrl2, null, SetupResultDto.class);
+        ResponseEntity<ApiResponse<SetupResultDto>> setup2 = restTemplate.exchange(
+                confirmUrl2,
+                HttpMethod.POST,
+                null,
+                new ParameterizedTypeReference<ApiResponse<SetupResultDto>>() {
+                });
 
         // Should fail because code is already used
         assertThat(setup2.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
@@ -329,48 +365,57 @@ class DeviceRegistrationIntegrationTest extends AbstractIntegrationTest {
         adminHeaders.setBearerAuth(adminToken);
         HttpEntity<GenerateCodeRequest> codeRequestEntity = new HttpEntity<>(codeRequest, adminHeaders);
 
-        ResponseEntity<GeneratedCodeDto> codeResponse = restTemplate.exchange(
+        ResponseEntity<ApiResponse<GeneratedCodeDto>> codeResponse = restTemplate.exchange(
                 "/api/v1/admin/devices/generate-code",
                 HttpMethod.POST,
                 codeRequestEntity,
-                GeneratedCodeDto.class);
+                new ParameterizedTypeReference<ApiResponse<GeneratedCodeDto>>() {
+                });
 
-        String code = codeResponse.getBody().code();
+        String code = codeResponse.getBody().getData().code();
         String hardwareId = "HW-BLOCK-TEST";
         String confirmUrl = "/api/v1/public/devices/confirm/" + code + "?hardwareId=" + hardwareId;
 
-        ResponseEntity<SetupResultDto> setupResponse = restTemplate.postForEntity(
-                confirmUrl, null, SetupResultDto.class);
+        ResponseEntity<ApiResponse<SetupResultDto>> setupResponse = restTemplate.exchange(
+                confirmUrl,
+                HttpMethod.POST,
+                null,
+                new ParameterizedTypeReference<ApiResponse<SetupResultDto>>() {
+                });
         assertThat(setupResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
 
-        UUID deviceId = setupResponse.getBody().deviceId();
-        String apiKey = setupResponse.getBody().apiKey();
+        UUID deviceId = setupResponse.getBody().getData().deviceId();
+        String apiKey = setupResponse.getBody().getData().apiKey();
 
         // Verify device can sync initially
         HttpHeaders headers = new HttpHeaders();
         headers.set("X-API-Key", apiKey);
-        ResponseEntity<DeviceContextDto> contextResponse1 = restTemplate.exchange(
+        ResponseEntity<ApiResponse<DeviceContextDto>> contextResponse1 = restTemplate.exchange(
                 "/api/v1/pos/sync/context",
                 HttpMethod.GET,
                 new HttpEntity<>(headers),
-                DeviceContextDto.class);
+                new ParameterizedTypeReference<ApiResponse<DeviceContextDto>>() {
+                });
         assertThat(contextResponse1.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(contextResponse1.getBody().isSuccess()).isTrue();
 
         // Block the device
         HttpEntity<Void> blockRequest = new HttpEntity<>(adminHeaders);
-        ResponseEntity<Void> blockResponse = restTemplate.exchange(
+        ResponseEntity<ApiResponse<Void>> blockResponse = restTemplate.exchange(
                 "/api/v1/admin/devices/" + deviceId + "/block",
                 HttpMethod.PUT,
                 blockRequest,
-                Void.class);
+                new ParameterizedTypeReference<ApiResponse<Void>>() {
+                });
         assertThat(blockResponse.getStatusCode()).isIn(HttpStatus.OK, HttpStatus.NO_CONTENT);
 
         // Try to sync with blocked device - should fail
-        ResponseEntity<DeviceContextDto> contextResponse2 = restTemplate.exchange(
+        ResponseEntity<ApiResponse<DeviceContextDto>> contextResponse2 = restTemplate.exchange(
                 "/api/v1/pos/sync/context",
                 HttpMethod.GET,
                 new HttpEntity<>(headers),
-                DeviceContextDto.class);
+                new ParameterizedTypeReference<ApiResponse<DeviceContextDto>>() {
+                });
         assertThat(contextResponse2.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
     }
 
@@ -381,14 +426,16 @@ class DeviceRegistrationIntegrationTest extends AbstractIntegrationTest {
         adminHeaders.setBearerAuth(adminToken);
         HttpEntity<Void> requestEntity = new HttpEntity<>(adminHeaders);
 
-        ResponseEntity<String> response = restTemplate.exchange(
+        ResponseEntity<ApiResponse<List<DeviceDto>>> response = restTemplate.exchange(
                 "/api/v1/admin/devices",
                 HttpMethod.GET,
                 requestEntity,
-                String.class);
+                new ParameterizedTypeReference<ApiResponse<List<DeviceDto>>>() {
+                });
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().isSuccess()).isTrue();
     }
 
     @Test
@@ -403,16 +450,18 @@ class DeviceRegistrationIntegrationTest extends AbstractIntegrationTest {
         adminHeaders.setBearerAuth(adminToken);
         HttpEntity<GenerateCodeRequest> requestEntity = new HttpEntity<>(codeRequest, adminHeaders);
 
-        ResponseEntity<GeneratedCodeDto> response = restTemplate.exchange(
+        ResponseEntity<ApiResponse<GeneratedCodeDto>> response = restTemplate.exchange(
                 "/api/v1/admin/devices/generate-code",
                 HttpMethod.POST,
                 requestEntity,
-                GeneratedCodeDto.class);
+                new ParameterizedTypeReference<ApiResponse<GeneratedCodeDto>>() {
+                });
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).isNotNull();
-        assertThat(response.getBody().code()).isNotBlank();
-        assertThat(response.getBody().posName()).isEqualTo("Long Validity POS");
+        assertThat(response.getBody().isSuccess()).isTrue();
+        assertThat(response.getBody().getData().code()).isNotBlank();
+        assertThat(response.getBody().getData().posName()).isEqualTo("Long Validity POS");
     }
 
     @Test
@@ -424,10 +473,12 @@ class DeviceRegistrationIntegrationTest extends AbstractIntegrationTest {
                 "Unauthorized POS",
                 24);
 
-        ResponseEntity<GeneratedCodeDto> response = restTemplate.postForEntity(
+        ResponseEntity<ApiResponse<GeneratedCodeDto>> response = restTemplate.exchange(
                 "/api/v1/admin/devices/generate-code",
-                codeRequest,
-                GeneratedCodeDto.class);
+                HttpMethod.POST,
+                new HttpEntity<>(codeRequest),
+                new ParameterizedTypeReference<ApiResponse<GeneratedCodeDto>>() {
+                });
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
     }

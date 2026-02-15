@@ -38,14 +38,7 @@ class InventoryIntegrationTest extends AbstractIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        // Clean test data
-        jdbcClient.sql("DELETE FROM stock_movements").update();
-        jdbcClient.sql("DELETE FROM inventory_stock").update();
-        jdbcClient.sql("DELETE FROM products").update();
-        jdbcClient.sql("DELETE FROM taxes").update();
-        jdbcClient.sql("DELETE FROM warehouses").update();
-        jdbcClient.sql("DELETE FROM stores").update();
-        jdbcClient.sql("DELETE FROM companies").update();
+        cleanDatabase();
 
         // Create test company
         testCompanyId = UUID.randomUUID();

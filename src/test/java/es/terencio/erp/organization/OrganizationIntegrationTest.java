@@ -37,11 +37,7 @@ class OrganizationIntegrationTest extends AbstractIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        // Clean test data
-        jdbcClient.sql("DELETE FROM store_settings").update();
-        jdbcClient.sql("DELETE FROM warehouses").update();
-        jdbcClient.sql("DELETE FROM stores").update();
-        jdbcClient.sql("DELETE FROM companies").update();
+        cleanDatabase();
     }
 
     @Test

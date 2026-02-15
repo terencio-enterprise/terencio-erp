@@ -38,13 +38,7 @@ class CrmIntegrationTest extends AbstractIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        // Clean test data
-        jdbcClient.sql("DELETE FROM customer_product_prices").update();
-        jdbcClient.sql("DELETE FROM customers").update();
-        jdbcClient.sql("DELETE FROM products").update();
-        jdbcClient.sql("DELETE FROM taxes").update();
-        jdbcClient.sql("DELETE FROM tariffs").update();
-        jdbcClient.sql("DELETE FROM companies").update();
+        cleanDatabase();
 
         // Create test company
         testCompanyId = UUID.randomUUID();
