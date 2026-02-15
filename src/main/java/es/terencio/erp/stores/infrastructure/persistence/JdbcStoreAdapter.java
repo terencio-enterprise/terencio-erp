@@ -21,14 +21,14 @@ public class JdbcStoreAdapter implements StorePort {
 
     @Override
     public List<StoreDto> findAll() {
-        return jdbcClient.sql("SELECT id, code, name, address, tax_id, is_active FROM stores ORDER BY name")
+        return jdbcClient.sql("SELECT id, code, name, address, NULL as tax_id, is_active FROM stores ORDER BY name")
                 .query(StoreDto.class)
                 .list();
     }
 
     @Override
     public Optional<StoreDto> findById(UUID id) {
-        return jdbcClient.sql("SELECT id, code, name, address, tax_id, is_active FROM stores WHERE id = :id")
+        return jdbcClient.sql("SELECT id, code, name, address, NULL as tax_id, is_active FROM stores WHERE id = :id")
                 .param("id", id)
                 .query(StoreDto.class)
                 .optional();
@@ -36,7 +36,8 @@ public class JdbcStoreAdapter implements StorePort {
 
     @Override
     public Optional<StoreDto> findByCode(String code) {
-        return jdbcClient.sql("SELECT id, code, name, address, tax_id, is_active FROM stores WHERE code = :code")
+        return jdbcClient
+                .sql("SELECT id, code, name, address, NULL as tax_id, is_active FROM stores WHERE code = :code")
                 .param("code", code)
                 .query(StoreDto.class)
                 .optional();
@@ -45,14 +46,13 @@ public class JdbcStoreAdapter implements StorePort {
     @Override
     public void save(StoreDto store) {
         jdbcClient.sql("""
-                INSERT INTO stores (id, code, name, address, tax_id, is_active, created_at, updated_at)
-                VALUES (:id, :code, :name, :address, :taxId, :isActive, NOW(), NOW())
+                INSERT INTO stores (id, code, name, address, is_active, created_at, updated_at)
+                VALUES (:id, :code, :name, :address, :isActive, NOW(), NOW())
                 """)
                 .param("id", store.id())
                 .param("code", store.code())
                 .param("name", store.name())
                 .param("address", store.address())
-                .param("taxId", store.taxId())
                 .param("isActive", store.isActive())
                 .update();
     }
@@ -60,8 +60,8 @@ public class JdbcStoreAdapter implements StorePort {
     @Override
     public void update(StoreDto store) {
         jdbcClient.sql("""
-                UPDATE stores 
-                SET code = :code, name = :name, address = :address, tax_id = :taxId, 
+                UPDATE stores
+                SET code = :code, name = :name, address = :address,
                     is_active = :isActive, updated_at = NOW()
                 WHERE id = :id
                 """)
@@ -69,7 +69,6 @@ public class JdbcStoreAdapter implements StorePort {
                 .param("code", store.code())
                 .param("name", store.name())
                 .param("address", store.address())
-                .param("taxId", store.taxId())
                 .param("isActive", store.isActive())
                 .update();
     }
@@ -81,7 +80,8 @@ public class JdbcStoreAdapter implements StorePort {
                 .query(Integer.class)
                 .single();
 
-        Integer deviceCount = jdbcClient.sql("SELECT COUNT(*) FROM devices WHERE store_id = :id AND status != 'INACTIVE'")
+        Integer deviceCount = jdbcClient
+                .sql("SELECT COUNT(*) FROM devices WHERE store_id = :id AND status != 'INACTIVE'")
                 .param("id", id)
                 .query(Integer.class)
                 .single();

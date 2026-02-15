@@ -29,7 +29,7 @@ import jakarta.servlet.http.HttpServletResponse;
 @Component
 public class DeviceApiKeyFilter extends OncePerRequestFilter {
 
-    private static final String API_KEY_HEADER = "X-Device-API-Key";
+    private static final String API_KEY_HEADER = "X-API-Key";
 
     private final DeviceApiKeyGenerator apiKeyGenerator;
     private final DataSource dataSource;
@@ -63,7 +63,21 @@ public class DeviceApiKeyFilter extends OncePerRequestFilter {
 
             // Load device from database
             DeviceInfo deviceInfo = loadDeviceInfo(deviceId);
-            if (deviceInfo == null || !"ACTIVE".equals(deviceInfo.status)) {
+            if (deviceInfo == null) {
+                filterChain.doFilter(request, response);
+                return;
+            }
+
+            // Check if device is blocked - return 403 immediately
+            if ("BLOCKED".equals(deviceInfo.status)) {
+                response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                response.setContentType("application/json");
+                response.getWriter().write("{\"error\":\"Device is blocked\"}");
+                return;
+            }
+
+            // If device is not ACTIVE, just continue without authentication
+            if (!"ACTIVE".equals(deviceInfo.status)) {
                 filterChain.doFilter(request, response);
                 return;
             }
@@ -131,7 +145,7 @@ public class DeviceApiKeyFilter extends OncePerRequestFilter {
         try (Connection conn = dataSource.getConnection();
                 PreparedStatement stmt = conn.prepareStatement(sql)) {
 
-            stmt.setObject(1, Instant.now());
+            stmt.setTimestamp(1, java.sql.Timestamp.from(Instant.now()));
             stmt.setObject(2, deviceId);
             stmt.executeUpdate();
 

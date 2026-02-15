@@ -48,7 +48,8 @@ public class JdbcUserPersistenceAdapter implements UserPort {
 
     @Override
     public List<UserDto> findByStoreId(UUID storeId) {
-        return jdbcClient.sql("SELECT * FROM users WHERE store_id = :storeId AND is_active = TRUE ORDER BY username")
+        return jdbcClient.sql(
+                "SELECT * FROM users WHERE store_id = :storeId AND is_active = TRUE AND role != 'ADMIN' ORDER BY username")
                 .param("storeId", storeId).query((rs, rowNum) -> mapRow(rs)).list();
     }
 
@@ -57,7 +58,7 @@ public class JdbcUserPersistenceAdapter implements UserPort {
         return jdbcClient.sql("""
                 SELECT id, username, full_name, role, pin_hash
                 FROM users
-                WHERE store_id = :storeId AND is_active = TRUE
+                WHERE store_id = :storeId AND is_active = TRUE AND role != 'ADMIN'
                 ORDER BY username
                 """)
                 .param("storeId", storeId)

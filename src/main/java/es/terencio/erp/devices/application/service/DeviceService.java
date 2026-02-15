@@ -20,6 +20,7 @@ import es.terencio.erp.devices.application.port.in.SetupDeviceUseCase;
 import es.terencio.erp.devices.application.port.out.DevicePort;
 import es.terencio.erp.shared.domain.SerialGenerator;
 import es.terencio.erp.shared.exception.RegistrationException;
+import es.terencio.erp.shared.exception.ResourceNotFoundException;
 import es.terencio.erp.users.application.port.out.UserPort;
 
 @Service
@@ -79,7 +80,8 @@ public class DeviceService implements ManageDevicesUseCase, SetupDeviceUseCase {
 
     @Override
     public SetupPreviewDto previewSetup(String code) {
-        var info = devicePort.findByCode(code).orElseThrow(() -> new RegistrationException("Invalid code"));
+        var info = devicePort.findByCode(code)
+                .orElseThrow(() -> new ResourceNotFoundException("Registration code not found"));
         validateCode(info);
 
         // Load users associated with this store
@@ -96,7 +98,8 @@ public class DeviceService implements ManageDevicesUseCase, SetupDeviceUseCase {
     @Override
     @Transactional
     public SetupResultDto confirmSetup(String code, String hardwareId) {
-        var info = devicePort.findByCode(code).orElseThrow(() -> new RegistrationException("Invalid code"));
+        var info = devicePort.findByCode(code)
+                .orElseThrow(() -> new ResourceNotFoundException("Registration code not found"));
         validateCode(info);
 
         // Generate device-specific secret

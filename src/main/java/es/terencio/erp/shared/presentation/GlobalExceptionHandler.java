@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import es.terencio.erp.shared.exception.DomainException;
 import es.terencio.erp.shared.exception.RegistrationException;
+import es.terencio.erp.shared.exception.ResourceNotFoundException;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -22,6 +23,17 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j // Adds the 'log' object automatically (Lombok)
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    @ExceptionHandler(ResourceNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleResourceNotFoundException(ResourceNotFoundException ex) {
+        log.warn("Resource not found: {}", ex.getMessage());
+
+        ErrorResponse error = new ErrorResponse(
+                HttpStatus.NOT_FOUND.value(),
+                ex.getMessage(),
+                Instant.now());
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
+    }
 
     @ExceptionHandler(RegistrationException.class)
     public ResponseEntity<ErrorResponse> handleRegistrationException(RegistrationException ex) {

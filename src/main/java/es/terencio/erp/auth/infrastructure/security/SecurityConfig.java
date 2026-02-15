@@ -43,8 +43,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         // Public endpoints
                         .requestMatchers("/api/v1/auth/**").permitAll()
-                        .requestMatchers("/api/v1/pos/registration/**").permitAll()
-                        .requestMatchers("/api/v1/devices/setup/**").permitAll()
+                        .requestMatchers("/api/v1/public/**").permitAll()
                         .requestMatchers("/actuator/**").permitAll()
                         // Secure endpoints
                         .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
