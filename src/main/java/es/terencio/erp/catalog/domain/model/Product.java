@@ -1,13 +1,13 @@
 package es.terencio.erp.catalog.domain.model;
 
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.util.UUID;
+
 import es.terencio.erp.shared.domain.exception.InvariantViolationException;
 import es.terencio.erp.shared.domain.identifier.CompanyId;
 import es.terencio.erp.shared.domain.identifier.ProductId;
 import es.terencio.erp.shared.domain.valueobject.Money;
-
-import java.math.BigDecimal;
-import java.time.Instant;
-import java.util.UUID;
 
 /**
  * Product aggregate root.
@@ -59,8 +59,7 @@ public class Product {
             Instant updatedAt,
             long version) {
 
-        if (id == null)
-            throw new InvariantViolationException("Product ID cannot be null");
+        // Note: id can be null for new products (will be assigned by persistence)
         if (uuid == null)
             throw new InvariantViolationException("Product UUID cannot be null");
         if (companyId == null)

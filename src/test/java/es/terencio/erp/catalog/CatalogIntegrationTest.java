@@ -254,7 +254,7 @@ class CatalogIntegrationTest extends AbstractIntegrationTest {
 
         // When
         ResponseEntity<Map[]> response = restTemplate.getForEntity(
-                "/api/v1/catalog/products/" + productId + "/prices",
+                "/api/v1/catalog/products/" + productId + "/prices?companyId=" + testCompanyId,
                 Map[].class);
 
         // Then
