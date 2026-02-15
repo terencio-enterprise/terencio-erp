@@ -1051,16 +1051,16 @@ VALUES ('22222222-2222-2222-2222-222222222222', '11111111-1111-1111-1111-1111111
 INSERT INTO warehouses (company_id, store_id, name)
 VALUES ('11111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-222222222222', 'Main Warehouse');
 
--- 4. Create Super Admin
-INSERT INTO users (company_id, store_id, username, password_hash, full_name, role)
-VALUES (
-    '11111111-1111-1111-1111-111111111111', 
-    '22222222-2222-2222-2222-222222222222', 
-    'admin', 
-    '$2a$10$X7V.jO.vj.j.j.j.j.j.j.j.j.j.j', -- Dummy BCrypt
-    'System Administrator', 
-    'SUPER_ADMIN'
-);
+-- 4. Create Super Admin (Handled by DataInitializer instead)
+-- INSERT INTO users (company_id, store_id, username, password_hash, full_name, role)
+-- VALUES (
+--     '11111111-1111-1111-1111-111111111111', 
+--     '22222222-2222-2222-2222-222222222222', 
+--     'admin', 
+--     '$2a$10$X7V.jO.vj.j.j.j.j.j.j.j.j.j.j', -- Dummy BCrypt
+--     'System Administrator', 
+--     'SUPER_ADMIN'
+-- );
 
 -- 5. Seed Document Types
 INSERT INTO document_types (code, name, description) VALUES

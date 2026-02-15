@@ -31,7 +31,9 @@ public class UserService implements ManageUsersUseCase {
     }
 
     @Override
-    public List<UserDto> listAll() { return userPort.findAll(); }
+    public List<UserDto> listAll() {
+        return userPort.findAll();
+    }
 
     @Override
     public UserDto getById(Long id) {
@@ -46,9 +48,11 @@ public class UserService implements ManageUsersUseCase {
         }
         String pinHash = passwordEncoder.encode(request.posPin());
         String passwordHash = passwordEncoder.encode(request.backofficePassword());
-        String permissionsJson = toJson(request.permissions() != null ? request.permissions() : Collections.emptyList());
+        String permissionsJson = toJson(
+                request.permissions() != null ? request.permissions() : Collections.emptyList());
 
-        Long id = userPort.save(request.username(), request.fullName(), request.role(), pinHash, passwordHash, request.storeId(), permissionsJson);
+        Long id = userPort.save(request.username(), request.fullName(), request.role(), pinHash, passwordHash,
+                request.companyId(), request.storeId(), permissionsJson);
         return getById(id);
     }
 
@@ -56,7 +60,8 @@ public class UserService implements ManageUsersUseCase {
     @Transactional
     public UserDto update(Long id, UpdateUserRequest request) {
         getById(id);
-        String permissionsJson = toJson(request.permissions() != null ? request.permissions() : Collections.emptyList());
+        String permissionsJson = toJson(
+                request.permissions() != null ? request.permissions() : Collections.emptyList());
         userPort.update(id, request.fullName(), request.role(), request.storeId(), request.isActive(), permissionsJson);
         return getById(id);
     }

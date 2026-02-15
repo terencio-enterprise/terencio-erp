@@ -9,11 +9,12 @@ import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 public record CreateUserRequest(
-    @NotBlank String username,
-    @NotBlank @Size(min = 6, max = 6) @Pattern(regexp = "\\d+") String posPin,
-    @NotBlank @Size(min = 8) String backofficePassword,
-    @NotBlank String fullName,
-    @NotBlank String role,
-    @NotNull UUID storeId,
-    List<String> permissions
-) {}
+        @NotBlank String username,
+        @NotBlank @Size(min = 6, max = 6) @Pattern(regexp = "\\d+") String posPin,
+        @NotBlank @Size(min = 8) String backofficePassword,
+        @NotBlank String fullName,
+        @NotBlank String role,
+        @NotNull UUID companyId,
+        UUID storeId,
+        List<String> permissions) {
+}

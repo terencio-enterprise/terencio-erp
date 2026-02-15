@@ -5,25 +5,32 @@ import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.boot.autoconfigure.flyway.FlywayMigrationInitializer;
+import org.springframework.context.annotation.DependsOn;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
 import es.terencio.erp.users.application.port.out.UserPort;
 
 @Component
+@DependsOn("flywayInitializer")
 public class DataInitializer implements CommandLineRunner {
 
     private static final Logger log = LoggerFactory.getLogger(DataInitializer.class);
 
     private final UserPort userPort;
     private final PasswordEncoder passwordEncoder;
+    private final FlywayMigrationInitializer flywayInitializer;
 
-    // Default store ID from V2__registration_system.sql migration
-    private static final UUID DEFAULT_STORE_ID = UUID.fromString("a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11");
+    // Default IDs from seed data in migration file (lines 697-704)
+    private static final UUID DEFAULT_COMPANY_ID = UUID.fromString("11111111-1111-1111-1111-111111111111");
+    private static final UUID DEFAULT_STORE_ID = UUID.fromString("22222222-2222-2222-2222-222222222222");
 
-    public DataInitializer(UserPort userPort, PasswordEncoder passwordEncoder) {
+    public DataInitializer(UserPort userPort, PasswordEncoder passwordEncoder,
+            FlywayMigrationInitializer flywayInitializer) {
         this.userPort = userPort;
         this.passwordEncoder = passwordEncoder;
+        this.flywayInitializer = flywayInitializer;
     }
 
     @Override
@@ -44,6 +51,7 @@ public class DataInitializer implements CommandLineRunner {
                     "ADMIN",
                     pinHash,
                     passwordHash,
+                    DEFAULT_COMPANY_ID,
                     DEFAULT_STORE_ID,
                     "[]" // Empty permissions JSON
             );
