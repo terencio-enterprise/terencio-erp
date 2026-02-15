@@ -20,7 +20,7 @@ public class CustomUserDetailsService implements UserDetailsService {
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
         String sql = """
-                    SELECT id, uuid, username, password_hash, role, store_id
+                    SELECT id, uuid, username, full_name, password_hash, role, store_id
                     FROM users
                     WHERE username = :username AND is_active = TRUE
                 """;
@@ -31,6 +31,7 @@ public class CustomUserDetailsService implements UserDetailsService {
                         rs.getLong("id"),
                         rs.getObject("uuid", UUID.class),
                         rs.getString("username"),
+                        rs.getString("full_name"),
                         rs.getString("password_hash"), // Backoffice password
                         rs.getString("role"),
                         rs.getObject("store_id", UUID.class)))

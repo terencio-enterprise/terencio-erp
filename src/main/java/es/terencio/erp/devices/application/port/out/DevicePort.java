@@ -10,6 +10,8 @@ import es.terencio.erp.devices.application.dto.DeviceDto;
 public interface DevicePort {
     List<DeviceDto> findAll();
 
+    Optional<DeviceDto> findById(UUID id);
+
     void updateStatus(UUID id, String status);
 
     // Registration Methods

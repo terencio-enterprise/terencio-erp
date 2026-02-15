@@ -5,6 +5,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import es.terencio.erp.users.application.dto.UserDto;
+import es.terencio.erp.users.application.dto.UserSyncDto;
 
 public interface UserPort {
     List<UserDto> findAll();
@@ -12,6 +13,10 @@ public interface UserPort {
     Optional<UserDto> findById(Long id);
 
     Optional<UserDto> findByUsername(String username);
+
+    List<UserDto> findByStoreId(UUID storeId);
+
+    List<UserSyncDto> findSyncDataByStoreId(UUID storeId);
 
     Long save(String username, String fullName, String role, String pinHash, String passwordHash, UUID companyId,
             UUID storeId, String permissionsJson);

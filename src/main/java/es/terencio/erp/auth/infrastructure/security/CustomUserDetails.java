@@ -15,23 +15,44 @@ public class CustomUserDetails implements UserDetails {
     private final Long id;
     private final UUID uuid;
     private final String username;
+    private final String fullName;
+    private final String role;
     @JsonIgnore
     private final String password; // This maps to pin_hash in DB
     private final Collection<? extends GrantedAuthority> authorities;
     private final UUID storeId;
 
-    public CustomUserDetails(Long id, UUID uuid, String username, String password, String role, UUID storeId) {
+    public CustomUserDetails(Long id, UUID uuid, String username, String fullName, String password, String role,
+            UUID storeId) {
         this.id = id;
         this.uuid = uuid;
         this.username = username;
+        this.fullName = fullName;
         this.password = password;
+        this.role = role;
         this.storeId = storeId;
         this.authorities = List.of(new SimpleGrantedAuthority("ROLE_" + role));
     }
 
-    public Long getId() { return id; }
-    public UUID getUuid() { return uuid; }
-    public UUID getStoreId() { return storeId; }
+    public Long getId() {
+        return id;
+    }
+
+    public UUID getUuid() {
+        return uuid;
+    }
+
+    public String getFullName() {
+        return fullName;
+    }
+
+    public String getRole() {
+        return role;
+    }
+
+    public UUID getStoreId() {
+        return storeId;
+    }
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
@@ -49,11 +70,22 @@ public class CustomUserDetails implements UserDetails {
     }
 
     @Override
-    public boolean isAccountNonExpired() { return true; }
+    public boolean isAccountNonExpired() {
+        return true;
+    }
+
     @Override
-    public boolean isAccountNonLocked() { return true; }
+    public boolean isAccountNonLocked() {
+        return true;
+    }
+
     @Override
-    public boolean isCredentialsNonExpired() { return true; }
+    public boolean isCredentialsNonExpired() {
+        return true;
+    }
+
     @Override
-    public boolean isEnabled() { return true; }
+    public boolean isEnabled() {
+        return true;
+    }
 }

@@ -1,0 +1,19 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5433/terencio_erp
+    username: terencio_admin
+    password: terencio_admin
+  
+  jpa:
+    hibernate:
+      ddl-auto: none
+  
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    clean-disabled: false
+
+logging:
+  level:
+    es.terencio.erp: DEBUG
+    org.springframework.security: DEBUG

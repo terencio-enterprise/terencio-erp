@@ -82,23 +82,8 @@ public class DeviceService implements ManageDevicesUseCase, SetupDeviceUseCase {
         var info = devicePort.findByCode(code).orElseThrow(() -> new RegistrationException("Invalid code"));
         validateCode(info);
 
-        // Load users from the existing Users Module (via UserPort adapter)
-        // Note: We might need a method in UserPort to list by store, currently
-        // findAll/findById exists.
-        // Assuming we rely on the JDBC Adapter implementation logic here or add
-        // `findByStoreId` to UserPort.
-        // For simplicity, we assume generic user loading or add the method.
-        // Let's assume we list all and filter, or cleaner: Add method to UserPort
-        // later.
-        // For now, returning empty list or adding the method to UserPort is best.
-
-        // IMPORTANT: In a real scenario, update UserPort to have findByStoreId(UUID).
-        // Since I am generating UserPort in this script too, I can update it.
-        // But for minimal conflict, I will just list all and filter in memory (not
-        // efficient but works for scaffold).
-        var storeUsers = userPort.findAll().stream()
-                .filter(u -> true) // In real app, DTO doesn't have storeId, need to fix UserDto or Port.
-                .toList();
+        // Load users associated with this store
+        var storeUsers = userPort.findByStoreId(info.storeId());
 
         return new SetupPreviewDto(
                 "POS-" + info.storeCode() + "-" + info.code(),

@@ -14,6 +14,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import es.terencio.erp.users.application.dto.UserDto;
+import es.terencio.erp.users.application.dto.UserSyncDto;
 import es.terencio.erp.users.application.port.out.UserPort;
 
 @Repository
@@ -43,6 +44,30 @@ public class JdbcUserPersistenceAdapter implements UserPort {
     public Optional<UserDto> findByUsername(String username) {
         return jdbcClient.sql("SELECT * FROM users WHERE username = :username")
                 .param("username", username).query((rs, rowNum) -> mapRow(rs)).optional();
+    }
+
+    @Override
+    public List<UserDto> findByStoreId(UUID storeId) {
+        return jdbcClient.sql("SELECT * FROM users WHERE store_id = :storeId AND is_active = TRUE ORDER BY username")
+                .param("storeId", storeId).query((rs, rowNum) -> mapRow(rs)).list();
+    }
+
+    @Override
+    public List<UserSyncDto> findSyncDataByStoreId(UUID storeId) {
+        return jdbcClient.sql("""
+                SELECT id, username, full_name, role, pin_hash
+                FROM users
+                WHERE store_id = :storeId AND is_active = TRUE
+                ORDER BY username
+                """)
+                .param("storeId", storeId)
+                .query((rs, rowNum) -> new UserSyncDto(
+                        rs.getLong("id"),
+                        rs.getString("username"),
+                        rs.getString("full_name"),
+                        rs.getString("role"),
+                        rs.getString("pin_hash")))
+                .list();
     }
 
     private UserDto mapRow(java.sql.ResultSet rs) throws java.sql.SQLException {
