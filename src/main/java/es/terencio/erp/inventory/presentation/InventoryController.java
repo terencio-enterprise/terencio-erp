@@ -23,6 +23,7 @@ import es.terencio.erp.shared.domain.identifier.CompanyId;
 import es.terencio.erp.shared.domain.identifier.ProductId;
 import es.terencio.erp.shared.domain.identifier.WarehouseId;
 import es.terencio.erp.shared.domain.valueobject.Quantity;
+import es.terencio.erp.shared.presentation.ApiResponse;
 import jakarta.validation.Valid;
 
 /**
@@ -44,7 +45,7 @@ public class InventoryController {
     }
 
     @GetMapping("/stock")
-    public ResponseEntity<List<StockResponse>> getStock(
+    public ResponseEntity<ApiResponse<List<StockResponse>>> getStock(
             @RequestParam UUID companyId,
             @RequestParam UUID warehouseId,
             @RequestParam(required = false) Long productId) {
@@ -67,11 +68,11 @@ public class InventoryController {
                         s.lastUpdatedAt()))
                 .toList();
 
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(ApiResponse.success("Stock fetched successfully", response));
     }
 
     @GetMapping("/products/{productId}/movements")
-    public ResponseEntity<List<MovementResponse>> getProductMovements(@PathVariable Long productId) {
+    public ResponseEntity<ApiResponse<List<MovementResponse>>> getProductMovements(@PathVariable Long productId) {
         List<StockMovement> movements = stockMovementRepository.findByProduct(new ProductId(productId));
 
         List<MovementResponse> response = movements.stream()
@@ -85,11 +86,12 @@ public class InventoryController {
                         m.createdAt()))
                 .toList();
 
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(ApiResponse.success("Stock movements fetched successfully", response));
     }
 
     @PostMapping("/adjustments")
-    public ResponseEntity<AdjustmentResponse> createAdjustment(@Valid @RequestBody AdjustmentRequest request) {
+    public ResponseEntity<ApiResponse<AdjustmentResponse>> createAdjustment(
+            @Valid @RequestBody AdjustmentRequest request) {
         ProductId productId = new ProductId(request.productId());
         WarehouseId warehouseId = new WarehouseId(request.warehouseId());
         CompanyId companyId = new CompanyId(request.companyId());
@@ -116,10 +118,10 @@ public class InventoryController {
         stock.adjustQuantity(adjustment);
         inventoryStockRepository.save(stock);
 
-        return ResponseEntity.ok(new AdjustmentResponse(
+        return ResponseEntity.ok(ApiResponse.success("Stock adjustment created successfully", new AdjustmentResponse(
                 productId.value(),
                 previousBalance.value(),
-                newBalance.value()));
+                newBalance.value())));
     }
 
     // ==================== RECORDS ====================

@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import es.terencio.erp.shared.presentation.ApiResponse;
 import es.terencio.erp.users.application.dto.CreateUserRequest;
 import es.terencio.erp.users.application.dto.UpdateUserRequest;
 import es.terencio.erp.users.application.dto.UserDto;
@@ -33,29 +34,43 @@ public class AdminUserController {
     }
 
     @GetMapping
-    public ResponseEntity<List<UserDto>> list() { return ResponseEntity.ok(manageUsersUseCase.listAll()); }
+    public ResponseEntity<ApiResponse<List<UserDto>>> list() {
+        return ResponseEntity.ok(ApiResponse.success("Users fetched successfully", manageUsersUseCase.listAll()));
+    }
 
     @GetMapping("/{id}")
-    public ResponseEntity<UserDto> get(@PathVariable Long id) { return ResponseEntity.ok(manageUsersUseCase.getById(id)); }
+    public ResponseEntity<ApiResponse<UserDto>> get(@PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponse.success("User fetched successfully", manageUsersUseCase.getById(id)));
+    }
 
     @PostMapping
-    public ResponseEntity<UserDto> create(@Valid @RequestBody CreateUserRequest request) { return ResponseEntity.ok(manageUsersUseCase.create(request)); }
+    public ResponseEntity<ApiResponse<UserDto>> create(@Valid @RequestBody CreateUserRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("User created successfully", manageUsersUseCase.create(request)));
+    }
 
     @PutMapping("/{id}")
-    public ResponseEntity<UserDto> update(@PathVariable Long id, @Valid @RequestBody UpdateUserRequest request) { return ResponseEntity.ok(manageUsersUseCase.update(id, request)); }
+    public ResponseEntity<ApiResponse<UserDto>> update(@PathVariable Long id,
+            @Valid @RequestBody UpdateUserRequest request) {
+        return ResponseEntity
+                .ok(ApiResponse.success("User updated successfully", manageUsersUseCase.update(id, request)));
+    }
 
     @PatchMapping("/{id}/pin")
-    public ResponseEntity<Void> changePosPin(@PathVariable Long id, @RequestBody Map<String, String> body) {
+    public ResponseEntity<ApiResponse<Void>> changePosPin(@PathVariable Long id,
+            @RequestBody Map<String, String> body) {
         manageUsersUseCase.changePosPin(id, body.get("pin"));
-        return ResponseEntity.noContent().build();
+        return ResponseEntity.ok(ApiResponse.success("POS PIN changed successfully"));
     }
 
     @PatchMapping("/{id}/password")
-    public ResponseEntity<Void> changeBackofficePassword(@PathVariable Long id, @RequestBody Map<String, String> body) {
+    public ResponseEntity<ApiResponse<Void>> changeBackofficePassword(@PathVariable Long id,
+            @RequestBody Map<String, String> body) {
         manageUsersUseCase.changeBackofficePassword(id, body.get("password"));
-        return ResponseEntity.noContent().build();
+        return ResponseEntity.ok(ApiResponse.success("Password changed successfully"));
     }
-    
+
     @GetMapping("/roles")
-    public ResponseEntity<Role[]> listRoles() { return ResponseEntity.ok(Role.values()); }
+    public ResponseEntity<ApiResponse<Role[]>> listRoles() {
+        return ResponseEntity.ok(ApiResponse.success("Roles fetched successfully", Role.values()));
+    }
 }

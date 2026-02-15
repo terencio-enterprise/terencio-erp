@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import es.terencio.erp.shared.presentation.ApiResponse;
 import es.terencio.erp.stores.application.dto.StoreDto;
 import es.terencio.erp.stores.application.port.in.ManageStoresUseCase;
 import jakarta.validation.Valid;
@@ -30,28 +31,30 @@ public class AdminStoreController {
     }
 
     @GetMapping
-    public ResponseEntity<List<StoreDto>> list() {
-        return ResponseEntity.ok(manageStoresUseCase.listAll());
+    public ResponseEntity<ApiResponse<List<StoreDto>>> list() {
+        return ResponseEntity.ok(ApiResponse.success("Stores fetched successfully", manageStoresUseCase.listAll()));
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<StoreDto> get(@PathVariable UUID id) {
-        return ResponseEntity.ok(manageStoresUseCase.getById(id));
+    public ResponseEntity<ApiResponse<StoreDto>> get(@PathVariable UUID id) {
+        return ResponseEntity.ok(ApiResponse.success("Store fetched successfully", manageStoresUseCase.getById(id)));
     }
 
     @PostMapping
-    public ResponseEntity<StoreDto> create(@Valid @RequestBody StoreDto request) {
-        return ResponseEntity.ok(manageStoresUseCase.create(request));
+    public ResponseEntity<ApiResponse<StoreDto>> create(@Valid @RequestBody StoreDto request) {
+        return ResponseEntity
+                .ok(ApiResponse.success("Store created successfully", manageStoresUseCase.create(request)));
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<StoreDto> update(@PathVariable UUID id, @Valid @RequestBody StoreDto request) {
-        return ResponseEntity.ok(manageStoresUseCase.update(id, request));
+    public ResponseEntity<ApiResponse<StoreDto>> update(@PathVariable UUID id, @Valid @RequestBody StoreDto request) {
+        return ResponseEntity
+                .ok(ApiResponse.success("Store updated successfully", manageStoresUseCase.update(id, request)));
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@PathVariable UUID id) {
+    public ResponseEntity<ApiResponse<Void>> delete(@PathVariable UUID id) {
         manageStoresUseCase.delete(id);
-        return ResponseEntity.noContent().build();
+        return ResponseEntity.ok(ApiResponse.success("Store deleted successfully"));
     }
 }

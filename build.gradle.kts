@@ -17,6 +17,14 @@ repositories {
     mavenCentral()
 }
 
+extra["testcontainersVersion"] = "1.20.4"
+
+dependencyManagement {
+    imports {
+        mavenBom("org.testcontainers:testcontainers-bom:${property("testcontainersVersion")}")
+    }
+}
+
 dependencies {
     // 1. WEB & VALIDATION
     implementation("org.springframework.boot:spring-boot-starter-web")

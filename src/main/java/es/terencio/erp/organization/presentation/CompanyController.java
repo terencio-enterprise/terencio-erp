@@ -21,6 +21,7 @@ import es.terencio.erp.organization.application.usecase.UpdateFiscalSettingsResu
 import es.terencio.erp.organization.application.usecase.UpdateFiscalSettingsService;
 import es.terencio.erp.organization.domain.model.Company;
 import es.terencio.erp.shared.domain.identifier.CompanyId;
+import es.terencio.erp.shared.presentation.ApiResponse;
 import jakarta.validation.Valid;
 
 /**
@@ -45,17 +46,18 @@ public class CompanyController {
     }
 
     @PostMapping
-    public ResponseEntity<CreateCompanyResult> createCompany(@Valid @RequestBody CreateCompanyCommand command) {
+    public ResponseEntity<ApiResponse<CreateCompanyResult>> createCompany(
+            @Valid @RequestBody CreateCompanyCommand command) {
         CreateCompanyResult result = createCompanyUseCase.execute(command);
-        return ResponseEntity.ok(result);
+        return ResponseEntity.ok(ApiResponse.success("Company created successfully", result));
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<CompanyResponse> getCompany(@PathVariable UUID id) {
+    public ResponseEntity<ApiResponse<CompanyResponse>> getCompany(@PathVariable UUID id) {
         Company company = companyRepository.findById(new CompanyId(id))
                 .orElseThrow(() -> new RuntimeException("Company not found"));
 
-        return ResponseEntity.ok(new CompanyResponse(
+        return ResponseEntity.ok(ApiResponse.success("Company fetched successfully", new CompanyResponse(
                 company.id().value(),
                 company.name(),
                 company.taxId().value(),
@@ -63,15 +65,15 @@ public class CompanyController {
                 company.fiscalRegime().name(),
                 company.priceIncludesTax(),
                 company.roundingMode().name(),
-                company.isActive()));
+                company.isActive())));
     }
 
     @PutMapping("/{id}/fiscal-settings")
-    public ResponseEntity<UpdateFiscalSettingsResult> updateFiscalSettings(
+    public ResponseEntity<ApiResponse<UpdateFiscalSettingsResult>> updateFiscalSettings(
             @PathVariable UUID id,
             @Valid @RequestBody UpdateFiscalSettingsCommand command) {
         UpdateFiscalSettingsResult result = updateFiscalSettingsService.execute(id, command);
-        return ResponseEntity.ok(result);
+        return ResponseEntity.ok(ApiResponse.success("Fiscal settings updated successfully", result));
     }
 
     public record CompanyResponse(

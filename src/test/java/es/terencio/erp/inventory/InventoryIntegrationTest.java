@@ -3,6 +3,7 @@ package es.terencio.erp.inventory;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -10,11 +11,15 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.web.client.TestRestTemplate;
+import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.simple.JdbcClient;
 
 import es.terencio.erp.AbstractIntegrationTest;
+import es.terencio.erp.shared.presentation.ApiResponse;
 
 /**
  * Integration tests for Inventory module (Stock movements, Stock projections).
@@ -106,16 +111,20 @@ class InventoryIntegrationTest extends AbstractIntegrationTest {
                 "reason", "Initial inventory");
 
         // When
-        ResponseEntity<Map> response = restTemplate.postForEntity(
+        ResponseEntity<ApiResponse<Map>> response = restTemplate.exchange(
                 "/api/v1/inventory/adjustments",
-                adjustmentRequest,
-                Map.class);
+                HttpMethod.POST,
+                new HttpEntity<>(adjustmentRequest),
+                new ParameterizedTypeReference<ApiResponse<Map>>() {
+                });
 
         // Then
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).isNotNull();
-        assertThat(response.getBody().get("previousBalance")).isEqualTo(0.0);
-        assertThat(response.getBody().get("newBalance")).isEqualTo(100.0);
+        assertThat(response.getBody().isSuccess()).isTrue();
+        Map result = response.getBody().getData();
+        assertThat(result.get("previousBalance")).isEqualTo(0.0);
+        assertThat(result.get("newBalance")).isEqualTo(100.0);
 
         // Verify stock movement created
         Integer movementCount = jdbcClient.sql("""
@@ -146,15 +155,21 @@ class InventoryIntegrationTest extends AbstractIntegrationTest {
         initializeStock(testProductId, testWarehouseId, new BigDecimal("50.00"));
 
         // When
-        ResponseEntity<Map[]> response = restTemplate.getForEntity(
+        ResponseEntity<ApiResponse<List<Map>>> response = restTemplate.exchange(
                 "/api/v1/inventory/stock?companyId=" + testCompanyId +
                         "&warehouseId=" + testWarehouseId,
-                Map[].class);
+                HttpMethod.GET,
+                null,
+                new ParameterizedTypeReference<ApiResponse<List<Map>>>() {
+                });
 
         // Then
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(response.getBody()).hasSize(1);
-        assertThat(response.getBody()[0].get("quantityOnHand")).isEqualTo(50.0);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().isSuccess()).isTrue();
+        List<Map> stock = response.getBody().getData();
+        assertThat(stock).hasSize(1);
+        assertThat(stock.get(0).get("quantityOnHand")).isEqualTo(50.0);
     }
 
     @Test
@@ -165,18 +180,24 @@ class InventoryIntegrationTest extends AbstractIntegrationTest {
         createMovement(testProductId, new BigDecimal("5.00"), "RETURN", "Return");
 
         // When
-        ResponseEntity<Map[]> response = restTemplate.getForEntity(
+        ResponseEntity<ApiResponse<List<Map>>> response = restTemplate.exchange(
                 "/api/v1/inventory/products/" + testProductId + "/movements",
-                Map[].class);
+                HttpMethod.GET,
+                null,
+                new ParameterizedTypeReference<ApiResponse<List<Map>>>() {
+                });
 
         // Then
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(response.getBody()).hasSize(3);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().isSuccess()).isTrue();
+        List<Map> movements = response.getBody().getData();
+        assertThat(movements).hasSize(3);
 
         // Verify order (newest first)
-        assertThat(response.getBody()[0].get("type")).isEqualTo("RETURN");
-        assertThat(response.getBody()[1].get("type")).isEqualTo("SALE");
-        assertThat(response.getBody()[2].get("type")).isEqualTo("ADJUSTMENT");
+        assertThat(movements.get(0).get("type")).isEqualTo("RETURN");
+        assertThat(movements.get(1).get("type")).isEqualTo("SALE");
+        assertThat(movements.get(2).get("type")).isEqualTo("ADJUSTMENT");
     }
 
     @Test
@@ -192,15 +213,20 @@ class InventoryIntegrationTest extends AbstractIntegrationTest {
                 "adjustmentQuantity", new BigDecimal("-30.00"),
                 "reason", "Breakage");
 
-        ResponseEntity<Map> response = restTemplate.postForEntity(
+        ResponseEntity<ApiResponse<Map>> response = restTemplate.exchange(
                 "/api/v1/inventory/adjustments",
-                adjustmentRequest,
-                Map.class);
+                HttpMethod.POST,
+                new HttpEntity<>(adjustmentRequest),
+                new ParameterizedTypeReference<ApiResponse<Map>>() {
+                });
 
         // Then
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(response.getBody().get("previousBalance")).isEqualTo(100.0);
-        assertThat(response.getBody().get("newBalance")).isEqualTo(70.0);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().isSuccess()).isTrue();
+        Map result = response.getBody().getData();
+        assertThat(result.get("previousBalance")).isEqualTo(100.0);
+        assertThat(result.get("newBalance")).isEqualTo(70.0);
 
         // Verify new balance in stock
         BigDecimal quantityOnHand = jdbcClient.sql("""
@@ -230,13 +256,19 @@ class InventoryIntegrationTest extends AbstractIntegrationTest {
         createMovement(testProductId, new BigDecimal("5.00"), "RETURN", "Customer return");
 
         // When
-        ResponseEntity<Map[]> response = restTemplate.getForEntity(
+        ResponseEntity<ApiResponse<List<Map>>> response = restTemplate.exchange(
                 "/api/v1/inventory/products/" + testProductId + "/movements",
-                Map[].class);
+                HttpMethod.GET,
+                null,
+                new ParameterizedTypeReference<ApiResponse<List<Map>>>() {
+                });
 
         // Then - Verify all movements recorded
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(response.getBody()).hasSize(4);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().isSuccess()).isTrue();
+        List<Map> movements = response.getBody().getData();
+        assertThat(movements).hasSize(4);
 
         // Verify final stock balance
         BigDecimal finalStock = jdbcClient.sql("""

@@ -9,6 +9,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.web.client.TestRestTemplate;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -21,6 +22,7 @@ import es.terencio.erp.AbstractIntegrationTest;
 import es.terencio.erp.auth.application.dto.LoginRequest;
 import es.terencio.erp.auth.application.dto.LoginResponse;
 import es.terencio.erp.auth.application.dto.UserInfoDto;
+import es.terencio.erp.shared.presentation.ApiResponse;
 
 /**
  * Integration test for Authentication endpoints.
@@ -50,6 +52,11 @@ class AuthenticationIntegrationTest extends AbstractIntegrationTest {
 
     @BeforeEach
     void setUp() {
+        // Clean up any existing test data
+        jdbcClient.sql("DELETE FROM users").update();
+        jdbcClient.sql("DELETE FROM stores").update();
+        jdbcClient.sql("DELETE FROM companies").update();
+
         // Create test company
         testCompanyId = UUID.randomUUID();
         jdbcClient.sql("""
@@ -121,16 +128,19 @@ class AuthenticationIntegrationTest extends AbstractIntegrationTest {
         LoginRequest loginRequest = new LoginRequest("admin", "admin123");
 
         // When
-        ResponseEntity<LoginResponse> response = restTemplate.postForEntity(
+        ResponseEntity<ApiResponse<LoginResponse>> response = restTemplate.exchange(
                 "/api/v1/auth/login",
-                loginRequest,
-                LoginResponse.class);
+                HttpMethod.POST,
+                new HttpEntity<>(loginRequest),
+                new ParameterizedTypeReference<ApiResponse<LoginResponse>>() {
+                });
 
         // Then
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().isSuccess()).isTrue();
 
-        LoginResponse loginResponse = response.getBody();
+        LoginResponse loginResponse = response.getBody().getData();
         assertThat(loginResponse.token()).isNotBlank();
         assertThat(loginResponse.username()).isEqualTo("admin");
         assertThat(loginResponse.role()).isEqualTo("ROLE_ADMIN");
@@ -179,30 +189,34 @@ class AuthenticationIntegrationTest extends AbstractIntegrationTest {
     void testGetCurrentUserWithValidToken() {
         // Given - Login first
         LoginRequest loginRequest = new LoginRequest("cashier", "cashier123");
-        ResponseEntity<LoginResponse> loginResponse = restTemplate.postForEntity(
+        ResponseEntity<ApiResponse<LoginResponse>> loginResponse = restTemplate.exchange(
                 "/api/v1/auth/login",
-                loginRequest,
-                LoginResponse.class);
+                HttpMethod.POST,
+                new HttpEntity<>(loginRequest),
+                new ParameterizedTypeReference<ApiResponse<LoginResponse>>() {
+                });
 
         assertThat(loginResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
-        String jwtToken = loginResponse.getBody().token();
+        String jwtToken = loginResponse.getBody().getData().token();
 
         // When - Get current user info with JWT cookie
         HttpHeaders headers = new HttpHeaders();
         headers.add(HttpHeaders.COOKIE, "JWT-TOKEN=" + jwtToken);
         HttpEntity<Void> entity = new HttpEntity<>(headers);
 
-        ResponseEntity<UserInfoDto> response = restTemplate.exchange(
+        ResponseEntity<ApiResponse<UserInfoDto>> response = restTemplate.exchange(
                 "/api/v1/auth/me",
                 HttpMethod.GET,
                 entity,
-                UserInfoDto.class);
+                new ParameterizedTypeReference<ApiResponse<UserInfoDto>>() {
+                });
 
         // Then
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().isSuccess()).isTrue();
 
-        UserInfoDto userInfo = response.getBody();
+        UserInfoDto userInfo = response.getBody().getData();
         assertThat(userInfo.id()).isEqualTo(cashierUserId);
         assertThat(userInfo.username()).isEqualTo("cashier");
         assertThat(userInfo.fullName()).isEqualTo("Cashier User");
@@ -215,30 +229,34 @@ class AuthenticationIntegrationTest extends AbstractIntegrationTest {
     void testGetCurrentUserWithBearerToken() {
         // Given - Login first
         LoginRequest loginRequest = new LoginRequest("manager", "manager123");
-        ResponseEntity<LoginResponse> loginResponse = restTemplate.postForEntity(
+        ResponseEntity<ApiResponse<LoginResponse>> loginResponse = restTemplate.exchange(
                 "/api/v1/auth/login",
-                loginRequest,
-                LoginResponse.class);
+                HttpMethod.POST,
+                new HttpEntity<>(loginRequest),
+                new ParameterizedTypeReference<ApiResponse<LoginResponse>>() {
+                });
 
         assertThat(loginResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
-        String jwtToken = loginResponse.getBody().token();
+        String jwtToken = loginResponse.getBody().getData().token();
 
         // When - Get current user info with Bearer token
         HttpHeaders headers = new HttpHeaders();
         headers.setBearerAuth(jwtToken);
         HttpEntity<Void> entity = new HttpEntity<>(headers);
 
-        ResponseEntity<UserInfoDto> response = restTemplate.exchange(
+        ResponseEntity<ApiResponse<UserInfoDto>> response = restTemplate.exchange(
                 "/api/v1/auth/me",
                 HttpMethod.GET,
                 entity,
-                UserInfoDto.class);
+                new ParameterizedTypeReference<ApiResponse<UserInfoDto>>() {
+                });
 
         // Then
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().isSuccess()).isTrue();
 
-        UserInfoDto userInfo = response.getBody();
+        UserInfoDto userInfo = response.getBody().getData();
         assertThat(userInfo.id()).isEqualTo(managerUserId);
         assertThat(userInfo.username()).isEqualTo("manager");
         assertThat(userInfo.role()).isEqualTo("MANAGER");
@@ -259,22 +277,27 @@ class AuthenticationIntegrationTest extends AbstractIntegrationTest {
     void testLogout() {
         // Given - Login first
         LoginRequest loginRequest = new LoginRequest("admin", "admin123");
-        ResponseEntity<LoginResponse> loginResponse = restTemplate.postForEntity(
+        ResponseEntity<ApiResponse<LoginResponse>> loginResponse = restTemplate.exchange(
                 "/api/v1/auth/login",
-                loginRequest,
-                LoginResponse.class);
+                HttpMethod.POST,
+                new HttpEntity<>(loginRequest),
+                new ParameterizedTypeReference<ApiResponse<LoginResponse>>() {
+                });
 
         assertThat(loginResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
-        String jwtToken = loginResponse.getBody().token();
 
         // When - Logout
-        ResponseEntity<Void> logoutResponse = restTemplate.postForEntity(
+        ResponseEntity<ApiResponse<Void>> logoutResponse = restTemplate.exchange(
                 "/api/v1/auth/logout",
+                HttpMethod.POST,
                 null,
-                Void.class);
+                new ParameterizedTypeReference<ApiResponse<Void>>() {
+                });
 
         // Then
         assertThat(logoutResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(logoutResponse.getBody()).isNotNull();
+        assertThat(logoutResponse.getBody().isSuccess()).isTrue();
 
         // Verify JWT cookie is cleared
         List<String> cookies = logoutResponse.getHeaders().get(HttpHeaders.SET_COOKIE);
@@ -288,21 +311,25 @@ class AuthenticationIntegrationTest extends AbstractIntegrationTest {
     void testMultipleUsersCanLoginSimultaneously() {
         // Login as admin
         LoginRequest adminLogin = new LoginRequest("admin", "admin123");
-        ResponseEntity<LoginResponse> adminResponse = restTemplate.postForEntity(
+        ResponseEntity<ApiResponse<LoginResponse>> adminResponse = restTemplate.exchange(
                 "/api/v1/auth/login",
-                adminLogin,
-                LoginResponse.class);
+                HttpMethod.POST,
+                new HttpEntity<>(adminLogin),
+                new ParameterizedTypeReference<ApiResponse<LoginResponse>>() {
+                });
         assertThat(adminResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
-        String adminToken = adminResponse.getBody().token();
+        String adminToken = adminResponse.getBody().getData().token();
 
         // Login as cashier
         LoginRequest cashierLogin = new LoginRequest("cashier", "cashier123");
-        ResponseEntity<LoginResponse> cashierResponse = restTemplate.postForEntity(
+        ResponseEntity<ApiResponse<LoginResponse>> cashierResponse = restTemplate.exchange(
                 "/api/v1/auth/login",
-                cashierLogin,
-                LoginResponse.class);
+                HttpMethod.POST,
+                new HttpEntity<>(cashierLogin),
+                new ParameterizedTypeReference<ApiResponse<LoginResponse>>() {
+                });
         assertThat(cashierResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
-        String cashierToken = cashierResponse.getBody().token();
+        String cashierToken = cashierResponse.getBody().getData().token();
 
         // Verify both tokens are different
         assertThat(adminToken).isNotEqualTo(cashierToken);
@@ -310,23 +337,25 @@ class AuthenticationIntegrationTest extends AbstractIntegrationTest {
         // Verify both tokens work
         HttpHeaders adminHeaders = new HttpHeaders();
         adminHeaders.setBearerAuth(adminToken);
-        ResponseEntity<UserInfoDto> adminMeResponse = restTemplate.exchange(
+        ResponseEntity<ApiResponse<UserInfoDto>> adminMeResponse = restTemplate.exchange(
                 "/api/v1/auth/me",
                 HttpMethod.GET,
                 new HttpEntity<>(adminHeaders),
-                UserInfoDto.class);
+                new ParameterizedTypeReference<ApiResponse<UserInfoDto>>() {
+                });
         assertThat(adminMeResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(adminMeResponse.getBody().username()).isEqualTo("admin");
+        assertThat(adminMeResponse.getBody().getData().username()).isEqualTo("admin");
 
         HttpHeaders cashierHeaders = new HttpHeaders();
         cashierHeaders.setBearerAuth(cashierToken);
-        ResponseEntity<UserInfoDto> cashierMeResponse = restTemplate.exchange(
+        ResponseEntity<ApiResponse<UserInfoDto>> cashierMeResponse = restTemplate.exchange(
                 "/api/v1/auth/me",
                 HttpMethod.GET,
                 new HttpEntity<>(cashierHeaders),
-                UserInfoDto.class);
+                new ParameterizedTypeReference<ApiResponse<UserInfoDto>>() {
+                });
         assertThat(cashierMeResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(cashierMeResponse.getBody().username()).isEqualTo("cashier");
+        assertThat(cashierMeResponse.getBody().getData().username()).isEqualTo("cashier");
     }
 
     @Test

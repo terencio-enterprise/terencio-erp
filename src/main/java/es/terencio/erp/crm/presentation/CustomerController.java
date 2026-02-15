@@ -23,6 +23,7 @@ import es.terencio.erp.shared.domain.identifier.ProductId;
 import es.terencio.erp.shared.domain.valueobject.Email;
 import es.terencio.erp.shared.domain.valueobject.Money;
 import es.terencio.erp.shared.domain.valueobject.TaxId;
+import es.terencio.erp.shared.presentation.ApiResponse;
 import jakarta.validation.Valid;
 
 /**
@@ -44,7 +45,7 @@ public class CustomerController {
     }
 
     @GetMapping
-    public ResponseEntity<List<CustomerResponse>> searchCustomers(
+    public ResponseEntity<ApiResponse<List<CustomerResponse>>> searchCustomers(
             @RequestParam UUID companyId,
             @RequestParam(required = false) String search) {
 
@@ -68,11 +69,12 @@ public class CustomerController {
                         c.creditLimit().cents()))
                 .toList();
 
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(ApiResponse.success("Customers fetched successfully", response));
     }
 
     @PostMapping
-    public ResponseEntity<CustomerResponse> createCustomer(@Valid @RequestBody CreateCustomerRequest request) {
+    public ResponseEntity<ApiResponse<CustomerResponse>> createCustomer(
+            @Valid @RequestBody CreateCustomerRequest request) {
         CompanyId companyId = new CompanyId(request.companyId());
         TaxId taxId = request.taxId() != null ? TaxId.of(request.taxId()) : null;
 
@@ -89,7 +91,7 @@ public class CustomerController {
 
         Customer saved = customerRepository.save(customer);
 
-        return ResponseEntity.ok(new CustomerResponse(
+        return ResponseEntity.ok(ApiResponse.success("Customer created successfully", new CustomerResponse(
                 saved.uuid(),
                 saved.legalName(),
                 saved.taxId() != null ? saved.taxId().value() : null,
@@ -97,11 +99,11 @@ public class CustomerController {
                 saved.phone(),
                 saved.tariffId(),
                 saved.allowCredit(),
-                saved.creditLimit().cents()));
+                saved.creditLimit().cents())));
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<CustomerResponse> updateCustomer(
+    public ResponseEntity<ApiResponse<CustomerResponse>> updateCustomer(
             @PathVariable UUID id,
             @Valid @RequestBody UpdateCustomerRequest request) {
 
@@ -119,7 +121,7 @@ public class CustomerController {
 
         Customer saved = customerRepository.save(customer);
 
-        return ResponseEntity.ok(new CustomerResponse(
+        return ResponseEntity.ok(ApiResponse.success("Customer updated successfully", new CustomerResponse(
                 saved.uuid(),
                 saved.legalName(),
                 saved.taxId() != null ? saved.taxId().value() : null,
@@ -127,11 +129,11 @@ public class CustomerController {
                 saved.phone(),
                 saved.tariffId(),
                 saved.allowCredit(),
-                saved.creditLimit().cents()));
+                saved.creditLimit().cents())));
     }
 
     @PutMapping("/{id}/commercial-terms")
-    public ResponseEntity<Void> updateCommercialTerms(
+    public ResponseEntity<ApiResponse<Void>> updateCommercialTerms(
             @PathVariable UUID id,
             @Valid @RequestBody UpdateCommercialTermsRequest request) {
 
@@ -150,11 +152,11 @@ public class CustomerController {
 
         customerRepository.save(customer);
 
-        return ResponseEntity.ok().build();
+        return ResponseEntity.ok(ApiResponse.success("Commercial terms updated successfully"));
     }
 
     @GetMapping("/{id}/special-prices")
-    public ResponseEntity<List<SpecialPriceResponse>> getSpecialPrices(@PathVariable UUID id) {
+    public ResponseEntity<ApiResponse<List<SpecialPriceResponse>>> getSpecialPrices(@PathVariable UUID id) {
         Customer customer = customerRepository.findByUuid(id)
                 .orElseThrow(() -> new RuntimeException("Customer not found"));
 
@@ -164,11 +166,11 @@ public class CustomerController {
                 .map(p -> new SpecialPriceResponse(p.productId().value(), p.customPrice().cents()))
                 .toList();
 
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(ApiResponse.success("Special prices fetched successfully", response));
     }
 
     @PutMapping("/{id}/special-prices")
-    public ResponseEntity<Void> updateSpecialPrices(
+    public ResponseEntity<ApiResponse<Void>> updateSpecialPrices(
             @PathVariable UUID id,
             @Valid @RequestBody UpdateSpecialPricesRequest request) {
 
@@ -183,7 +185,7 @@ public class CustomerController {
             customerProductPriceRepository.save(price);
         }
 
-        return ResponseEntity.ok().build();
+        return ResponseEntity.ok(ApiResponse.success("Special prices updated successfully"));
     }
 
     // ==================== RECORDS ====================

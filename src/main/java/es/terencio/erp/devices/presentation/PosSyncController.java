@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import es.terencio.erp.devices.application.dto.DeviceContextDto;
 import es.terencio.erp.devices.application.port.in.GetDeviceContextUseCase;
+import es.terencio.erp.shared.presentation.ApiResponse;
 
 /**
  * REST controller for POS device synchronization.
@@ -35,8 +36,8 @@ public class PosSyncController {
      */
     @GetMapping("/context")
     @PreAuthorize("hasRole('DEVICE')")
-    public ResponseEntity<DeviceContextDto> getContext(@AuthenticationPrincipal UUID deviceId) {
+    public ResponseEntity<ApiResponse<DeviceContextDto>> getContext(@AuthenticationPrincipal UUID deviceId) {
         DeviceContextDto context = getDeviceContextUseCase.getContext(deviceId);
-        return ResponseEntity.ok(context);
+        return ResponseEntity.ok(ApiResponse.success("Device context fetched successfully", context));
     }
 }

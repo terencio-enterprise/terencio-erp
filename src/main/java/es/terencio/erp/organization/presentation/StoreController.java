@@ -25,6 +25,7 @@ import es.terencio.erp.organization.domain.model.Store;
 import es.terencio.erp.organization.domain.model.StoreSettings;
 import es.terencio.erp.shared.domain.identifier.CompanyId;
 import es.terencio.erp.shared.domain.identifier.StoreId;
+import es.terencio.erp.shared.presentation.ApiResponse;
 import jakarta.validation.Valid;
 
 /**
@@ -52,13 +53,13 @@ public class StoreController {
     }
 
     @PostMapping
-    public ResponseEntity<CreateStoreResult> createStore(@Valid @RequestBody CreateStoreCommand command) {
+    public ResponseEntity<ApiResponse<CreateStoreResult>> createStore(@Valid @RequestBody CreateStoreCommand command) {
         CreateStoreResult result = createStoreUseCase.execute(command);
-        return ResponseEntity.ok(result);
+        return ResponseEntity.ok(ApiResponse.success("Store created successfully", result));
     }
 
     @GetMapping
-    public ResponseEntity<List<StoreResponse>> listStores(@RequestParam UUID companyId) {
+    public ResponseEntity<ApiResponse<List<StoreResponse>>> listStores(@RequestParam UUID companyId) {
         List<Store> stores = storeRepository.findByCompanyId(new CompanyId(companyId));
         List<StoreResponse> response = stores.stream()
                 .map(s -> new StoreResponse(
@@ -68,27 +69,27 @@ public class StoreController {
                         s.address() != null ? s.address().street() : null,
                         s.isActive()))
                 .toList();
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(ApiResponse.success("Stores fetched successfully", response));
     }
 
     @GetMapping("/{id}/settings")
-    public ResponseEntity<StoreSettingsResponse> getStoreSettings(@PathVariable UUID id) {
+    public ResponseEntity<ApiResponse<StoreSettingsResponse>> getStoreSettings(@PathVariable UUID id) {
         StoreSettings settings = storeSettingsRepository.findByStoreId(new StoreId(id))
                 .orElseThrow(() -> new RuntimeException("Store settings not found"));
 
-        return ResponseEntity.ok(new StoreSettingsResponse(
+        return ResponseEntity.ok(ApiResponse.success("Store settings fetched successfully", new StoreSettingsResponse(
                 settings.allowNegativeStock(),
                 settings.defaultTariffId(),
                 settings.printTicketAutomatically(),
-                settings.requireCustomerForLargeAmount().cents()));
+                settings.requireCustomerForLargeAmount().cents())));
     }
 
     @PutMapping("/{id}/settings")
-    public ResponseEntity<Void> updateStoreSettings(
+    public ResponseEntity<ApiResponse<Void>> updateStoreSettings(
             @PathVariable UUID id,
             @Valid @RequestBody UpdateStoreSettingsCommand command) {
         updateStoreSettingsUseCase.execute(command);
-        return ResponseEntity.ok().build();
+        return ResponseEntity.ok(ApiResponse.success("Store settings updated successfully"));
     }
 
     public record StoreResponse(

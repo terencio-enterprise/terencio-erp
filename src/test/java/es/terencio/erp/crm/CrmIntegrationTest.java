@@ -10,6 +10,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.web.client.TestRestTemplate;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
@@ -17,6 +18,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.simple.JdbcClient;
 
 import es.terencio.erp.AbstractIntegrationTest;
+import es.terencio.erp.shared.presentation.ApiResponse;
 
 /**
  * Integration tests for CRM module (Customers, Commercial terms, Special
@@ -102,14 +104,18 @@ class CrmIntegrationTest extends AbstractIntegrationTest {
 
         // When
         @SuppressWarnings("rawtypes")
-        ResponseEntity<Map> response = restTemplate.postForEntity(
+        ResponseEntity<ApiResponse<Map>> response = restTemplate.exchange(
                 "/api/v1/customers",
-                createRequest,
-                Map.class);
+                HttpMethod.POST,
+                new HttpEntity<>(createRequest),
+                new ParameterizedTypeReference<ApiResponse<Map>>() {
+                });
 
         // Then
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        Map<String, Object> body = response.getBody();
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().isSuccess()).isTrue();
+        Map<String, Object> body = response.getBody().getData();
         assertThat(body).isNotNull();
         assertThat(body.get("legalName")).isEqualTo("Test Customer SL");
         assertThat(body.get("taxId")).isEqualTo("B98765432");
@@ -132,13 +138,19 @@ class CrmIntegrationTest extends AbstractIntegrationTest {
 
         // When - search by name
         @SuppressWarnings("rawtypes")
-        ResponseEntity<Map[]> response = restTemplate.getForEntity(
+        ResponseEntity<ApiResponse<List<Map>>> response = restTemplate.exchange(
                 "/api/v1/customers?companyId=" + testCompanyId + "&search=Customer",
-                Map[].class);
+                HttpMethod.GET,
+                null,
+                new ParameterizedTypeReference<ApiResponse<List<Map>>>() {
+                });
 
         // Then
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(response.getBody()).hasSize(2);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().isSuccess()).isTrue();
+        List<Map> customers = response.getBody().getData();
+        assertThat(customers).hasSize(2);
     }
 
     @Test
@@ -149,13 +161,19 @@ class CrmIntegrationTest extends AbstractIntegrationTest {
 
         // When
         @SuppressWarnings("rawtypes")
-        ResponseEntity<Map[]> response = restTemplate.getForEntity(
+        ResponseEntity<ApiResponse<List<Map>>> response = restTemplate.exchange(
                 "/api/v1/customers?companyId=" + testCompanyId,
-                Map[].class);
+                HttpMethod.GET,
+                null,
+                new ParameterizedTypeReference<ApiResponse<List<Map>>>() {
+                });
 
         // Then
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(response.getBody()).hasSize(2);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().isSuccess()).isTrue();
+        List<Map> customers = response.getBody().getData();
+        assertThat(customers).hasSize(2);
     }
 
     @Test
@@ -172,15 +190,18 @@ class CrmIntegrationTest extends AbstractIntegrationTest {
 
         // When
         @SuppressWarnings("rawtypes")
-        ResponseEntity<Map> response = restTemplate.exchange(
+        ResponseEntity<ApiResponse<Map>> response = restTemplate.exchange(
                 "/api/v1/customers/" + customerId,
                 HttpMethod.PUT,
                 new HttpEntity<>(updateRequest),
-                Map.class);
+                new ParameterizedTypeReference<ApiResponse<Map>>() {
+                });
 
         // Then
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        Map<String, Object> body = response.getBody();
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().isSuccess()).isTrue();
+        Map<String, Object> body = response.getBody().getData();
         assertThat(body).isNotNull();
         assertThat(body.get("email")).isEqualTo("updated@test.com");
 
@@ -291,15 +312,20 @@ class CrmIntegrationTest extends AbstractIntegrationTest {
 
         // When
         @SuppressWarnings("rawtypes")
-        ResponseEntity<Map[]> response = restTemplate.getForEntity(
+        ResponseEntity<ApiResponse<List<Map>>> response = restTemplate.exchange(
                 "/api/v1/customers/" + customerId + "/special-prices",
-                Map[].class);
+                HttpMethod.GET,
+                null,
+                new ParameterizedTypeReference<ApiResponse<List<Map>>>() {
+                });
 
         // Then
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        Map<String, Object>[] body = response.getBody();
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().isSuccess()).isTrue();
+        List<Map> body = response.getBody().getData();
         assertThat(body).hasSize(1);
-        assertThat(body[0].get("priceCents")).isEqualTo(9000);
+        assertThat(body.get(0).get("priceCents")).isEqualTo(9000);
     }
 
     @Test
@@ -328,13 +354,19 @@ class CrmIntegrationTest extends AbstractIntegrationTest {
                 .update();
 
         // When - List customers for test company only
-        ResponseEntity<Map[]> response = restTemplate.getForEntity(
+        ResponseEntity<ApiResponse<List<Map>>> response = restTemplate.exchange(
                 "/api/v1/customers?companyId=" + testCompanyId,
-                Map[].class);
+                HttpMethod.GET,
+                null,
+                new ParameterizedTypeReference<ApiResponse<List<Map>>>() {
+                });
 
         // Then - Should only see customers from test company
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(response.getBody()).isEmpty();
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().isSuccess()).isTrue();
+        List<Map> customers = response.getBody().getData();
+        assertThat(customers).isEmpty();
     }
 
     // ==================== HELPER METHODS ====================

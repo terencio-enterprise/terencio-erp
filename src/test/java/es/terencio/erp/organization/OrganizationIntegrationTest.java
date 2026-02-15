@@ -2,6 +2,7 @@ package es.terencio.erp.organization;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -9,6 +10,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.web.client.TestRestTemplate;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
@@ -16,6 +18,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.simple.JdbcClient;
 
 import es.terencio.erp.AbstractIntegrationTest;
+import es.terencio.erp.shared.presentation.ApiResponse;
 
 /**
  * Integration tests for Organization module (Company, Store, StoreSettings).
@@ -53,18 +56,22 @@ class OrganizationIntegrationTest extends AbstractIntegrationTest {
                 "roundingMode", "LINE");
 
         // When
-        ResponseEntity<Map> response = restTemplate.postForEntity(
+        ResponseEntity<ApiResponse<Map>> response = restTemplate.exchange(
                 "/api/v1/companies",
-                createRequest,
-                Map.class);
+                HttpMethod.POST,
+                new HttpEntity<>(createRequest),
+                new ParameterizedTypeReference<ApiResponse<Map>>() {
+                });
 
         // Then
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).isNotNull();
-        assertThat(response.getBody().get("name")).isEqualTo("Test Company SA");
-        assertThat(response.getBody().get("taxId")).isEqualTo("B12345678");
+        assertThat(response.getBody().isSuccess()).isTrue();
+        Map company = response.getBody().getData();
+        assertThat(company.get("name")).isEqualTo("Test Company SA");
+        assertThat(company.get("taxId")).isEqualTo("B12345678");
 
-        UUID companyId = UUID.fromString((String) response.getBody().get("companyId"));
+        UUID companyId = UUID.fromString((String) company.get("companyId"));
 
         // Verify persistence
         Integer count = jdbcClient.sql("SELECT COUNT(*) FROM companies WHERE id = ?")
@@ -80,15 +87,20 @@ class OrganizationIntegrationTest extends AbstractIntegrationTest {
         UUID companyId = createTestCompany();
 
         // When
-        ResponseEntity<Map> response = restTemplate.getForEntity(
+        ResponseEntity<ApiResponse<Map>> response = restTemplate.exchange(
                 "/api/v1/companies/" + companyId,
-                Map.class);
+                HttpMethod.GET,
+                null,
+                new ParameterizedTypeReference<ApiResponse<Map>>() {
+                });
 
         // Then
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).isNotNull();
-        assertThat(response.getBody().get("id")).isEqualTo(companyId.toString());
-        assertThat(response.getBody().get("fiscalRegime")).isEqualTo("COMMON");
+        assertThat(response.getBody().isSuccess()).isTrue();
+        Map company = response.getBody().getData();
+        assertThat(company.get("id")).isEqualTo(companyId.toString());
+        assertThat(company.get("fiscalRegime")).isEqualTo("COMMON");
     }
 
     @Test
@@ -102,17 +114,20 @@ class OrganizationIntegrationTest extends AbstractIntegrationTest {
                 "roundingMode", "TOTAL");
 
         // When
-        ResponseEntity<Map> response = restTemplate.exchange(
+        ResponseEntity<ApiResponse<Map>> response = restTemplate.exchange(
                 "/api/v1/companies/" + companyId + "/fiscal-settings",
                 HttpMethod.PUT,
                 new HttpEntity<>(updateRequest),
-                Map.class);
+                new ParameterizedTypeReference<ApiResponse<Map>>() {
+                });
 
         // Then
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).isNotNull();
-        assertThat(response.getBody().get("fiscalRegime")).isEqualTo("SII");
-        assertThat(response.getBody().get("roundingMode")).isEqualTo("TOTAL");
+        assertThat(response.getBody().isSuccess()).isTrue();
+        Map company = response.getBody().getData();
+        assertThat(company.get("fiscalRegime")).isEqualTo("SII");
+        assertThat(company.get("roundingMode")).isEqualTo("TOTAL");
 
         // Verify persistence
         String fiscalRegime = jdbcClient.sql("SELECT fiscal_regime FROM companies WHERE id = ?")
@@ -136,18 +151,22 @@ class OrganizationIntegrationTest extends AbstractIntegrationTest {
                 "city", "Madrid");
 
         // When
-        ResponseEntity<Map> response = restTemplate.postForEntity(
+        ResponseEntity<ApiResponse<Map>> response = restTemplate.exchange(
                 "/api/v1/stores",
-                createRequest,
-                Map.class);
+                HttpMethod.POST,
+                new HttpEntity<>(createRequest),
+                new ParameterizedTypeReference<ApiResponse<Map>>() {
+                });
 
         // Then
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).isNotNull();
-        assertThat(response.getBody().get("storeCode")).isEqualTo("STORE001");
+        assertThat(response.getBody().isSuccess()).isTrue();
+        Map store = response.getBody().getData();
+        assertThat(store.get("storeCode")).isEqualTo("STORE001");
 
-        UUID storeId = UUID.fromString((String) response.getBody().get("storeId"));
-        UUID warehouseId = UUID.fromString((String) response.getBody().get("warehouseId"));
+        UUID storeId = UUID.fromString((String) store.get("storeId"));
+        UUID warehouseId = UUID.fromString((String) store.get("warehouseId"));
 
         // Verify store persistence
         Integer storeCount = jdbcClient.sql("SELECT COUNT(*) FROM stores WHERE id = ?")
@@ -179,13 +198,19 @@ class OrganizationIntegrationTest extends AbstractIntegrationTest {
         createTestStore(companyId, "STORE002", "Store Two ");
 
         // When
-        ResponseEntity<Map[]> response = restTemplate.getForEntity(
+        ResponseEntity<ApiResponse<List<Map>>> response = restTemplate.exchange(
                 "/api/v1/stores?companyId=" + companyId,
-                Map[].class);
+                HttpMethod.GET,
+                null,
+                new ParameterizedTypeReference<ApiResponse<List<Map>>>() {
+                });
 
         // Then
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(response.getBody()).hasSize(2);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().isSuccess()).isTrue();
+        List<Map> stores = response.getBody().getData();
+        assertThat(stores).hasSize(2);
     }
 
     @Test
@@ -195,15 +220,20 @@ class OrganizationIntegrationTest extends AbstractIntegrationTest {
         UUID storeId = createTestStore(companyId, "STORE001", "Test Store");
 
         // When
-        ResponseEntity<Map> response = restTemplate.getForEntity(
+        ResponseEntity<ApiResponse<Map>> response = restTemplate.exchange(
                 "/api/v1/stores/" + storeId + "/settings",
-                Map.class);
+                HttpMethod.GET,
+                null,
+                new ParameterizedTypeReference<ApiResponse<Map>>() {
+                });
 
         // Then
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).isNotNull();
-        assertThat(response.getBody().get("allowNegativeStock")).isEqualTo(false);
-        assertThat(response.getBody().get("printTicketAutomatically")).isEqualTo(true);
+        assertThat(response.getBody().isSuccess()).isTrue();
+        Map settings = response.getBody().getData();
+        assertThat(settings.get("allowNegativeStock")).isEqualTo(false);
+        assertThat(settings.get("printTicketAutomatically")).isEqualTo(true);
     }
 
     @Test

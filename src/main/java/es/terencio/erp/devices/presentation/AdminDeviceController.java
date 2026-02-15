@@ -17,6 +17,7 @@ import es.terencio.erp.devices.application.dto.DeviceDto;
 import es.terencio.erp.devices.application.dto.GenerateCodeRequest;
 import es.terencio.erp.devices.application.dto.GeneratedCodeDto;
 import es.terencio.erp.devices.application.port.in.ManageDevicesUseCase;
+import es.terencio.erp.shared.presentation.ApiResponse;
 import jakarta.validation.Valid;
 
 @RestController
@@ -31,24 +32,25 @@ public class AdminDeviceController {
     }
 
     @GetMapping
-    public ResponseEntity<List<DeviceDto>> list() {
-        return ResponseEntity.ok(manageDevicesUseCase.listAll());
+    public ResponseEntity<ApiResponse<List<DeviceDto>>> list() {
+        return ResponseEntity.ok(ApiResponse.success("Devices fetched successfully", manageDevicesUseCase.listAll()));
     }
 
     @PutMapping("/{id}/block")
-    public ResponseEntity<Void> blockDevice(@PathVariable UUID id) {
+    public ResponseEntity<ApiResponse<Void>> blockDevice(@PathVariable UUID id) {
         manageDevicesUseCase.blockDevice(id);
-        return ResponseEntity.noContent().build();
+        return ResponseEntity.ok(ApiResponse.success("Device blocked successfully"));
     }
 
     @PutMapping("/{id}/unblock")
-    public ResponseEntity<Void> unblockDevice(@PathVariable UUID id) {
+    public ResponseEntity<ApiResponse<Void>> unblockDevice(@PathVariable UUID id) {
         manageDevicesUseCase.unblockDevice(id);
-        return ResponseEntity.noContent().build();
+        return ResponseEntity.ok(ApiResponse.success("Device unblocked successfully"));
     }
 
     @PostMapping("/generate-code")
-    public ResponseEntity<GeneratedCodeDto> generateCode(@Valid @RequestBody GenerateCodeRequest request) {
-        return ResponseEntity.ok(manageDevicesUseCase.generateRegistrationCode(request));
+    public ResponseEntity<ApiResponse<GeneratedCodeDto>> generateCode(@Valid @RequestBody GenerateCodeRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("Registration code generated successfully",
+                manageDevicesUseCase.generateRegistrationCode(request)));
     }
 }

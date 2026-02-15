@@ -20,6 +20,7 @@ import es.terencio.erp.auth.application.dto.LoginResponse;
 import es.terencio.erp.auth.application.dto.UserInfoDto;
 import es.terencio.erp.auth.infrastructure.security.CustomUserDetails;
 import es.terencio.erp.auth.infrastructure.security.JwtTokenProvider;
+import es.terencio.erp.shared.presentation.ApiResponse;
 import jakarta.validation.Valid;
 
 @RestController
@@ -39,7 +40,7 @@ public class AuthController {
      * Also returns user info in response body.
      */
     @PostMapping("/login")
-    public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
+    public ResponseEntity<ApiResponse<LoginResponse>> login(@Valid @RequestBody LoginRequest request) {
         Authentication authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(request.username(), request.password()));
 
@@ -62,14 +63,14 @@ public class AuthController {
 
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, jwtCookie.toString())
-                .body(new LoginResponse(jwt, authentication.getName(), role));
+                .body(ApiResponse.success("Login successful", new LoginResponse(jwt, authentication.getName(), role)));
     }
 
     /**
      * Logout endpoint - clears JWT cookie.
      */
     @PostMapping("/logout")
-    public ResponseEntity<Void> logout() {
+    public ResponseEntity<ApiResponse<Void>> logout() {
         ResponseCookie jwtCookie = ResponseCookie.from("JWT-TOKEN", "")
                 .httpOnly(true)
                 .secure(false)
@@ -80,14 +81,15 @@ public class AuthController {
 
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, jwtCookie.toString())
-                .build();
+                .body(ApiResponse.success("Logout successful"));
     }
 
     /**
      * Get current authenticated user information.
      */
     @GetMapping("/me")
-    public ResponseEntity<UserInfoDto> getCurrentUser(@AuthenticationPrincipal CustomUserDetails userDetails) {
+    public ResponseEntity<ApiResponse<UserInfoDto>> getCurrentUser(
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
         if (userDetails == null) {
             return ResponseEntity.status(401).build();
         }
@@ -100,6 +102,6 @@ public class AuthController {
                 userDetails.getStoreId(),
                 userDetails.isEnabled());
 
-        return ResponseEntity.ok(userInfo);
+        return ResponseEntity.ok(ApiResponse.success("User info fetched successfully", userInfo));
     }
 }

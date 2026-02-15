@@ -31,6 +31,7 @@ import es.terencio.erp.catalog.infrastructure.persistence.JdbcProductPersistence
 import es.terencio.erp.shared.domain.identifier.CompanyId;
 import es.terencio.erp.shared.domain.identifier.ProductId;
 import es.terencio.erp.shared.domain.valueobject.Money;
+import es.terencio.erp.shared.presentation.ApiResponse;
 import jakarta.validation.Valid;
 
 /**
@@ -66,37 +67,39 @@ public class CatalogController {
     // ==================== TAX ENDPOINTS ====================
 
     @GetMapping("/taxes")
-    public ResponseEntity<List<TaxResponse>> listTaxes(@RequestParam UUID companyId) {
+    public ResponseEntity<ApiResponse<List<TaxResponse>>> listTaxes(@RequestParam UUID companyId) {
         List<Tax> taxes = taxRepository.findByCompanyId(new CompanyId(companyId));
         List<TaxResponse> response = taxes.stream()
                 .map(t -> new TaxResponse(t.id(), t.name(), t.rate().rate(), t.surcharge().rate()))
                 .toList();
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(ApiResponse.success("Taxes fetched successfully", response));
     }
 
     // ==================== CATEGORY ENDPOINTS ====================
 
     @GetMapping("/categories")
-    public ResponseEntity<List<CategoryResponse>> listCategories(@RequestParam UUID companyId) {
+    public ResponseEntity<ApiResponse<List<CategoryResponse>>> listCategories(@RequestParam UUID companyId) {
         List<Category> categories = categoryRepository.findByCompanyId(new CompanyId(companyId));
         List<CategoryResponse> response = categories.stream()
                 .map(c -> new CategoryResponse(c.id(), c.parentId(), c.name(), c.color(), c.isActive()))
                 .toList();
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(ApiResponse.success("Categories fetched successfully", response));
     }
 
     @PostMapping("/categories")
-    public ResponseEntity<CategoryResponse> createCategory(@Valid @RequestBody CreateCategoryRequest request) {
+    public ResponseEntity<ApiResponse<CategoryResponse>> createCategory(
+            @Valid @RequestBody CreateCategoryRequest request) {
         Category category = Category.create(new CompanyId(request.companyId()), request.name());
         Category saved = categoryRepository.save(category);
         return ResponseEntity
-                .ok(new CategoryResponse(saved.id(), saved.parentId(), saved.name(), saved.color(), saved.isActive()));
+                .ok(ApiResponse.success("Category created successfully", new CategoryResponse(saved.id(),
+                        saved.parentId(), saved.name(), saved.color(), saved.isActive())));
     }
 
     // ==================== PRODUCT ENDPOINTS ====================
 
     @GetMapping("/products")
-    public ResponseEntity<List<ProductResponse>> searchProducts(
+    public ResponseEntity<ApiResponse<List<ProductResponse>>> searchProducts(
             @RequestParam UUID companyId,
             @RequestParam(required = false) String name,
             @RequestParam(required = false) String reference,
@@ -119,11 +122,12 @@ public class CatalogController {
                         p.isActive()))
                 .toList();
 
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(ApiResponse.success("Products fetched successfully", response));
     }
 
     @PostMapping("/products")
-    public ResponseEntity<ProductResponse> createProduct(@Valid @RequestBody CreateProductRequest request) {
+    public ResponseEntity<ApiResponse<ProductResponse>> createProduct(
+            @Valid @RequestBody CreateProductRequest request) {
         CompanyId companyId = new CompanyId(request.companyId());
 
         if (productRepository.existsByCompanyAndReference(companyId, request.reference())) {
@@ -139,7 +143,7 @@ public class CatalogController {
 
         Product saved = productRepository.save(product);
 
-        return ResponseEntity.ok(new ProductResponse(
+        return ResponseEntity.ok(ApiResponse.success("Product created successfully", new ProductResponse(
                 saved.id().value(),
                 saved.reference(),
                 saved.name(),
@@ -147,11 +151,11 @@ public class CatalogController {
                 saved.categoryId(),
                 saved.taxId(),
                 saved.type().name(),
-                saved.isActive()));
+                saved.isActive())));
     }
 
     @PutMapping("/products/{id}")
-    public ResponseEntity<ProductResponse> updateProduct(
+    public ResponseEntity<ApiResponse<ProductResponse>> updateProduct(
             @PathVariable Long id,
             @Valid @RequestBody UpdateProductRequest request) {
 
@@ -166,7 +170,7 @@ public class CatalogController {
 
         Product saved = productRepository.save(product);
 
-        return ResponseEntity.ok(new ProductResponse(
+        return ResponseEntity.ok(ApiResponse.success("Product updated successfully", new ProductResponse(
                 saved.id().value(),
                 saved.reference(),
                 saved.name(),
@@ -174,11 +178,11 @@ public class CatalogController {
                 saved.categoryId(),
                 saved.taxId(),
                 saved.type().name(),
-                saved.isActive()));
+                saved.isActive())));
     }
 
     @GetMapping("/products/{id}/prices")
-    public ResponseEntity<List<ProductPriceResponse>> getProductPrices(
+    public ResponseEntity<ApiResponse<List<ProductPriceResponse>>> getProductPrices(
             @PathVariable Long id,
             @RequestParam UUID companyId) {
         // Get all tariffs and check prices for each
@@ -191,11 +195,11 @@ public class CatalogController {
         List<ProductPriceResponse> response = prices.stream()
                 .map(p -> new ProductPriceResponse(p.tariffId(), p.price().cents()))
                 .toList();
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(ApiResponse.success("Product prices fetched successfully", response));
     }
 
     @PutMapping("/products/{id}/prices")
-    public ResponseEntity<Void> updateProductPrices(
+    public ResponseEntity<ApiResponse<Void>> updateProductPrices(
             @PathVariable Long id,
             @Valid @RequestBody UpdateProductPricesRequest request) {
 
@@ -209,18 +213,18 @@ public class CatalogController {
             productPriceRepository.save(price);
         }
 
-        return ResponseEntity.ok().build();
+        return ResponseEntity.ok(ApiResponse.success("Product prices updated successfully"));
     }
 
     // ==================== TARIFF ENDPOINTS ====================
 
     @GetMapping("/tariffs")
-    public ResponseEntity<List<TariffResponse>> listTariffs(@RequestParam UUID companyId) {
+    public ResponseEntity<ApiResponse<List<TariffResponse>>> listTariffs(@RequestParam UUID companyId) {
         List<Tariff> tariffs = tariffRepository.findByCompanyId(new CompanyId(companyId));
         List<TariffResponse> response = tariffs.stream()
                 .map(t -> new TariffResponse(t.id(), t.name(), t.priceType(), t.isDefault()))
                 .toList();
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(ApiResponse.success("Tariffs fetched successfully", response));
     }
 
     // ==================== RECORDS ====================

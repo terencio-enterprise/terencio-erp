@@ -10,6 +10,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.web.client.TestRestTemplate;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
@@ -17,6 +18,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.simple.JdbcClient;
 
 import es.terencio.erp.AbstractIntegrationTest;
+import es.terencio.erp.shared.presentation.ApiResponse;
 
 /**
  * Integration tests for Catalog module (Products, Categories, Taxes, Tariffs,
@@ -67,15 +69,21 @@ class CatalogIntegrationTest extends AbstractIntegrationTest {
     @Test
     void shouldListTaxes() {
         // When
-        ResponseEntity<Map[]> response = restTemplate.getForEntity(
+        ResponseEntity<ApiResponse<List<Map>>> response = restTemplate.exchange(
                 "/api/v1/catalog/taxes?companyId=" + testCompanyId,
-                Map[].class);
+                HttpMethod.GET,
+                null,
+                new ParameterizedTypeReference<ApiResponse<List<Map>>>() {
+                });
 
         // Then
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(response.getBody()).hasSize(1);
-        assertThat(response.getBody()[0].get("name")).isEqualTo("IVA 21%");
-        assertThat(response.getBody()[0].get("rate")).isEqualTo(21.0);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().isSuccess()).isTrue();
+        List<Map> taxes = response.getBody().getData();
+        assertThat(taxes).hasSize(1);
+        assertThat(taxes.get(0).get("name")).isEqualTo("IVA 21%");
+        assertThat(taxes.get(0).get("rate")).isEqualTo(21.0);
     }
 
     @Test
@@ -86,15 +94,19 @@ class CatalogIntegrationTest extends AbstractIntegrationTest {
                 "name", "Electronics");
 
         // When
-        ResponseEntity<Map> response = restTemplate.postForEntity(
+        ResponseEntity<ApiResponse<Map>> response = restTemplate.exchange(
                 "/api/v1/catalog/categories",
-                createRequest,
-                Map.class);
+                HttpMethod.POST,
+                new HttpEntity<>(createRequest),
+                new ParameterizedTypeReference<ApiResponse<Map>>() {
+                });
 
         // Then
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).isNotNull();
-        assertThat(response.getBody().get("name")).isEqualTo("Electronics");
+        assertThat(response.getBody().isSuccess()).isTrue();
+        Map category = response.getBody().getData();
+        assertThat(category.get("name")).isEqualTo("Electronics");
 
         // Verify persistence
         Integer count = jdbcClient.sql("SELECT COUNT(*) FROM categories WHERE company_id = ?")
@@ -111,13 +123,19 @@ class CatalogIntegrationTest extends AbstractIntegrationTest {
         createTestCategory("Category B");
 
         // When
-        ResponseEntity<Map[]> response = restTemplate.getForEntity(
+        ResponseEntity<ApiResponse<List<Map>>> response = restTemplate.exchange(
                 "/api/v1/catalog/categories?companyId=" + testCompanyId,
-                Map[].class);
+                HttpMethod.GET,
+                null,
+                new ParameterizedTypeReference<ApiResponse<List<Map>>>() {
+                });
 
         // Then
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(response.getBody()).hasSize(2);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().isSuccess()).isTrue();
+        List<Map> categories = response.getBody().getData();
+        assertThat(categories).hasSize(2);
     }
 
     @Test
@@ -134,16 +152,20 @@ class CatalogIntegrationTest extends AbstractIntegrationTest {
                 "type", "PRODUCT");
 
         // When
-        ResponseEntity<Map> response = restTemplate.postForEntity(
+        ResponseEntity<ApiResponse<Map>> response = restTemplate.exchange(
                 "/api/v1/catalog/products",
-                createRequest,
-                Map.class);
+                HttpMethod.POST,
+                new HttpEntity<>(createRequest),
+                new ParameterizedTypeReference<ApiResponse<Map>>() {
+                });
 
         // Then
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).isNotNull();
-        assertThat(response.getBody().get("reference")).isEqualTo("PROD001");
-        assertThat(response.getBody().get("name")).isEqualTo("Test Product");
+        assertThat(response.getBody().isSuccess()).isTrue();
+        Map product = response.getBody().getData();
+        assertThat(product.get("reference")).isEqualTo("PROD001");
+        assertThat(product.get("name")).isEqualTo("Test Product");
 
         // Verify persistence
         Integer count = jdbcClient.sql("SELECT COUNT(*) FROM products WHERE reference = ?")
@@ -161,13 +183,19 @@ class CatalogIntegrationTest extends AbstractIntegrationTest {
         createTestProduct("PROD003", "Mouse Logitech");
 
         // When - search by name
-        ResponseEntity<Map[]> response = restTemplate.getForEntity(
+        ResponseEntity<ApiResponse<List<Map>>> response = restTemplate.exchange(
                 "/api/v1/catalog/products?companyId=" + testCompanyId + "&name=Laptop",
-                Map[].class);
+                HttpMethod.GET,
+                null,
+                new ParameterizedTypeReference<ApiResponse<List<Map>>>() {
+                });
 
         // Then
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(response.getBody()).hasSize(2);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().isSuccess()).isTrue();
+        List<Map> products = response.getBody().getData();
+        assertThat(products).hasSize(2);
     }
 
     @Test
@@ -181,15 +209,19 @@ class CatalogIntegrationTest extends AbstractIntegrationTest {
                 "description", "Updated description");
 
         // When
-        ResponseEntity<Map> response = restTemplate.exchange(
+        ResponseEntity<ApiResponse<Map>> response = restTemplate.exchange(
                 "/api/v1/catalog/products/" + productId,
                 HttpMethod.PUT,
                 new HttpEntity<>(updateRequest),
-                Map.class);
+                new ParameterizedTypeReference<ApiResponse<Map>>() {
+                });
 
         // Then
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(response.getBody().get("name")).isEqualTo("Updated Product Name");
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().isSuccess()).isTrue();
+        Map product = response.getBody().getData();
+        assertThat(product.get("name")).isEqualTo("Updated Product Name");
 
         // Verify persistence
         String name = jdbcClient.sql("SELECT name FROM products WHERE id = ?")
@@ -206,13 +238,19 @@ class CatalogIntegrationTest extends AbstractIntegrationTest {
         createTestTariff("Wholesale", false);
 
         // When
-        ResponseEntity<Map[]> response = restTemplate.getForEntity(
+        ResponseEntity<ApiResponse<List<Map>>> response = restTemplate.exchange(
                 "/api/v1/catalog/tariffs?companyId=" + testCompanyId,
-                Map[].class);
+                HttpMethod.GET,
+                null,
+                new ParameterizedTypeReference<ApiResponse<List<Map>>>() {
+                });
 
         // Then
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(response.getBody()).hasSize(2);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().isSuccess()).isTrue();
+        List<Map> tariffs = response.getBody().getData();
+        assertThat(tariffs).hasSize(2);
     }
 
     @Test
@@ -253,14 +291,20 @@ class CatalogIntegrationTest extends AbstractIntegrationTest {
         createTestProductPrice(productId, tariffId, 15000L);
 
         // When
-        ResponseEntity<Map[]> response = restTemplate.getForEntity(
+        ResponseEntity<ApiResponse<List<Map>>> response = restTemplate.exchange(
                 "/api/v1/catalog/products/" + productId + "/prices?companyId=" + testCompanyId,
-                Map[].class);
+                HttpMethod.GET,
+                null,
+                new ParameterizedTypeReference<ApiResponse<List<Map>>>() {
+                });
 
         // Then
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(response.getBody()).hasSize(1);
-        assertThat(response.getBody()[0].get("priceCents")).isEqualTo(15000);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().isSuccess()).isTrue();
+        List<Map> prices = response.getBody().getData();
+        assertThat(prices).hasSize(1);
+        assertThat(prices.get(0).get("priceCents")).isEqualTo(15000);
     }
 
     // ==================== HELPER METHODS ====================
