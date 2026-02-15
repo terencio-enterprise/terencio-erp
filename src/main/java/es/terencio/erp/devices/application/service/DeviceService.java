@@ -9,27 +9,33 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import es.terencio.erp.devices.application.dto.*;
+import es.terencio.erp.auth.infrastructure.security.DeviceApiKeyGenerator;
+import es.terencio.erp.devices.application.dto.DeviceDto;
+import es.terencio.erp.devices.application.dto.GenerateCodeRequest;
+import es.terencio.erp.devices.application.dto.GeneratedCodeDto;
+import es.terencio.erp.devices.application.dto.SetupPreviewDto;
+import es.terencio.erp.devices.application.dto.SetupResultDto;
 import es.terencio.erp.devices.application.port.in.ManageDevicesUseCase;
 import es.terencio.erp.devices.application.port.in.SetupDeviceUseCase;
 import es.terencio.erp.devices.application.port.out.DevicePort;
 import es.terencio.erp.shared.domain.SerialGenerator;
 import es.terencio.erp.shared.exception.RegistrationException;
-import es.terencio.erp.users.application.port.out.UserPort; // Use existing UserPort from users module
+import es.terencio.erp.users.application.port.out.UserPort;
 
 @Service
 public class DeviceService implements ManageDevicesUseCase, SetupDeviceUseCase {
 
     private final DevicePort devicePort;
-    private final UserPort userPort; // Direct dependency on UserPort output port
+    private final UserPort userPort;
+    private final DeviceApiKeyGenerator apiKeyGenerator;
     private final SecureRandom random = new SecureRandom();
 
-    public DeviceService(DevicePort devicePort, UserPort userPort) {
+    public DeviceService(DevicePort devicePort, UserPort userPort,
+            DeviceApiKeyGenerator apiKeyGenerator) {
         this.devicePort = devicePort;
         this.userPort = userPort;
+        this.apiKeyGenerator = apiKeyGenerator;
     }
-
-    // --- Admin Management ---
 
     @Override
     public List<DeviceDto> listAll() {
@@ -63,7 +69,8 @@ public class DeviceService implements ManageDevicesUseCase, SetupDeviceUseCase {
         for (int i = 0; i < 5; i++) {
             int num = 100000 + random.nextInt(900000);
             String code = String.valueOf(num);
-            if (devicePort.findByCode(code).isEmpty()) return code;
+            if (devicePort.findByCode(code).isEmpty())
+                return code;
         }
         throw new RuntimeException("Failed to generate code");
     }
@@ -76,26 +83,29 @@ public class DeviceService implements ManageDevicesUseCase, SetupDeviceUseCase {
         validateCode(info);
 
         // Load users from the existing Users Module (via UserPort adapter)
-        // Note: We might need a method in UserPort to list by store, currently findAll/findById exists.
-        // Assuming we rely on the JDBC Adapter implementation logic here or add `findByStoreId` to UserPort.
+        // Note: We might need a method in UserPort to list by store, currently
+        // findAll/findById exists.
+        // Assuming we rely on the JDBC Adapter implementation logic here or add
+        // `findByStoreId` to UserPort.
         // For simplicity, we assume generic user loading or add the method.
-        // Let's assume we list all and filter, or cleaner: Add method to UserPort later. 
+        // Let's assume we list all and filter, or cleaner: Add method to UserPort
+        // later.
         // For now, returning empty list or adding the method to UserPort is best.
-        
+
         // IMPORTANT: In a real scenario, update UserPort to have findByStoreId(UUID).
-        // Since I am generating UserPort in this script too, I can update it. 
-        // But for minimal conflict, I will just list all and filter in memory (not efficient but works for scaffold).
+        // Since I am generating UserPort in this script too, I can update it.
+        // But for minimal conflict, I will just list all and filter in memory (not
+        // efficient but works for scaffold).
         var storeUsers = userPort.findAll().stream()
-            .filter(u -> true) // In real app, DTO doesn't have storeId, need to fix UserDto or Port.
-            .toList(); 
-            
+                .filter(u -> true) // In real app, DTO doesn't have storeId, need to fix UserDto or Port.
+                .toList();
+
         return new SetupPreviewDto(
-            "POS-" + info.storeCode() + "-" + info.code(),
-            info.preassignedName(),
-            info.storeId().toString(),
-            info.storeName(),
-            storeUsers
-        );
+                "POS-" + info.storeCode() + "-" + info.code(),
+                info.preassignedName(),
+                info.storeId().toString(),
+                info.storeName(),
+                storeUsers);
     }
 
     @Override
@@ -104,20 +114,28 @@ public class DeviceService implements ManageDevicesUseCase, SetupDeviceUseCase {
         var info = devicePort.findByCode(code).orElseThrow(() -> new RegistrationException("Invalid code"));
         validateCode(info);
 
+        // Generate device-specific secret
+        String deviceSecret = apiKeyGenerator.generateDeviceSecret();
+
+        // Register device with plaintext secret (database encryption handles security)
         String serialCode = SerialGenerator.generate(info.storeCode());
-        UUID deviceId = devicePort.registerDevice(code, hardwareId, info.storeId(), serialCode);
+        UUID deviceId = devicePort.registerDevice(code, hardwareId, info.storeId(), serialCode, deviceSecret);
+
+        // Generate API key (device will use this for authentication)
+        String apiKey = apiKeyGenerator.generateApiKey(deviceId, deviceSecret, 1);
 
         return new SetupResultDto(
-            info.storeId(),
-            info.storeName(),
-            deviceId,
-            serialCode,
-            UUID.randomUUID().toString()
-        );
+                info.storeId(),
+                info.storeName(),
+                deviceId,
+                serialCode,
+                apiKey);
     }
 
     private void validateCode(DevicePort.CodeInfo info) {
-        if (info.isUsed()) throw new RegistrationException("Code already used");
-        if (info.expiresAt().isBefore(Instant.now())) throw new RegistrationException("Code expired");
+        if (info.isUsed())
+            throw new RegistrationException("Code already used");
+        if (info.expiresAt().isBefore(Instant.now()))
+            throw new RegistrationException("Code expired");
     }
 }

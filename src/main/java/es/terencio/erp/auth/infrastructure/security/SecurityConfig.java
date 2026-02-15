@@ -21,11 +21,14 @@ import org.springframework.web.cors.CorsConfigurationSource;
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final DeviceApiKeyFilter deviceApiKeyFilter;
     private final CorsConfigurationSource corsConfigurationSource;
 
     public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter,
+            DeviceApiKeyFilter deviceApiKeyFilter,
             CorsConfigurationSource corsConfigurationSource) {
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
+        this.deviceApiKeyFilter = deviceApiKeyFilter;
         this.corsConfigurationSource = corsConfigurationSource;
     }
 
@@ -39,6 +42,7 @@ public class SecurityConfig {
                         // Public endpoints
                         .requestMatchers("/api/v1/auth/**").permitAll()
                         .requestMatchers("/api/v1/pos/registration/**").permitAll()
+                        .requestMatchers("/api/v1/devices/setup/**").permitAll()
                         .requestMatchers("/actuator/**").permitAll()
                         // Secure endpoints
                         .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
@@ -46,6 +50,7 @@ public class SecurityConfig {
                         .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html", "/api-docs/**")
                         .permitAll()
                         .anyRequest().authenticated())
+                .addFilterBefore(deviceApiKeyFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();

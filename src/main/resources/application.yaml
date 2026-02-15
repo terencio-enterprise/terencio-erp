@@ -79,3 +79,8 @@ cors:
   allowed-headers: ${CORS_ALLOWED_HEADERS:*}
   allow-credentials: ${CORS_ALLOW_CREDENTIALS:true}
   max-age: ${CORS_MAX_AGE:3600}
+
+# Device Authentication
+security:
+  device:
+    api-secret: ${DEVICE_API_SECRET:default_dev_secret_change_me}
