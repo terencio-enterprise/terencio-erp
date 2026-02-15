@@ -1,16 +1,10 @@
+# Test profile - inherits all config from main application.yaml and .env
+# Tests will use the same database configuration as dev/prod
+# Changes are rolled back automatically thanks to @Transactional in AbstractIntegrationTest
+
 spring:
-  datasource:
-    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5433}/${DB_NAME:terencio_erp}
-    username: ${DB_USER:terencio_admin}
-    password: ${DB_PASSWORD:terencio_admin}
-  
-  jpa:
-    hibernate:
-      ddl-auto: none
-  
   flyway:
-    enabled: true
-    locations: classpath:db/migration
+    # Allow Flyway to clean the schema in tests if needed
     clean-disabled: false
 
 logging:

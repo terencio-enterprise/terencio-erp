@@ -34,7 +34,15 @@ public class CorsConfig {
 
         // Parse comma-separated origins
         List<String> origins = Arrays.asList(allowedOrigins.split(","));
-        configuration.setAllowedOrigins(origins);
+
+        // Use setAllowedOriginPatterns instead of setAllowedOrigins when credentials
+        // are enabled
+        // This allows wildcards and specific origins to work with allowCredentials=true
+        if (allowCredentials) {
+            configuration.setAllowedOriginPatterns(origins);
+        } else {
+            configuration.setAllowedOrigins(origins);
+        }
 
         // Parse comma-separated methods
         List<String> methods = Arrays.asList(allowedMethods.split(","));

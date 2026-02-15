@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.UUID;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -57,8 +58,8 @@ class DeviceRegistrationIntegrationTest extends AbstractIntegrationTest {
         // Create test company
         testCompanyId = UUID.randomUUID();
         jdbcClient.sql("""
-                INSERT INTO companies (id, code, name, tax_id, is_active)
-                VALUES (:id, 'TEST-001', 'Test Company', 'B12345678', TRUE)
+                INSERT INTO companies (id, name, tax_id, is_active)
+                VALUES (:id, 'Test Company', 'B12345678', TRUE)
                 """)
                 .param("id", testCompanyId)
                 .update();
@@ -66,10 +67,11 @@ class DeviceRegistrationIntegrationTest extends AbstractIntegrationTest {
         // Create test store
         testStoreId = UUID.randomUUID();
         jdbcClient.sql("""
-                INSERT INTO stores (id, code, name, address, tax_id, is_active)
-                VALUES (:id, 'MAD-TEST', 'Test Store Madrid', 'Test Address', 'B12345678', TRUE)
+                INSERT INTO stores (id, company_id, code, name, address, is_active)
+                VALUES (:id, :companyId, 'MAD-TEST', 'Test Store Madrid', 'Test Address', TRUE)
                 """)
                 .param("id", testStoreId)
+                .param("companyId", testCompanyId)
                 .update();
 
         // Create store settings
@@ -125,9 +127,18 @@ class DeviceRegistrationIntegrationTest extends AbstractIntegrationTest {
                 loginRequest,
                 LoginResponse.class);
 
-        if (loginResponse.getStatusCode() == HttpStatus.OK && loginResponse.getBody() != null) {
-            adminToken = loginResponse.getBody().token();
-        }
+        assertThat(loginResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(loginResponse.getBody()).isNotNull();
+        adminToken = loginResponse.getBody().token();
+        assertThat(adminToken).isNotBlank();
+    }
+
+    @AfterEach
+    void cleanup() {
+        // Use TRUNCATE CASCADE to automatically handle all foreign key constraints
+        jdbcClient.sql(
+                "TRUNCATE TABLE devices, registration_codes, users, store_settings, warehouses, stores, companies CASCADE")
+                .update();
     }
 
     @Test

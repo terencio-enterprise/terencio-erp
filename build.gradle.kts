@@ -57,3 +57,15 @@ tasks.withType<Test> {
 tasks.withType<JavaCompile> {
     options.encoding = "UTF-8"
 }
+
+tasks.test {
+    testLogging {
+        events("FAILED", "SKIPPED")
+
+        exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.SHORT
+
+        showExceptions = true
+        showCauses = true
+        showStackTraces = true
+    }
+}

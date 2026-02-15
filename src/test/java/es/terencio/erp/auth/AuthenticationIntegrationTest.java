@@ -53,8 +53,8 @@ class AuthenticationIntegrationTest extends AbstractIntegrationTest {
         // Create test company
         testCompanyId = UUID.randomUUID();
         jdbcClient.sql("""
-                INSERT INTO companies (id, code, name, tax_id, is_active)
-                VALUES (:id, 'TEST-COMP', 'Test Company', 'B11111111', TRUE)
+                INSERT INTO companies (id, name, tax_id, is_active)
+                VALUES (:id, 'Test Company', 'B11111111', TRUE)
                 """)
                 .param("id", testCompanyId)
                 .update();
@@ -62,10 +62,11 @@ class AuthenticationIntegrationTest extends AbstractIntegrationTest {
         // Create test store
         testStoreId = UUID.randomUUID();
         jdbcClient.sql("""
-                INSERT INTO stores (id, code, name, address, tax_id, is_active)
-                VALUES (:id, 'TEST-STORE', 'Test Store', 'Test Address', 'B11111111', TRUE)
+                INSERT INTO stores (id, company_id, code, name, address, is_active)
+                VALUES (:id, :companyId, 'TEST-STORE', 'Test Store', 'Test Address', TRUE)
                 """)
                 .param("id", testStoreId)
+                .param("companyId", testCompanyId)
                 .update();
 
         // Create admin user

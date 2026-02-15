@@ -5,9 +5,17 @@ import java.util.UUID;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
-import es.terencio.erp.devices.application.dto.*;
+import es.terencio.erp.devices.application.dto.DeviceDto;
+import es.terencio.erp.devices.application.dto.GenerateCodeRequest;
+import es.terencio.erp.devices.application.dto.GeneratedCodeDto;
 import es.terencio.erp.devices.application.port.in.ManageDevicesUseCase;
 import jakarta.validation.Valid;
 
@@ -27,15 +35,19 @@ public class AdminDeviceController {
         return ResponseEntity.ok(manageDevicesUseCase.listAll());
     }
 
-    @PatchMapping("/{id}/status")
-    public ResponseEntity<Void> updateStatus(@PathVariable UUID id, @RequestParam String action) {
-        if ("block".equalsIgnoreCase(action)) manageDevicesUseCase.blockDevice(id);
-        else if ("unblock".equalsIgnoreCase(action)) manageDevicesUseCase.unblockDevice(id);
-        else return ResponseEntity.badRequest().build();
+    @PutMapping("/{id}/block")
+    public ResponseEntity<Void> blockDevice(@PathVariable UUID id) {
+        manageDevicesUseCase.blockDevice(id);
         return ResponseEntity.noContent().build();
     }
 
-    @PostMapping("/codes")
+    @PutMapping("/{id}/unblock")
+    public ResponseEntity<Void> unblockDevice(@PathVariable UUID id) {
+        manageDevicesUseCase.unblockDevice(id);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/generate-code")
     public ResponseEntity<GeneratedCodeDto> generateCode(@Valid @RequestBody GenerateCodeRequest request) {
         return ResponseEntity.ok(manageDevicesUseCase.generateRegistrationCode(request));
     }
