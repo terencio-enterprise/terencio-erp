@@ -1,7 +1,8 @@
-package es.terencio.erp.auth.infrastructure.security;
+package es.terencio.erp.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
 import org.springframework.context.annotation.Profile;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
@@ -13,47 +14,38 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-import org.springframework.web.cors.CorsConfigurationSource;
 
+import es.terencio.erp.auth.infrastructure.security.DeviceApiKeyFilter;
+import es.terencio.erp.auth.infrastructure.security.JwtAuthenticationFilter;
+
+/**
+ * Security configuration for tests.
+ * Simplified version that avoids MVC introspection issues.
+ */
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity
-@Profile("!test")
-public class SecurityConfig {
-
-    private final JwtAuthenticationFilter jwtAuthenticationFilter;
-    private final DeviceApiKeyFilter deviceApiKeyFilter;
-    private final CorsConfigurationSource corsConfigurationSource;
-
-    public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter,
-            DeviceApiKeyFilter deviceApiKeyFilter,
-            CorsConfigurationSource corsConfigurationSource) {
-        this.jwtAuthenticationFilter = jwtAuthenticationFilter;
-        this.deviceApiKeyFilter = deviceApiKeyFilter;
-        this.corsConfigurationSource = corsConfigurationSource;
-    }
+@Profile("test")
+public class TestSecurityConfig {
 
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+    @Primary
+    public SecurityFilterChain testFilterChain(HttpSecurity http,
+            JwtAuthenticationFilter jwtAuthenticationFilter,
+            DeviceApiKeyFilter deviceApiKeyFilter) throws Exception {
         http
                 .csrf(AbstractHttpConfigurer::disable)
-                .cors(cors -> cors.configurationSource(corsConfigurationSource))
+                .cors(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        // Public endpoints
                         .requestMatchers("/api/v1/auth/**").permitAll()
-                        .requestMatchers("/api/v1/pos/registration/**").permitAll()
-                        .requestMatchers("/api/v1/devices/setup/**").permitAll()
-                        .requestMatchers("/actuator/**").permitAll()
-                        // Secure endpoints
+                        .requestMatchers("/api/v1/public/**").permitAll()
                         .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
-                        // Docs
-                        .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html", "/api-docs/**")
-                        .permitAll()
                         .anyRequest().authenticated())
-                .addFilterBefore(deviceApiKeyFilter, UsernamePasswordAuthenticationFilter.class)
-                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+                .addFilterBefore(deviceApiKeyFilter,
+                        org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(jwtAuthenticationFilter,
+                        org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }

@@ -7,12 +7,14 @@ import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.autoconfigure.flyway.FlywayMigrationInitializer;
 import org.springframework.context.annotation.DependsOn;
+import org.springframework.context.annotation.Profile;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
 import es.terencio.erp.users.application.port.out.UserPort;
 
 @Component
+@Profile("!test")
 @DependsOn("flywayInitializer")
 public class DataInitializer implements CommandLineRunner {
 

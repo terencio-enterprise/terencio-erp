@@ -1,8 +1,8 @@
 spring:
   datasource:
-    url: jdbc:postgresql://localhost:5433/terencio_erp
-    username: terencio_admin
-    password: terencio_admin
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5433}/${DB_NAME:terencio_erp}
+    username: ${DB_USER:terencio_admin}
+    password: ${DB_PASSWORD:terencio_admin}
   
   jpa:
     hibernate:
@@ -15,5 +15,6 @@ spring:
 
 logging:
   level:
-    es.terencio.erp: DEBUG
-    org.springframework.security: DEBUG
+    '[es.terencio.erp]': DEBUG
+    '[org.springframework.security]': DEBUG
+    '[org.springframework.transaction]': TRACE
