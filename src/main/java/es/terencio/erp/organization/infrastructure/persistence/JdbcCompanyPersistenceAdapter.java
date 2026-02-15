@@ -1,19 +1,20 @@
 package es.terencio.erp.organization.infrastructure.persistence;
 
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.util.Currency;
+import java.util.Optional;
+import java.util.UUID;
+
+import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.stereotype.Repository;
+
 import es.terencio.erp.organization.application.port.out.CompanyRepository;
 import es.terencio.erp.organization.domain.model.Company;
 import es.terencio.erp.organization.domain.model.FiscalRegime;
 import es.terencio.erp.organization.domain.model.RoundingMode;
 import es.terencio.erp.shared.domain.identifier.CompanyId;
 import es.terencio.erp.shared.domain.valueobject.TaxId;
-import org.springframework.jdbc.core.simple.JdbcClient;
-import org.springframework.stereotype.Repository;
-
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.util.Currency;
-import java.util.Optional;
-import java.util.UUID;
 
 /**
  * JDBC adapter for Company persistence.
