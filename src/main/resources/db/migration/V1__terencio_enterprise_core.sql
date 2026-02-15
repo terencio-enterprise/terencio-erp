@@ -1,31 +1,29 @@
 -- ==================================================================================
--- PROJECT: TERENCIO POS - ENTERPRISE CORE (Unified V1)
--- SCOPE: Multi-Company, Multi-Store, VeriFactu, CRM, Inventory, Purchasing, Accounting
--- ENGINE: PostgreSQL 16+
--- STATUS: ENTERPRISE GRADE (Hardened Fiscal Audit, Rectification Snapshots, Strict Sequence)
--- VERSION: 1.5 (Accounting Integrity, Price Overlap Protection, Multi-Tenant Isolation)
+-- PROYECTO: TERENCIO POS - NÚCLEO EMPRESARIAL
+-- ALCANCE: Multi-Empresa, Multi-Tienda, VeriFactu, Inventario (Simplificado), Contabilidad
+-- MOTOR: PostgreSQL 16+
 -- ==================================================================================
 
--- Enable UUID extension
+-- Habilitar extensión para generación de UUIDs
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
--- Enable PGCrypto for internal hashing if needed
+-- Habilitar PGCrypto para hashing interno (necesario para firmas VeriFactu si se hace en DB)
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 -- ==================================================================================
--- 1. ORGANIZATION LAYER (Multi-Tenant / Multi-Company)
+-- 1. CAPA DE ORGANIZACIÓN (Multi-Inquilino / Multi-Empresa)
 -- ==================================================================================
 
--- Companies (Legal Entities)
+-- Empresas (Entidades Legales)
 CREATE TABLE companies (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name VARCHAR(255) NOT NULL,
     tax_id VARCHAR(50) NOT NULL, -- CIF/NIF
     currency_code VARCHAR(3) DEFAULT 'EUR',
     
-    -- Fiscal Configuration (Point 4)
-    fiscal_regime VARCHAR(50) DEFAULT 'COMMON', -- COMMON, SII, CANARY_IGIC
-    price_includes_tax BOOLEAN DEFAULT TRUE,
-    rounding_mode VARCHAR(20) DEFAULT 'LINE', -- LINE, TOTAL
+    -- Configuración Fiscal
+    fiscal_regime VARCHAR(50) DEFAULT 'COMMON', -- COMUN, SII, CANARIAS_IGIC, RECARGO
+    price_includes_tax BOOLEAN DEFAULT TRUE, -- ¿Precios con IVA incluido?
+    rounding_mode VARCHAR(20) DEFAULT 'LINE', -- Redondeo por LÍNEA o por TOTAL
     
     is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -34,18 +32,17 @@ CREATE TABLE companies (
     version BIGINT DEFAULT 1
 );
 
--- Stores (Tiendas/Branches)
+-- Tiendas (Sucursales físicas o lógicas)
 CREATE TABLE stores (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     company_id UUID NOT NULL REFERENCES companies(id),
     
-    code VARCHAR(50) NOT NULL, -- Internal Code 'MAD-001'
+    code VARCHAR(50) NOT NULL, -- Código interno ej: 'MAD-001'
     name VARCHAR(255) NOT NULL,
     address TEXT,
     zip_code VARCHAR(20),
     city VARCHAR(100),
     
-    -- Store Specifics
     is_active BOOLEAN DEFAULT TRUE,
     timezone VARCHAR(50) DEFAULT 'Europe/Madrid',
     
@@ -54,56 +51,51 @@ CREATE TABLE stores (
     deleted_at TIMESTAMPTZ,
     version BIGINT DEFAULT 1,
     
-    UNIQUE(company_id, code)
+    UNIQUE(company_id, code) -- El código de tienda debe ser único dentro de la empresa
 );
 
--- Store Settings (Point 6 - Configuration per Store)
+-- Configuración específica por Tienda
 CREATE TABLE store_settings (
     store_id UUID PRIMARY KEY REFERENCES stores(id),
-    allow_negative_stock BOOLEAN DEFAULT FALSE,
-    default_tariff_id BIGINT, -- FK added later or handled logically to avoid circular dep
+    allow_negative_stock BOOLEAN DEFAULT FALSE, -- ¿Permitir vender sin stock?
+    default_tariff_id BIGINT, 
     print_ticket_automatically BOOLEAN DEFAULT TRUE,
-    require_customer_for_large_amount DECIMAL(15,2),
+    require_customer_for_large_amount DECIMAL(15,2), -- Ley antifraude (ej: > 1000€ requiere NIF)
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Warehouses (Almacenes) - Can be physical store or logic warehouse
+-- Almacenes (Logística)
 CREATE TABLE warehouses (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    company_id UUID NOT NULL REFERENCES companies(id),
-    store_id UUID REFERENCES stores(id), -- Optional: Link to a specific store
+    store_id UUID NOT NULL REFERENCES stores(id), -- Único padre directo
     
     name VARCHAR(255) NOT NULL,
-    code VARCHAR(50),
-    address TEXT,
+    code VARCHAR(50), -- Código interno opcional
     
-    is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMPTZ DEFAULT NOW(),
-    deleted_at TIMESTAMPTZ
+    deleted_at TIMESTAMPTZ,
+    
+    UNIQUE(store_id) -- Regla de Negocio: Un almacén por tienda en esta versión
 );
 
 -- ==================================================================================
--- 2. SECURITY & ACCESS (RBAC)
+-- 2. SEGURIDAD Y ACCESO (RBAC - Control de Acceso Basado en Roles)
 -- ==================================================================================
 
 CREATE TABLE users (
     id BIGSERIAL PRIMARY KEY,
     uuid UUID NOT NULL UNIQUE DEFAULT uuid_generate_v4(),
     company_id UUID NOT NULL REFERENCES companies(id),
-    store_id UUID REFERENCES stores(id), -- If NULL, user has access to company (depending on role)
+    store_id UUID REFERENCES stores(id), -- Si es NULL, tiene acceso a toda la empresa (según rol)
     
     username VARCHAR(100) NOT NULL,
     email VARCHAR(255),
-    
-    -- Authentication
-    password_hash VARCHAR(255), -- Web/Admin access
-    pin_hash VARCHAR(255),      -- Quick POS access
+    password_hash VARCHAR(255), -- Acceso Web
+    pin_hash VARCHAR(255),      -- Acceso rápido TPV
     
     full_name VARCHAR(255),
-    role VARCHAR(50) DEFAULT 'CASHIER', -- CASHIER, MANAGER, ADMIN, SUPER_ADMIN
-    
-    -- Fine-grained permissions
-    permissions_json JSONB DEFAULT '[]',
+    role VARCHAR(50) DEFAULT 'CASHIER', -- CAJERO, ENCARGADO, ADMIN, SUPER_ADMIN
+    permissions_json JSONB DEFAULT '[]', -- Permisos granulares extra
     
     is_active BOOLEAN DEFAULT TRUE,
     last_login_at TIMESTAMPTZ,
@@ -115,21 +107,20 @@ CREATE TABLE users (
     UNIQUE(company_id, username)
 );
 
--- Devices (POS Terminals) - with Auth (V4 merged)
+-- Dispositivos (Terminales TPV)
 CREATE TABLE devices (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     store_id UUID NOT NULL REFERENCES stores(id),
     
     name VARCHAR(100),
-    serial_code VARCHAR(100) NOT NULL, -- Logical ID 'POS-01'
-    hardware_id VARCHAR(255) NOT NULL, -- Physical fingerprint
+    serial_code VARCHAR(100) NOT NULL, -- ID Lógico 'CAJA-01'
+    hardware_id VARCHAR(255) NOT NULL, -- Huella digital física (Fingerprint)
     
-    -- Status
-    status VARCHAR(50) DEFAULT 'PENDING', -- PENDING, ACTIVE, BLOCKED, REVOKED
+    status VARCHAR(50) DEFAULT 'PENDING', -- PENDING, ACTIVE, BLOCKED
     version_app VARCHAR(50),
     
-    -- Security / Auth (V4)
-    device_secret VARCHAR(255), -- HMAC secret
+    -- Seguridad
+    device_secret VARCHAR(255), -- Secreto para firma HMAC
     api_key_version INTEGER DEFAULT 1,
     last_authenticated_at TIMESTAMPTZ,
     last_sync_at TIMESTAMPTZ,
@@ -140,193 +131,140 @@ CREATE TABLE devices (
     UNIQUE(store_id, serial_code)
 );
 
--- Device Registration Codes (V2 merged)
+-- Códigos de Vinculación de Dispositivos (Onboarding)
 CREATE TABLE registration_codes (
-    code VARCHAR(10) PRIMARY KEY, -- 'A1B2C3'
+    code VARCHAR(10) PRIMARY KEY,
     store_id UUID NOT NULL REFERENCES stores(id),
-    
     preassigned_name VARCHAR(100),
     expires_at TIMESTAMPTZ NOT NULL,
-    
     is_used BOOLEAN DEFAULT FALSE,
     used_at TIMESTAMPTZ,
     used_by_device_id UUID REFERENCES devices(id),
-    
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- ==================================================================================
--- 3. MASTER DATA (Catalog, Taxes, Pricing)
+-- 3. DATOS MAESTROS (Catálogo, Impuestos, Tarifas)
 -- ==================================================================================
 
--- Taxes
+-- Impuestos (IVA, IGIC)
 CREATE TABLE taxes (
     id BIGSERIAL PRIMARY KEY,
     company_id UUID NOT NULL REFERENCES companies(id),
-    
-    name VARCHAR(100) NOT NULL,
+    name VARCHAR(100) NOT NULL, -- ej: "IVA General 21%"
     rate DECIMAL(10,4) NOT NULL, -- 21.0000
-    surcharge DECIMAL(10,4) DEFAULT 0, -- Recargo equivalencia
-    
-    code_aeat VARCHAR(50), -- Tax code for reporting
-    
+    surcharge DECIMAL(10,4) DEFAULT 0, -- Recargo de Equivalencia (R.E.)
+    code_aeat VARCHAR(50), -- Código para modelo 303/347
     active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Categories (Tree Structure)
+-- Categorías (Árbol de productos)
 CREATE TABLE categories (
     id BIGSERIAL PRIMARY KEY,
     company_id UUID NOT NULL REFERENCES companies(id),
-    parent_id BIGINT REFERENCES categories(id),
-    
+    parent_id BIGINT REFERENCES categories(id), -- Jerarquía
     name VARCHAR(100) NOT NULL,
     color VARCHAR(20),
     image_url TEXT,
-    
     active BOOLEAN DEFAULT TRUE
 );
 
--- Products
+-- Productos
 CREATE TABLE products (
     id BIGSERIAL PRIMARY KEY,
     uuid UUID NOT NULL UNIQUE DEFAULT uuid_generate_v4(),
     company_id UUID NOT NULL REFERENCES companies(id),
     
-    -- Identification
-    reference VARCHAR(100) NOT NULL, -- SKU
+    reference VARCHAR(100) NOT NULL, -- SKU / Referencia interna
     name VARCHAR(255) NOT NULL,
-    short_name VARCHAR(100),
+    short_name VARCHAR(100), -- Para ticket (limitado caracteres)
     description TEXT,
     
-    -- Classification
     category_id BIGINT REFERENCES categories(id),
     tax_id BIGINT NOT NULL REFERENCES taxes(id),
     brand VARCHAR(100),
     
-    -- Flags
-    type VARCHAR(50) DEFAULT 'PRODUCT', -- PRODUCT, SERVICE, KITS
-    is_weighted BOOLEAN DEFAULT FALSE,
-    is_inventoriable BOOLEAN DEFAULT TRUE,
+    type VARCHAR(50) DEFAULT 'PRODUCT', -- PRODUCTO, SERVICIO, KIT
+    is_weighted BOOLEAN DEFAULT FALSE,  -- ¿Se vende por peso (balanza)?
+    is_inventoriable BOOLEAN DEFAULT TRUE, -- ¿Controla stock?
     
-    -- Inventory Settings
     min_stock_alert DECIMAL(15,3) DEFAULT 0,
-    
-    -- Cost Control (Point 9)
-    average_cost DECIMAL(15,4) DEFAULT 0,
+    average_cost DECIMAL(15,4) DEFAULT 0, -- PMP (Precio Medio Ponderado)
     last_purchase_cost DECIMAL(15,4) DEFAULT 0,
     
-    -- Media
     image_url TEXT,
-    
     active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
     deleted_at TIMESTAMPTZ,
-    version BIGINT DEFAULT 1, -- Optimistic Locking
+    version BIGINT DEFAULT 1, -- Bloqueo optimista
     
     UNIQUE(company_id, reference)
 );
 
--- Barcodes (Multi-barcode support)
+-- Códigos de Barras (Multi-código)
 CREATE TABLE product_barcodes (
     barcode VARCHAR(100) PRIMARY KEY,
     product_id BIGINT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
     type VARCHAR(20) DEFAULT 'EAN13',
-    quantity_factor DECIMAL(10,3) DEFAULT 1, -- For packs (e.g., barcode for a box of 12)
+    quantity_factor DECIMAL(10,3) DEFAULT 1, -- Para packs (ej: código de caja de 6 uds)
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Tariffs (Price Lists)
+-- Tarifas de Precios
 CREATE TABLE tariffs (
     id BIGSERIAL PRIMARY KEY,
     company_id UUID NOT NULL REFERENCES companies(id),
-    name VARCHAR(100) NOT NULL,
+    name VARCHAR(100) NOT NULL, -- ej: "PVP General", "Tarifa Mayorista"
     priority INT DEFAULT 0,
-    
-    -- Price Classification (Point 5)
-    price_type VARCHAR(20) DEFAULT 'RETAIL', -- RETAIL, WHOLESALE, PREMIUM
-    
+    price_type VARCHAR(20) DEFAULT 'RETAIL', -- RETAIL (IVA inc), WHOLESALE (Base + IVA)
     is_default BOOLEAN DEFAULT FALSE,
     active BOOLEAN DEFAULT TRUE,
-    version BIGINT DEFAULT 1 -- Optimistic Locking (Point 8)
+    version BIGINT DEFAULT 1
 );
 
--- Prices (Standard List Prices)
+-- Precios por Producto y Tarifa
 CREATE TABLE product_prices (
     product_id BIGINT NOT NULL REFERENCES products(id),
     tariff_id BIGINT NOT NULL REFERENCES tariffs(id),
-    
-    price DECIMAL(15,4) NOT NULL, -- Base price (usually pre-tax, depends on config)
-    cost_price DECIMAL(15,4), -- Snapshot of cost at setting time
-    
+    price DECIMAL(15,4) NOT NULL, -- Precio base
+    cost_price DECIMAL(15,4), -- Coste de referencia al fijar precio
     updated_at TIMESTAMPTZ DEFAULT NOW(),
     PRIMARY KEY (product_id, tariff_id)
 );
 
--- Product Price History (Point 1 - Critical Audit)
-CREATE TABLE product_price_history (
-    id BIGSERIAL PRIMARY KEY,
-    product_id BIGINT NOT NULL REFERENCES products(id),
-    tariff_id BIGINT NOT NULL REFERENCES tariffs(id),
-    
-    price DECIMAL(15,4) NOT NULL,
-    
-    valid_from TIMESTAMPTZ NOT NULL,
-    valid_until TIMESTAMPTZ,
-    changed_by BIGINT REFERENCES users(id),
-    reason VARCHAR(255),
-    created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- Product Cost History (Point 1 - Critical Audit)
-CREATE TABLE product_cost_history (
-    id BIGSERIAL PRIMARY KEY,
-    product_id BIGINT NOT NULL REFERENCES products(id),
-    
-    cost DECIMAL(15,4) NOT NULL,
-    source VARCHAR(50), -- PURCHASE, ADJUSTMENT, MANUAL
-    reference_uuid UUID,
-    
-    valid_from TIMESTAMPTZ NOT NULL,
-    valid_until TIMESTAMPTZ,
-    created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- Payment Methods (Configuration)
+-- Métodos de Pago
 CREATE TABLE payment_methods (
     id BIGSERIAL PRIMARY KEY,
-    company_id UUID REFERENCES companies(id), -- Null for system defaults
+    company_id UUID REFERENCES companies(id), -- NULL = Sistema por defecto
     code VARCHAR(50) NOT NULL, -- CASH, CARD, BIZUM
     name VARCHAR(100) NOT NULL,
-    is_cash BOOLEAN DEFAULT FALSE,
-    requires_reference BOOLEAN DEFAULT FALSE,
+    is_cash BOOLEAN DEFAULT FALSE, -- Controla apertura de cajón
+    requires_reference BOOLEAN DEFAULT FALSE, -- Requiere nº operación (tarjeta)
     active BOOLEAN DEFAULT TRUE,
-    
     UNIQUE(company_id, code)
 );
 
--- Document Types (Configuration)
+-- Tipos de Documento
 CREATE TABLE document_types (
-    code VARCHAR(50) PRIMARY KEY, -- SIMPLIFIED, FULL, CREDIT_NOTE
+    code VARCHAR(50) PRIMARY KEY, -- SIMPLIFIED (Ticket), FULL (Factura), CREDIT_NOTE (Abono)
     name VARCHAR(100) NOT NULL,
     description TEXT
 );
 
 -- ==================================================================================
--- 4. BUSINESS PARTNERS & PRICING ENGINE (CRM & Suppliers)
+-- 4. SOCIOS DE NEGOCIO (CRM & Clientes)
 -- ==================================================================================
 
--- Customers
 CREATE TABLE customers (
     id BIGSERIAL PRIMARY KEY,
     uuid UUID NOT NULL UNIQUE DEFAULT uuid_generate_v4(),
     company_id UUID NOT NULL REFERENCES companies(id),
     
-    tax_id VARCHAR(50), -- NIF/CIF
-    legal_name VARCHAR(255),
+    tax_id VARCHAR(50), -- NIF / CIF
+    legal_name VARCHAR(255), -- Razón Social
     commercial_name VARCHAR(255),
-    
     email VARCHAR(255),
     phone VARCHAR(50),
     address TEXT,
@@ -334,11 +272,10 @@ CREATE TABLE customers (
     city VARCHAR(100),
     country VARCHAR(10) DEFAULT 'ES',
     
-    -- Commercial Conditions
-    tariff_id BIGINT REFERENCES tariffs(id),
-    allow_credit BOOLEAN DEFAULT FALSE,
+    tariff_id BIGINT REFERENCES tariffs(id), -- Tarifa especial asignada
+    allow_credit BOOLEAN DEFAULT FALSE, -- ¿Permite pago diferido?
     credit_limit DECIMAL(15,2) DEFAULT 0,
-    surcharge_apply BOOLEAN DEFAULT FALSE, -- Recargo Equivalencia flag
+    surcharge_apply BOOLEAN DEFAULT FALSE, -- ¿Aplica Recargo de Equivalencia?
     
     notes TEXT,
     active BOOLEAN DEFAULT TRUE,
@@ -347,289 +284,154 @@ CREATE TABLE customers (
     deleted_at TIMESTAMPTZ
 );
 
--- Customer Specific Pricing (Overrides - Point 2.A)
+-- Precios Especiales pactados con Cliente
 CREATE TABLE customer_product_prices (
-    customer_id BIGINT NOT NULL REFERENCES customers(id) ON DELETE RESTRICT, -- Point 7
-    product_id BIGINT NOT NULL REFERENCES products(id) ON DELETE RESTRICT, -- Point 7
-    
+    customer_id BIGINT NOT NULL REFERENCES customers(id) ON DELETE RESTRICT,
+    product_id BIGINT NOT NULL REFERENCES products(id) ON DELETE RESTRICT,
     custom_price DECIMAL(15,4) NOT NULL,
     valid_from TIMESTAMPTZ DEFAULT NOW(),
     valid_until TIMESTAMPTZ,
-    
     created_at TIMESTAMPTZ DEFAULT NOW(),
     PRIMARY KEY (customer_id, product_id)
 );
 
--- Dynamic Pricing Rules (Volume/Promos - Point 2.B)
+-- Reglas de Precios Dinámicas (Ofertas/Promociones)
 CREATE TABLE pricing_rules (
     id BIGSERIAL PRIMARY KEY,
     company_id UUID NOT NULL REFERENCES companies(id),
-    
     name VARCHAR(100) NOT NULL,
-    rule_type VARCHAR(50) NOT NULL, -- VOLUME_DISCOUNT, BOGO, CATEGORY_DISCOUNT
-    
-    condition_json JSONB NOT NULL, -- e.g. {"min_qty": 10, "product_id": 5}
-    effect_json JSONB NOT NULL, -- e.g. {"discount_percent": 10}
-    
+    rule_type VARCHAR(50) NOT NULL, -- VOLUME_DISCOUNT, BOGO (2x1)
+    condition_json JSONB NOT NULL, -- ej: {"min_qty": 10}
+    effect_json JSONB NOT NULL, -- ej: {"discount_percent": 10}
     priority INT DEFAULT 10,
     active BOOLEAN DEFAULT TRUE,
-    version BIGINT DEFAULT 1, -- Optimistic Locking (Point 8)
-    
+    version BIGINT DEFAULT 1,
     start_date TIMESTAMPTZ,
     end_date TIMESTAMPTZ,
-    
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Customer Account Ledger (Point 9 - B2B Professional)
+-- Libro Mayor de Cuenta de Cliente (Deudas/Saldos)
 CREATE TABLE customer_account_movements (
     id BIGSERIAL PRIMARY KEY,
     customer_id BIGINT NOT NULL REFERENCES customers(id) ON DELETE RESTRICT,
-    reference_uuid UUID, -- Sale UUID or Payment UUID
-    type VARCHAR(20) NOT NULL, -- INVOICE, PAYMENT, REFUND, ADJUSTMENT
-    amount DECIMAL(15,2) NOT NULL, -- Positive (Debit/Owe), Negative (Credit/Pay)
+    reference_uuid UUID, -- ID de Venta o Pago
+    type VARCHAR(20) NOT NULL, -- INVOICE (Debe), PAYMENT (Haber)
+    amount DECIMAL(15,2) NOT NULL,
     balance_after DECIMAL(15,2),
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Suppliers
-CREATE TABLE suppliers (
-    id BIGSERIAL PRIMARY KEY,
-    uuid UUID NOT NULL UNIQUE DEFAULT uuid_generate_v4(),
+-- ==================================================================================
+-- 5. INVENTARIO
+-- ==================================================================================
+
+-- Stock Actual (Foto instantánea)
+CREATE TABLE inventory_stock (
+    product_id BIGINT NOT NULL REFERENCES products(id) ON DELETE RESTRICT,
+    warehouse_id UUID NOT NULL REFERENCES warehouses(id),
     company_id UUID NOT NULL REFERENCES companies(id),
     
-    tax_id VARCHAR(50),
-    legal_name VARCHAR(255) NOT NULL,
-    contact_name VARCHAR(255),
-    email VARCHAR(255),
-    phone VARCHAR(50),
-    
-    active BOOLEAN DEFAULT TRUE,
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    deleted_at TIMESTAMPTZ
-);
-
--- ==================================================================================
--- 5. INVENTORY & PURCHASING
--- ==================================================================================
-
--- Inventory Lots (Trazabilidad)
-CREATE TABLE inventory_lots (
-    id BIGSERIAL PRIMARY KEY,
-    product_id BIGINT NOT NULL REFERENCES products(id) ON DELETE RESTRICT, -- Point 7
-    warehouse_id UUID NOT NULL REFERENCES warehouses(id),
-    
-    lot_code VARCHAR(100) NOT NULL,
-    expiration_date DATE,
-    quantity DECIMAL(15,3) DEFAULT 0,
-    
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    UNIQUE(product_id, warehouse_id, lot_code)
-);
-
--- Current Stock Levels (Snapshot)
-CREATE TABLE inventory_stock (
-    product_id BIGINT NOT NULL REFERENCES products(id) ON DELETE RESTRICT, -- Point 7
-    warehouse_id UUID NOT NULL REFERENCES warehouses(id),
-    
-    quantity_on_hand DECIMAL(15,3) DEFAULT 0,
-    quantity_reserved DECIMAL(15,3) DEFAULT 0,
-    quantity_incoming DECIMAL(15,3) DEFAULT 0, -- Ordered from suppliers
+    quantity_on_hand DECIMAL(15,3) DEFAULT 0, -- Cantidad física real
     
     last_updated_at TIMESTAMPTZ DEFAULT NOW(),
-    version BIGINT DEFAULT 1, -- Optimistic Locking
+    version BIGINT DEFAULT 1, -- Bloqueo optimista para concurrencia
     
     PRIMARY KEY (product_id, warehouse_id)
-    
-    -- Removed rigid constraint chk_positive_stock as per user request (allow negative stock logic)
 );
 
--- Stock Movements (The Truth Ledger)
+-- Movimientos de Stock (La Fuente de la Verdad)
 CREATE TABLE stock_movements (
     id BIGSERIAL PRIMARY KEY,
     uuid UUID NOT NULL UNIQUE DEFAULT uuid_generate_v4(),
-    company_id UUID NOT NULL REFERENCES companies(id),
-    
-    type VARCHAR(50) NOT NULL, -- SALE, RETURN, PURCHASE, ADJUSTMENT, TRANSFER_IN, TRANSFER_OUT
     
     product_id BIGINT NOT NULL REFERENCES products(id),
     warehouse_id UUID NOT NULL REFERENCES warehouses(id),
-    lot_id BIGINT REFERENCES inventory_lots(id), -- Optional Lot tracking
     
-    quantity DECIMAL(15,3) NOT NULL, -- Positive (add) or Negative (remove)
+    type VARCHAR(20) NOT NULL CHECK (type IN ('SALE', 'RETURN', 'ADJUSTMENT')),
+    
+    quantity DECIMAL(15,3) NOT NULL, -- Positivo (Entrada) o Negativo (Salida)
     previous_balance DECIMAL(15,3) NOT NULL,
     new_balance DECIMAL(15,3) NOT NULL,
     
-    cost_unit DECIMAL(15,4), -- Snapshot of cost at movement time
+    cost_unit DECIMAL(15,4), -- Coste unitario en el momento del movimiento
     
-    -- Context
     reason VARCHAR(255),
-    reference_doc_type VARCHAR(50), -- SALE_UUID, PO_UUID, TRANSFER_UUID
+    
+    reference_doc_type VARCHAR(50) CHECK (reference_doc_type IN ('SALE', 'RECTIFICATION', 'ADJUSTMENT')),
     reference_doc_uuid UUID,
     
     user_id BIGINT REFERENCES users(id),
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Stock Transfers (Point 2 - Warehouse Management)
-CREATE TABLE stock_transfers (
-    id BIGSERIAL PRIMARY KEY,
-    uuid UUID UNIQUE DEFAULT uuid_generate_v4(),
-    company_id UUID NOT NULL REFERENCES companies(id),
-    from_warehouse_id UUID NOT NULL REFERENCES warehouses(id),
-    to_warehouse_id UUID NOT NULL REFERENCES warehouses(id),
-    status VARCHAR(20) DEFAULT 'DRAFT', -- DRAFT, IN_TRANSIT, COMPLETED, CANCELLED
-    created_by BIGINT REFERENCES users(id),
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    completed_at TIMESTAMPTZ,
-    
-    -- Self-transfer prevention (Point 5)
-    CONSTRAINT chk_transfer_diff CHECK (from_warehouse_id <> to_warehouse_id)
-);
-
-CREATE TABLE stock_transfer_lines (
-    id BIGSERIAL PRIMARY KEY,
-    transfer_id BIGINT REFERENCES stock_transfers(id) ON DELETE CASCADE,
-    product_id BIGINT NOT NULL REFERENCES products(id),
-    quantity DECIMAL(15,3) NOT NULL
-);
-
--- Stock Counts / Inventarios Físicos (Point 2)
-CREATE TABLE stock_counts (
-    id BIGSERIAL PRIMARY KEY,
-    company_id UUID NOT NULL REFERENCES companies(id), -- Point 10: Multi-tenant isolation
-    warehouse_id UUID NOT NULL REFERENCES warehouses(id),
-    status VARCHAR(20) DEFAULT 'DRAFT', -- DRAFT, COMPLETED
-    created_by BIGINT REFERENCES users(id),
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    applied_at TIMESTAMPTZ
-);
-
-CREATE TABLE stock_count_lines (
-    id BIGSERIAL PRIMARY KEY,
-    stock_count_id BIGINT REFERENCES stock_counts(id) ON DELETE CASCADE,
-    product_id BIGINT NOT NULL REFERENCES products(id),
-    expected_qty DECIMAL(15,3),
-    counted_qty DECIMAL(15,3)
-);
-
--- Purchase Orders (To Suppliers)
-CREATE TABLE purchase_orders (
-    id BIGSERIAL PRIMARY KEY,
-    uuid UUID NOT NULL UNIQUE DEFAULT uuid_generate_v4(),
-    company_id UUID NOT NULL REFERENCES companies(id),
-    warehouse_id UUID NOT NULL REFERENCES warehouses(id),
-    supplier_id BIGINT NOT NULL REFERENCES suppliers(id) ON DELETE RESTRICT, -- Point 7
-    
-    reference VARCHAR(50), -- Supplier invoice number etc
-    status VARCHAR(50) DEFAULT 'DRAFT', -- DRAFT, SENT, PARTIAL, RECEIVED, CANCELLED
-    
-    expected_date DATE,
-    notes TEXT,
-    
-    total_amount DECIMAL(15,2),
-    created_by BIGINT REFERENCES users(id),
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- Purchase Order Lines (Point 1 - Critical Missing Piece)
-CREATE TABLE purchase_order_lines (
-    id BIGSERIAL PRIMARY KEY,
-    purchase_order_id BIGINT NOT NULL REFERENCES purchase_orders(id) ON DELETE RESTRICT,
-    product_id BIGINT NOT NULL REFERENCES products(id) ON DELETE RESTRICT,
-    
-    quantity DECIMAL(15,3) NOT NULL,
-    unit_cost DECIMAL(15,4) NOT NULL,
-    
-    tax_rate DECIMAL(10,4) NOT NULL,
-    tax_amount DECIMAL(15,2) NOT NULL,
-    
-    total_line DECIMAL(15,2) NOT NULL
-);
-
 -- ==================================================================================
--- 6. SALES & POS OPERATIONS
+-- 6. VENTAS Y OPERATIVA TPV
 -- ==================================================================================
 
--- Global Sequences (Backup / Online Issues)
-CREATE TABLE doc_sequences (
-    store_id UUID NOT NULL REFERENCES stores(id),
-    series VARCHAR(50) NOT NULL, 
-    year INT NOT NULL,
-    current_value INT DEFAULT 0,
-    version BIGINT DEFAULT 1, 
-    PRIMARY KEY (store_id, series, year)
-);
-
--- DEVICE SEQUENCES (OFFLINE AUTONOMY - Point 3.C)
--- Each POS manages its own numbering range to avoid server roundtrips
+-- Secuenciadores por Dispositivo (Autonomía Offline)
+-- Cada TPV gestiona su propia serie para no depender del servidor al facturar
 CREATE TABLE device_sequences (
     device_id UUID NOT NULL REFERENCES devices(id),
     series VARCHAR(50) NOT NULL,
     year INT NOT NULL,
     current_value INT DEFAULT 0,
-    version BIGINT DEFAULT 1, -- Optimistic Lock requested
+    version BIGINT DEFAULT 1,
     last_updated_at TIMESTAMPTZ DEFAULT NOW(),
     PRIMARY KEY (device_id, series, year)
 );
 
--- Shifts (Cajas / Turnos)
+-- Turnos de Caja (Aperturas y Cierres)
 CREATE TABLE shifts (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     store_id UUID NOT NULL REFERENCES stores(id),
     device_id UUID NOT NULL REFERENCES devices(id),
-    user_id BIGINT REFERENCES users(id), -- Who opened it
+    user_id BIGINT REFERENCES users(id),
     
     opened_at TIMESTAMPTZ NOT NULL,
     closed_at TIMESTAMPTZ,
     
-    amount_initial DECIMAL(15,2) DEFAULT 0,
-    amount_system DECIMAL(15,2) DEFAULT 0, -- Expected cash
-    amount_counted DECIMAL(15,2), -- Actual count
-    amount_diff DECIMAL(15,2),
+    amount_initial DECIMAL(15,2) DEFAULT 0, -- Fondo de caja
+    amount_system DECIMAL(15,2) DEFAULT 0, -- Teórico calculado por sistema
+    amount_counted DECIMAL(15,2), -- Real contado por usuario
+    amount_diff DECIMAL(15,2), -- Descuadre
     
-    status VARCHAR(20) DEFAULT 'OPEN', -- OPEN, CLOSED
-    
-    -- Z Report Data
-    z_count INT, 
+    status VARCHAR(20) DEFAULT 'OPEN',
+    z_count INT, -- Número de informe Z
     z_report_signature TEXT,
-    
     synced_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Cash Movements (Entries/Exits separate from Sales)
+-- Movimientos de Caja (Entradas/Salidas manuales)
 CREATE TABLE cash_movements (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     shift_id UUID NOT NULL REFERENCES shifts(id),
-    type VARCHAR(20) NOT NULL, -- DROP (retirada), FLOAT (entrada), EXPENSE (pago proveedor)
+    type VARCHAR(20) NOT NULL, -- DROP (Retirada), FLOAT (Ingreso)
     amount DECIMAL(15,2) NOT NULL,
     reason TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Sales Headers (Tickets/Invoices)
+-- Cabeceras de Venta (Tickets/Facturas)
 CREATE TABLE sales (
     id BIGSERIAL PRIMARY KEY,
-    uuid UUID NOT NULL UNIQUE, -- Generated at POS, checked for idempotency
+    uuid UUID NOT NULL UNIQUE, -- Generado en TPV (Offline First)
     company_id UUID NOT NULL REFERENCES companies(id),
     store_id UUID NOT NULL REFERENCES stores(id),
     device_id UUID NOT NULL REFERENCES devices(id),
     
-    -- Document ID
+    -- Identificación Fiscal del Documento
     series VARCHAR(50) NOT NULL,
     number INT NOT NULL,
-    full_reference VARCHAR(100) NOT NULL, -- 'T-POS1-2024-1005'
+    full_reference VARCHAR(100) NOT NULL, -- Ej: 'CAJA1-2024-1005'
     
-    -- Type
     type VARCHAR(50) NOT NULL DEFAULT 'SIMPLIFIED' REFERENCES document_types(code),
     
-    -- Context
     shift_id UUID REFERENCES shifts(id),
     user_id BIGINT REFERENCES users(id),
-    customer_id BIGINT REFERENCES customers(id) ON DELETE RESTRICT, -- Point 7 - Protect History
+    customer_id BIGINT REFERENCES customers(id) ON DELETE RESTRICT,
     
-    -- FISCAL SNAPSHOT
+    -- FOTO FISCAL (Snapshot) - Datos inmutables del momento de la venta
     customer_tax_id VARCHAR(50),
     customer_legal_name VARCHAR(255),
     customer_address TEXT,
@@ -640,94 +442,74 @@ CREATE TABLE sales (
     store_legal_name VARCHAR(255),
     store_address TEXT,
     
-    -- Dates
     created_at_pos TIMESTAMPTZ NOT NULL,
-    issued_at_pos TIMESTAMPTZ, -- Fiscal Date
+    issued_at_pos TIMESTAMPTZ, -- Fecha devengo impuestos
     received_at_server TIMESTAMPTZ DEFAULT NOW(),
     
-    -- Status
-    status VARCHAR(20) DEFAULT 'DRAFT', -- DRAFT, ISSUED, FISCALIZED, SENT_AEAT, AEAT_ACCEPTED, AEAT_REJECTED, CANCELLED
-    sync_status VARCHAR(20) DEFAULT 'PENDING', -- PENDING, SYNCED, ERROR (Point 3)
-    sync_batch_id UUID, -- Point 3 - Audit Sync Batches
+    status VARCHAR(20) DEFAULT 'DRAFT', -- DRAFT, ISSUED, FISCALIZED (VeriFactu)
+    sync_status VARCHAR(20) DEFAULT 'PENDING',
+    sync_batch_id UUID,
     is_offline BOOLEAN DEFAULT FALSE,
     
-    -- Totals
-    total_net DECIMAL(15,2) DEFAULT 0,
-    total_tax DECIMAL(15,2) DEFAULT 0,
-    total_surcharge DECIMAL(15,2) DEFAULT 0, -- Added for Integrity Check
-    total_amount DECIMAL(15,2) DEFAULT 0,
+    -- Totales
+    total_net DECIMAL(15,2) DEFAULT 0, -- Base Imponible
+    total_tax DECIMAL(15,2) DEFAULT 0, -- Cuota IVA
+    total_surcharge DECIMAL(15,2) DEFAULT 0, -- Cuota Recargo
+    total_amount DECIMAL(15,2) DEFAULT 0, -- Total a Pagar
     
-    -- Refund / Rectification Links (Enhanced Step 1)
+    -- Enlaces Rectificativas (Factura de Abono)
     original_sale_uuid UUID REFERENCES sales(uuid),
     refund_reason TEXT,
     
-    -- Rectification Snapshot
+    -- Datos Específicos Rectificación
     original_series VARCHAR(50),
     original_number INT,
     original_issue_date TIMESTAMPTZ,
-    rectification_type VARCHAR(50), -- TOTAL, PARTIAL, DATA_CORRECTION
-    rectification_legal_reason VARCHAR(255), -- Added Point A (Legal requirement)
-    rectified_by_uuid UUID REFERENCES sales(uuid), -- Added Point B (Bidirectional Link)
+    rectification_type VARCHAR(50), -- TOTAL, PARCIAL
+    rectification_legal_reason VARCHAR(255),
+    rectified_by_uuid UUID REFERENCES sales(uuid), -- Enlace bidireccional
     
     UNIQUE(store_id, full_reference),
+    UNIQUE(device_id, series, number), -- Unicidad estricta por serie/número
     
-    -- STRICT UNIQUENESS PER DEVICE (Point 1.B)
-    UNIQUE(device_id, series, number),
-    
-    -- DATA INTEGRITY CHECK (Point 6.A)
-    -- Ensures mathematical consistency of the document
+    -- VALIDACIÓN MATEMÁTICA (Integridad de Datos)
     CONSTRAINT chk_sales_totals CHECK (
         ABS(total_amount - (total_net + total_tax + total_surcharge)) < 0.05
     ),
-    
-    -- RECTIFICATION LOGIC CHECK (Point 6)
+    -- LÓGICA DE ABONO
     CONSTRAINT chk_credit_note_logic CHECK (
         (type != 'CREDIT_NOTE') OR (original_sale_uuid IS NOT NULL)
     )
 );
 
--- Sync Logs (Point 3 - Professional Monitoring)
-CREATE TABLE sync_logs (
-    id BIGSERIAL PRIMARY KEY,
-    device_id UUID REFERENCES devices(id),
-    batch_id UUID,
-    status VARCHAR(20), -- START, SUCCESS, ERROR
-    error_message TEXT,
-    created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- Sale Lines
+-- Líneas de Venta (Detalle)
 CREATE TABLE sale_lines (
     id BIGSERIAL PRIMARY KEY,
-    sale_uuid UUID NOT NULL REFERENCES sales(uuid) ON DELETE RESTRICT, -- Prevent accidental cascade
+    sale_uuid UUID NOT NULL REFERENCES sales(uuid) ON DELETE RESTRICT,
     
-    product_id BIGINT REFERENCES products(id) ON DELETE RESTRICT, -- Point 7
-    description VARCHAR(255) NOT NULL, -- Snapshot of name
+    product_id BIGINT REFERENCES products(id) ON DELETE RESTRICT,
+    description VARCHAR(255) NOT NULL, -- Nombre del producto en el momento de venta
     
     quantity DECIMAL(15,3) NOT NULL,
-    unit_price DECIMAL(15,4) NOT NULL, -- Includes pricing rules applied
+    unit_price DECIMAL(15,4) NOT NULL, -- Precio unitario
     
-    -- Discounts
     discount_percent DECIMAL(5,2) DEFAULT 0,
     discount_amount DECIMAL(15,2) DEFAULT 0,
     
-    -- Tax Snapshot
+    -- Desglose Impuestos Línea
     tax_id BIGINT REFERENCES taxes(id),
     tax_rate DECIMAL(10,4) NOT NULL,
     tax_amount DECIMAL(15,4) NOT NULL,
     
     total_line DECIMAL(15,2) NOT NULL,
+    pricing_context JSONB, -- Traza de por qué se aplicó este precio (oferta, tarifa, etc)
     
-    -- Pricing Traceability (Point 2)
-    pricing_context JSONB, -- Stores info about applied tariffs, rules, overrides
-    
-    -- MATH CONSISTENCY CHECK (Point 5)
     CONSTRAINT chk_line_totals CHECK (
         ABS(total_line - ((quantity * unit_price) - discount_amount + tax_amount)) < 0.05
     )
 );
 
--- Sale Taxes Aggregates
+-- Desglose de Impuestos Agregado (Bases por Tipo)
 CREATE TABLE sale_taxes (
     id BIGSERIAL PRIMARY KEY,
     sale_uuid UUID NOT NULL REFERENCES sales(uuid) ON DELETE RESTRICT,
@@ -740,198 +522,142 @@ CREATE TABLE sale_taxes (
     surcharge_rate DECIMAL(10,4) DEFAULT 0,
     surcharge_amount DECIMAL(15,2) DEFAULT 0,
     
-    -- Consistency Check (Enhanced Step 2)
-    -- Uniqueness based on rates, not IDs (which might change/null)
-    UNIQUE(sale_uuid, tax_rate, surcharge_rate)
+    UNIQUE(sale_uuid, tax_rate, surcharge_rate) -- Evita duplicados por tipo impositivo
 );
 
--- Payments
+-- Pagos (Cobros asociados a la venta)
 CREATE TABLE payments (
     id BIGSERIAL PRIMARY KEY,
-    uuid UUID NOT NULL UNIQUE DEFAULT uuid_generate_v4(), -- Added Step 3
+    uuid UUID NOT NULL UNIQUE DEFAULT uuid_generate_v4(),
     sale_uuid UUID NOT NULL REFERENCES sales(uuid) ON DELETE RESTRICT,
     
-    payment_method_id BIGINT REFERENCES payment_methods(id) ON DELETE RESTRICT, -- Point 6.C
+    payment_method_id BIGINT REFERENCES payment_methods(id) ON DELETE RESTRICT,
     amount DECIMAL(15,2) NOT NULL,
     currency VARCHAR(3) DEFAULT 'EUR',
     exchange_rate DECIMAL(10,4) DEFAULT 1,
     
-    payment_data JSONB, -- Card auth codes, etc
+    payment_data JSONB, -- Datos pasarela, auth code, etc.
     created_at_pos TIMESTAMPTZ NOT NULL,
     
-    -- Integrity Check (Enhanced Step 3)
     UNIQUE(sale_uuid, payment_method_id, created_at_pos)
 );
 
 -- ==================================================================================
--- 7. VERIFACTU & FISCAL COMPLIANCE (The Immutable Chain)
+-- 7. REGISTRO DE AUDITORÍA FISCAL (VeriFactu / TicketBAI)
 -- ==================================================================================
-
+-- Tabla INMUTABLE que garantiza el encadenamiento criptográfico
 CREATE TABLE fiscal_audit_log (
     id BIGSERIAL PRIMARY KEY,
-    uuid UUID NOT NULL UNIQUE, -- Generated at POS
+    uuid UUID NOT NULL UNIQUE,
     sale_uuid UUID NOT NULL REFERENCES sales(uuid),
     store_id UUID NOT NULL REFERENCES stores(id),
     device_id UUID NOT NULL REFERENCES devices(id),
     
-    event_type VARCHAR(20) NOT NULL, -- ISSUE, ANNUL
+    event_type VARCHAR(20) NOT NULL, -- ISSUE (Emisión), ANNUL (Anulación)
     
-    -- THE CHAIN (VeriFactu Requirement)
-    -- Chain per Device strategy enabled by device_sequences table
-    previous_record_hash VARCHAR(64) NOT NULL, 
-    chain_sequence_id INT NOT NULL, 
+    -- LA CADENA (Requisito Legal Antifraude)
+    previous_record_hash VARCHAR(64) NOT NULL, -- Hash del registro anterior
+    chain_sequence_id INT NOT NULL, -- Secuencial estricto 1, 2, 3...
     
-    -- Fingerprinting
-    record_hash VARCHAR(64) NOT NULL, 
-    signature TEXT, 
+    -- Huella Digital
+    record_hash VARCHAR(64) NOT NULL, -- Hash SHA-256 de este registro
+    signature TEXT, -- Firma digital (si aplica)
     
-    -- Software Identification
+    -- Identificación Software
     software_id VARCHAR(100) NOT NULL,
     software_version VARCHAR(50) NOT NULL,
     developer_id VARCHAR(100) NOT NULL,
     certification_reference VARCHAR(100),
     
-    -- Audit Data
+    -- Datos Auditados
     invoice_amount DECIMAL(15,2) NOT NULL,
     invoice_date TIMESTAMPTZ NOT NULL,
     
-    -- AEAT Communication
+    -- Comunicación AEAT
     aeat_status VARCHAR(20) DEFAULT 'PENDING',
     aeat_csv_sent TEXT,
     aeat_response_json JSONB,
     
     created_at TIMESTAMPTZ DEFAULT NOW(),
     
-    -- Integrity: A device cannot have two records with same sequence
+    -- Integridad: Un dispositivo no puede repetir secuencia
     UNIQUE(device_id, chain_sequence_id),
-    
-    -- PREVENT DOUBLE FISCALIZATION (Point 1.A)
+    -- Integridad: Una venta no puede fiscalizarse dos veces por el mismo evento
     UNIQUE(sale_uuid, event_type),
     
-    -- STRICT HASH CHECKS (Point 6.D)
     CONSTRAINT chk_hash_length CHECK (LENGTH(record_hash) = 64),
     CONSTRAINT chk_prev_hash_length CHECK (LENGTH(previous_record_hash) = 64)
 );
 
 -- ==================================================================================
--- 8. ACCOUNTING & AUDIT (Point 3 & 10)
+-- 8. CONTABILIDAD Y AUDITORÍA INTERNA
 -- ==================================================================================
 
--- Accounting Entries (Asientos)
+-- Asientos Contables
 CREATE TABLE accounting_entries (
     id BIGSERIAL PRIMARY KEY,
     company_id UUID NOT NULL REFERENCES companies(id),
-    
     reference_type VARCHAR(50), -- SALE, PURCHASE, PAYMENT
     reference_uuid UUID,
-    
     entry_date DATE NOT NULL,
     description TEXT,
-    
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Líneas de Asiento (Apuntes)
 CREATE TABLE accounting_entry_lines (
     id BIGSERIAL PRIMARY KEY,
     entry_id BIGINT REFERENCES accounting_entries(id) ON DELETE CASCADE,
+    account_code VARCHAR(20) NOT NULL, -- Ej: '430000', '700000'
+    debit DECIMAL(15,2) DEFAULT 0, -- Debe
+    credit DECIMAL(15,2) DEFAULT 0, -- Haber
     
-    account_code VARCHAR(20) NOT NULL,
-    debit DECIMAL(15,2) DEFAULT 0,
-    credit DECIMAL(15,2) DEFAULT 0,
-
-    -- Accounting Integrity (Point 1: Debit OR Credit, never both active)
+    -- Regla Contable: Una línea va al Debe O al Haber, no ambos (o cero)
     CONSTRAINT chk_debit_credit_exclusive CHECK (
         (debit = 0 AND credit > 0) OR (credit = 0 AND debit > 0)
     )
 );
 
--- Audit Log (Security)
+-- Auditoría de Acciones de Usuario (Log de Seguridad)
 CREATE TABLE audit_user_actions (
     id BIGSERIAL PRIMARY KEY,
     user_id BIGINT REFERENCES users(id),
-    action VARCHAR(100) NOT NULL, -- LOGIN_FAILED, PRICE_CHANGED, STOCK_ADJUSTED
+    action VARCHAR(100) NOT NULL, -- LOGIN_FAILED, PRICE_OVERRIDE
     entity VARCHAR(50),
     entity_id VARCHAR(100),
     payload JSONB,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-
 -- ==================================================================================
--- 9. DOMAIN EVENTS (For BI / Async)
--- ==================================================================================
-CREATE TABLE domain_events (
-    id BIGSERIAL PRIMARY KEY,
-    aggregate_type VARCHAR(50) NOT NULL, -- SALE, PRODUCT, STOCK
-    aggregate_id VARCHAR(100) NOT NULL, -- UUID or ID
-    event_type VARCHAR(100) NOT NULL, -- SALE_CREATED, STOCK_ADJUSTED
-    payload JSONB NOT NULL,
-    
-    -- Processing Status (Point 5)
-    processed BOOLEAN DEFAULT FALSE,
-    processed_at TIMESTAMPTZ,
-    
-    created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- ==================================================================================
--- 10. INDEXES & OPTIMIZATIONS
+-- 9. ÍNDICES Y OPTIMIZACIONES
 -- ==================================================================================
 
--- Performance Indexes
 CREATE INDEX idx_products_search ON products(company_id, name);
 CREATE INDEX idx_products_ref ON products(company_id, reference);
 CREATE INDEX idx_sales_date ON sales(issued_at_pos);
 CREATE INDEX idx_sales_customer ON sales(customer_id);
-CREATE INDEX idx_inventory_lookup ON inventory_stock(product_id, warehouse_id);
-CREATE INDEX idx_fiscal_chain ON fiscal_audit_log(device_id, chain_sequence_id);
 
--- Operational Indexes
+-- Índice de Inventario Actualizado (Usa el nuevo company_id)
+CREATE INDEX idx_inventory_lookup ON inventory_stock(company_id, product_id, warehouse_id);
+
+CREATE INDEX idx_stock_movements_wh ON stock_movements(warehouse_id);
+CREATE INDEX idx_stock_movements_prod ON stock_movements(product_id);
+
+CREATE INDEX idx_fiscal_chain ON fiscal_audit_log(device_id, chain_sequence_id);
 CREATE INDEX idx_sales_uuid ON sales(uuid);
 CREATE INDEX idx_sales_store_date ON sales(store_id, issued_at_pos);
-CREATE INDEX idx_stock_mov_product ON stock_movements(product_id);
 CREATE INDEX idx_sale_lines_sale ON sale_lines(sale_uuid);
-CREATE INDEX idx_fiscal_log_sale ON fiscal_audit_log(sale_uuid);
-
--- NEW CRITICAL INDEXES (Points 1.C & 6)
-CREATE INDEX idx_fiscal_device_date ON fiscal_audit_log(device_id, invoice_date);
-CREATE INDEX idx_events_unprocessed ON domain_events(processed, created_at);
-
--- Requested Analysis Indexes (Step 7)
-CREATE INDEX idx_sales_device_issued ON sales(device_id, issued_at_pos);
-CREATE INDEX idx_sale_lines_product ON sale_lines(product_id);
-
--- Extra Enterprise Hardening Indexes (Point 4 & 5)
-CREATE INDEX idx_fiscal_device_created ON fiscal_audit_log(device_id, created_at);
-CREATE INDEX idx_customer_product_price_lookup ON customer_product_prices(customer_id, product_id);
-
--- Multi-Tenancy & Isolation Optimization (Point 5)
-CREATE INDEX idx_sales_company_date ON sales(company_id, issued_at_pos);
-CREATE INDEX idx_products_company_active ON products(company_id, active);
-
--- Soft Delete Optimization (Point 7)
-CREATE INDEX idx_products_active_only ON products(company_id, reference) WHERE deleted_at IS NULL;
-CREATE INDEX idx_customers_active_only ON customers(company_id, tax_id) WHERE deleted_at IS NULL;
-
--- NEW INDEXES (Version 1.5 - Point 4, 8, 9, 11)
-CREATE INDEX idx_price_history_lookup ON product_price_history(product_id, tariff_id, valid_from, valid_until);
-CREATE INDEX idx_cost_history_lookup ON product_cost_history(product_id, valid_from, valid_until);
-CREATE INDEX idx_customer_ledger ON customer_account_movements(customer_id, created_at);
-CREATE INDEX idx_accounting_company_date ON accounting_entries(company_id, entry_date);
-
--- UNIQUE ACTIVE PRICE (Point 11 - Prevent double active price)
-CREATE UNIQUE INDEX uniq_price_active ON product_price_history(product_id, tariff_id) WHERE valid_until IS NULL;
-
 
 -- ==================================================================================
--- 11. TRIGGERS & SECURITY
+-- 10. TRIGGERS Y SEGURIDAD DE DATOS
 -- ==================================================================================
 
--- Function to prevent updates/deletes on fiscal log
+-- Función: Proteger el Log Fiscal (Inmutabilidad)
 CREATE OR REPLACE FUNCTION prevent_change_fiscal_log()
 RETURNS TRIGGER AS $$
 BEGIN
-    RAISE EXCEPTION 'Fiscal Audit Log is Immutable. Operation not allowed.';
+    RAISE EXCEPTION 'EL REGISTRO FISCAL ES INMUTABLE. Operación denegada por seguridad.';
 END;
 $$ LANGUAGE plpgsql;
 
@@ -939,16 +665,13 @@ CREATE TRIGGER trg_protect_fiscal_log
 BEFORE UPDATE OR DELETE ON fiscal_audit_log
 FOR EACH ROW EXECUTE FUNCTION prevent_change_fiscal_log();
 
--- ==================================================================================
--- TRIGGER: FISCAL SEQUENCE VALIDATION (Step 4 - DB Level Chain Protection)
--- ==================================================================================
+-- Función: Validar Cadena Fiscal (Prevención de Huecos)
 CREATE OR REPLACE FUNCTION validate_fiscal_sequence()
 RETURNS TRIGGER AS $$
 DECLARE
     last_seq INT;
 BEGIN
-    -- High Concurrency Protection (Point D)
-    -- Select the last record for this device and lock it (FOR UPDATE)
+    -- Bloquear registro anterior para evitar condiciones de carrera
     SELECT chain_sequence_id INTO last_seq
     FROM fiscal_audit_log
     WHERE device_id = NEW.device_id
@@ -956,15 +679,11 @@ BEGIN
     LIMIT 1
     FOR UPDATE;
     
-    -- Handle first record case
-    IF last_seq IS NULL THEN
-        last_seq := 0;
-    END IF;
+    IF last_seq IS NULL THEN last_seq := 0; END IF;
 
-    -- Enforce strict next sequence
+    -- Verificar que el nuevo registro es exactamente el siguiente (+1)
     IF NEW.chain_sequence_id != last_seq + 1 THEN
-        RAISE EXCEPTION 'Fiscal Chain Breach: Expected sequence % but got % for device %', 
-            last_seq + 1, NEW.chain_sequence_id, NEW.device_id;
+        RAISE EXCEPTION 'Rotura de Cadena Fiscal: Se esperaba % pero se recibió %', last_seq + 1, NEW.chain_sequence_id;
     END IF;
     
     RETURN NEW;
@@ -975,104 +694,77 @@ CREATE TRIGGER trg_validate_fiscal_sequence
 BEFORE INSERT ON fiscal_audit_log
 FOR EACH ROW EXECUTE FUNCTION validate_fiscal_sequence();
 
-
--- ==================================================================================
--- TRIGGER: PROTECT FISCALIZED SALES (Step 6 - Never Delete)
--- ==================================================================================
+-- Función: Proteger Ventas ya Fiscalizadas (No editar Facturas emitidas)
 CREATE OR REPLACE FUNCTION prevent_change_fiscalized_sales()
 RETURNS TRIGGER AS $$
 DECLARE
     current_status VARCHAR(20);
 BEGIN
-    -- Determine status based on table type
     IF TG_TABLE_NAME = 'sales' THEN
         current_status := OLD.status;
     ELSE
-        -- For lines, payments, taxes -> fetch parent sales status
+        -- Si es una línea hija, buscar el estado del padre
         SELECT status INTO current_status FROM sales WHERE uuid = OLD.sale_uuid;
     END IF;
 
-    -- Block modifications if fiscalized
     IF current_status IN ('ISSUED', 'FISCALIZED', 'SENT_AEAT', 'AEAT_ACCEPTED') THEN
-        RAISE EXCEPTION 'Operation Denied: Cannot DELETE or UPDATE records of a fiscalized sale (Status: %). Issue a Rectification instead.', current_status;
+        RAISE EXCEPTION 'Operación Denegada: No se puede modificar una venta fiscalizada (Estado: %). Emitir Rectificativa.', current_status;
     END IF;
 
     RETURN OLD;
 END;
 $$ LANGUAGE plpgsql;
 
--- Apply to all critical sales tables
+-- Aplicar protección a todas las tablas de venta
 CREATE TRIGGER trg_protect_sales_del BEFORE DELETE OR UPDATE ON sales
 FOR EACH ROW EXECUTE FUNCTION prevent_change_fiscalized_sales();
 
 CREATE TRIGGER trg_protect_lines_del BEFORE DELETE OR UPDATE ON sale_lines
 FOR EACH ROW EXECUTE FUNCTION prevent_change_fiscalized_sales();
 
-CREATE TRIGGER trg_protect_taxes_del BEFORE DELETE OR UPDATE ON sale_taxes
-FOR EACH ROW EXECUTE FUNCTION prevent_change_fiscalized_sales();
-
-CREATE TRIGGER trg_protect_pay_del BEFORE DELETE OR UPDATE ON payments
-FOR EACH ROW EXECUTE FUNCTION prevent_change_fiscalized_sales();
-
-
 -- ==================================================================================
--- TRIGGER: PROTECT COMPLETED STOCK DOCS (Point 7)
--- ==================================================================================
-CREATE OR REPLACE FUNCTION prevent_change_completed_stock()
-RETURNS TRIGGER AS $$
-BEGIN
-    IF OLD.status = 'COMPLETED' THEN
-        RAISE EXCEPTION 'Operation Denied: Cannot DELETE or UPDATE a COMPLETED stock document.';
-    END IF;
-    RETURN OLD;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER trg_protect_transfer_del BEFORE DELETE OR UPDATE ON stock_transfers
-FOR EACH ROW EXECUTE FUNCTION prevent_change_completed_stock();
-
-CREATE TRIGGER trg_protect_count_del BEFORE DELETE OR UPDATE ON stock_counts
-FOR EACH ROW EXECUTE FUNCTION prevent_change_completed_stock();
-
-
--- ==================================================================================
--- 12. SEED DATA (Bootstrap)
+-- 11. DATOS SEMILLA (Bootstrap)
 -- ==================================================================================
 
--- 1. Create Default Company
-INSERT INTO companies (id, name, tax_id) 
-VALUES ('11111111-1111-1111-1111-111111111111', 'DEMO COMPANY S.L.', 'B12345678');
+-- 1. Empresa Principal (Demo)
+INSERT INTO companies (id, name, tax_id, fiscal_regime) 
+VALUES ('11111111-1111-1111-1111-111111111111', 'TERENCIO ENTERPRISE S.L.', 'B12345678', 'COMMON');
 
--- 2. Create Default Store
-INSERT INTO stores (id, company_id, code, name)
-VALUES ('22222222-2222-2222-2222-222222222222', '11111111-1111-1111-1111-111111111111', 'MAIN-01', 'Main Store');
+-- 2. Tienda Principal (Madrid)
+INSERT INTO stores (id, company_id, code, name, city)
+VALUES ('22222222-2222-2222-2222-222222222222', '11111111-1111-1111-1111-111111111111', 'MAD-001', 'Tienda Central', 'Madrid');
 
--- 3. Create Default Warehouse
-INSERT INTO warehouses (company_id, store_id, name)
-VALUES ('11111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-222222222222', 'Main Warehouse');
+-- 3. Almacén Lógico
+INSERT INTO warehouses (store_id, name, code)
+VALUES ('22222222-2222-2222-2222-222222222222', 'Almacén Central', 'WH-MAD-01');
 
--- 4. Create Super Admin (Handled by DataInitializer instead)
--- INSERT INTO users (company_id, store_id, username, password_hash, full_name, role)
--- VALUES (
---     '11111111-1111-1111-1111-111111111111', 
---     '22222222-2222-2222-2222-222222222222', 
---     'admin', 
---     '$2a$10$X7V.jO.vj.j.j.j.j.j.j.j.j.j.j', -- Dummy BCrypt
---     'System Administrator', 
---     'SUPER_ADMIN'
--- );
+-- 4. Impuestos Reales (España Peninsular y Canarias)
+INSERT INTO taxes (company_id, name, rate, code_aeat) VALUES 
+-- IVA Peninsular
+('11111111-1111-1111-1111-111111111111', 'IVA General 21%', 21.0000, 'IVA_21'),
+('11111111-1111-1111-1111-111111111111', 'IVA Reducido 10%', 10.0000, 'IVA_10'),
+('11111111-1111-1111-1111-111111111111', 'IVA Superreducido 4%', 4.0000, 'IVA_4'),
+-- IGIC Canarias
+('11111111-1111-1111-1111-111111111111', 'IGIC General 7%', 7.0000, 'IGIC_7'),
+('11111111-1111-1111-1111-111111111111', 'IGIC Reducido 3%', 3.0000, 'IGIC_3'),
+('11111111-1111-1111-1111-111111111111', 'IGIC Cero 0%', 0.0000, 'IGIC_0');
 
--- 5. Seed Document Types
-INSERT INTO document_types (code, name, description) VALUES
-('SIMPLIFIED', 'Factura Simplificada', 'Ticket de venta estándar (antiguo ticket)'),
-('FULL', 'Factura Completa', 'Factura con datos fiscales completos del cliente'),
-('CREDIT_NOTE', 'Factura Rectificativa', 'Devolución o corrección de factura anterior');
+-- 5. Usuario Administrador (Hash ficticio)
+INSERT INTO users (company_id, store_id, username, password_hash, full_name, role)
+VALUES ('11111111-1111-1111-1111-111111111111', NULL, 'admin', '$2a$12$R9h/cIPz0gi.URNNX3kh2OPST9/PgBkqquii.V3ilJjy8I0Iy', 'Administrador Sistema', 'SUPER_ADMIN');
 
--- 6. Seed Payment Methods
+-- 6. Métodos de Pago
 INSERT INTO payment_methods (company_id, code, name, is_cash, requires_reference) VALUES
-(NULL, 'CASH', 'Efectivo', TRUE, FALSE),
-(NULL, 'CARD', 'Tarjeta Crédito/Débito', FALSE, TRUE);
+(NULL, 'EFECTIVO', 'Efectivo', TRUE, FALSE),
+(NULL, 'TARJETA', 'Tarjeta', FALSE, TRUE),
+(NULL, 'BIZUM', 'Bizum', FALSE, TRUE);
 
--- 7. Create a Registration Code for immediate POS onboarding
+-- 7. Tipos de Documento
+INSERT INTO document_types (code, name, description) VALUES
+('SIMPLIFIED', 'Factura Simplificada', 'Ticket de venta'),
+('FULL', 'Factura Completa', 'Factura nominativa'),
+('CREDIT_NOTE', 'Factura Rectificativa', 'Abono o devolución');
+
+-- 8. Código de Activación TPV
 INSERT INTO registration_codes (code, store_id, preassigned_name, expires_at)
-VALUES ('123456', '22222222-2222-2222-2222-222222222222', 'POS 1', NOW() + INTERVAL '1 year');
+VALUES ('999999', '22222222-2222-2222-2222-222222222222', 'CAJA-PRINCIPAL', NOW() + INTERVAL '10 years');
