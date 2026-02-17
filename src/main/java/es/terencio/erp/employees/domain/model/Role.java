@@ -1,4 +1,4 @@
-package es.terencio.erp.users.domain.model;
+package es.terencio.erp.employees.domain.model;
 
 public enum Role {
     ADMIN("Administrator", "Full access to everything"),

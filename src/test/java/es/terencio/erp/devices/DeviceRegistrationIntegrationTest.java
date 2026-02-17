@@ -91,13 +91,14 @@ class DeviceRegistrationIntegrationTest extends AbstractIntegrationTest {
 
         // Create admin user for authentication
         String adminPassword = passwordEncoder.encode("admin123");
-        adminUserId = jdbcClient.sql("""
-                INSERT INTO users (username, full_name, role, pin_hash, password_hash,
-                    company_id, store_id, permissions_json, is_active)
-                VALUES ('admindev', 'Admin Device', 'ADMIN', 'pinadmin', :password,
-                    :companyId, :storeId, '[]', TRUE)
-                RETURNING id
-                """)
+        adminUserId = jdbcClient
+                .sql("""
+                                        INSERT INTO employees (username, full_name, role, pin_hash, password_hash,
+                                                organization_id, store_id, permissions_json, is_active)
+                        VALUES ('admindev', 'Admin Device', 'ADMIN', 'pinadmin', :password,
+                                                (SELECT organization_id FROM companies WHERE id = :companyId), :storeId, '[]', TRUE)
+                        RETURNING id
+                        """)
                 .param("password", adminPassword)
                 .param("companyId", testCompanyId)
                 .param("storeId", testStoreId)
@@ -107,8 +108,8 @@ class DeviceRegistrationIntegrationTest extends AbstractIntegrationTest {
         // Create test users for the store
         testUserId1 = jdbcClient
                 .sql("""
-                        INSERT INTO users (username, full_name, role, pin_hash, password_hash, company_id, store_id, permissions_json, is_active)
-                        VALUES ('cashier1', 'Test Cashier 1', 'CASHIER', 'pinhash1', 'passhash1', :companyId, :storeId, '[]', TRUE)
+                        INSERT INTO employees (username, full_name, role, pin_hash, password_hash, organization_id, store_id, permissions_json, is_active)
+                        VALUES ('cashier1', 'Test Cashier 1', 'CASHIER', 'pinhash1', 'passhash1', (SELECT organization_id FROM companies WHERE id = :companyId), :storeId, '[]', TRUE)
                         RETURNING id
                         """)
                 .param("companyId", testCompanyId)
@@ -118,8 +119,8 @@ class DeviceRegistrationIntegrationTest extends AbstractIntegrationTest {
 
         testUserId2 = jdbcClient
                 .sql("""
-                        INSERT INTO users (username, full_name, role, pin_hash, password_hash, company_id, store_id, permissions_json, is_active)
-                        VALUES ('manager1', 'Test Manager 1', 'MANAGER', 'pinhash2', 'passhash2', :companyId, :storeId, '[]', TRUE)
+                        INSERT INTO employees (username, full_name, role, pin_hash, password_hash, organization_id, store_id, permissions_json, is_active)
+                        VALUES ('manager1', 'Test Manager 1', 'MANAGER', 'pinhash2', 'passhash2', (SELECT organization_id FROM companies WHERE id = :companyId), :storeId, '[]', TRUE)
                         RETURNING id
                         """)
                 .param("companyId", testCompanyId)

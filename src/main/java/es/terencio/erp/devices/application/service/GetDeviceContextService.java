@@ -9,13 +9,13 @@ import es.terencio.erp.devices.application.dto.DeviceContextDto;
 import es.terencio.erp.devices.application.dto.DeviceDto;
 import es.terencio.erp.devices.application.port.in.GetDeviceContextUseCase;
 import es.terencio.erp.devices.application.port.out.DevicePort;
+import es.terencio.erp.employees.application.dto.UserSyncDto;
+import es.terencio.erp.employees.application.port.out.UserPort;
 import es.terencio.erp.shared.exception.RegistrationException;
 import es.terencio.erp.stores.application.dto.StoreDto;
 import es.terencio.erp.stores.application.dto.StoreSettingsDto;
 import es.terencio.erp.stores.application.port.out.StorePort;
 import es.terencio.erp.stores.application.port.out.StoreSettingsPort;
-import es.terencio.erp.users.application.dto.UserSyncDto;
-import es.terencio.erp.users.application.port.out.UserPort;
 
 /**
  * Service for retrieving device context information.

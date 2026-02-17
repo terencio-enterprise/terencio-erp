@@ -75,7 +75,8 @@ public abstract class AbstractIntegrationTest {
         jdbcClient.sql("DELETE FROM shifts").update();
         jdbcClient.sql("DELETE FROM registration_codes").update();
         jdbcClient.sql("DELETE FROM devices").update();
-        jdbcClient.sql("DELETE FROM users").update();
+        jdbcClient.sql("DELETE FROM employee_access_grants").update();
+        jdbcClient.sql("DELETE FROM employees").update();
         jdbcClient.sql("DELETE FROM warehouses").update();
         jdbcClient.sql("DELETE FROM store_settings").update();
         jdbcClient.sql("DELETE FROM stores").update();
@@ -89,6 +90,7 @@ public abstract class AbstractIntegrationTest {
 
         // Level 5: Root tables
         jdbcClient.sql("DELETE FROM companies").update();
+        jdbcClient.sql("DELETE FROM organizations").update();
     }
 
     // ==================== AUTH HELPER METHODS ====================
@@ -108,10 +110,10 @@ public abstract class AbstractIntegrationTest {
     protected void createAdminUser(java.util.UUID companyId, java.util.UUID storeId, String username, String password) {
         String encodedPassword = passwordEncoder.encode(password);
         jdbcClient.sql("""
-                INSERT INTO users (username, full_name, role, pin_hash, password_hash,
-                    company_id, store_id, permissions_json, is_active)
+                INSERT INTO employees (username, full_name, role, pin_hash, password_hash,
+                    organization_id, store_id, permissions_json, is_active)
                 VALUES (:username, 'Admin User', 'ADMIN', 'pin123', :password,
-                    :companyId, :storeId, '[]', TRUE)
+                    (SELECT organization_id FROM companies WHERE id = :companyId), :storeId, '[]', TRUE)
                 """)
                 .param("username", username)
                 .param("password", encodedPassword)

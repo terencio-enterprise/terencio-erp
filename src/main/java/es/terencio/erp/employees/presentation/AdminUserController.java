@@ -1,4 +1,4 @@
-package es.terencio.erp.users.presentation;
+package es.terencio.erp.employees.presentation;
 
 import java.util.List;
 import java.util.Map;
@@ -15,19 +15,19 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import es.terencio.erp.shared.presentation.ApiResponse;
-import es.terencio.erp.users.application.dto.CreateUserRequest;
-import es.terencio.erp.users.application.dto.UpdateUserRequest;
-import es.terencio.erp.users.application.dto.UserDto;
-import es.terencio.erp.users.application.port.in.ManageUsersUseCase;
-import es.terencio.erp.users.domain.model.Role;
+import es.terencio.erp.employees.application.dto.CreateUserRequest;
+import es.terencio.erp.employees.application.dto.UpdateUserRequest;
+import es.terencio.erp.employees.application.dto.UserDto;
+import es.terencio.erp.employees.application.port.in.ManageUsersUseCase;
+import es.terencio.erp.employees.domain.model.Role;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 
 @RestController
-@RequestMapping("/api/v1/admin/users")
+@RequestMapping("/api/v1/admin/employees")
 @PreAuthorize("hasRole('ADMIN')")
-@Tag(name = "Admin Users", description = "Administrative user management endpoints")
+@Tag(name = "Admin Employees", description = "Administrative employee management endpoints")
 public class AdminUserController {
 
     private final ManageUsersUseCase manageUsersUseCase;
@@ -37,33 +37,34 @@ public class AdminUserController {
     }
 
     @GetMapping
-    @Operation(summary = "List users", description = "Returns all users")
+    @Operation(summary = "List employees", description = "Returns all employees")
     public ResponseEntity<ApiResponse<List<UserDto>>> list() {
-        return ResponseEntity.ok(ApiResponse.success("Users fetched successfully", manageUsersUseCase.listAll()));
+        return ResponseEntity.ok(ApiResponse.success("Employees fetched successfully", manageUsersUseCase.listAll()));
     }
 
     @GetMapping("/{id}")
-    @Operation(summary = "Get user", description = "Returns one user by identifier")
+    @Operation(summary = "Get employee", description = "Returns one employee by identifier")
     public ResponseEntity<ApiResponse<UserDto>> get(@PathVariable Long id) {
-        return ResponseEntity.ok(ApiResponse.success("User fetched successfully", manageUsersUseCase.getById(id)));
+        return ResponseEntity.ok(ApiResponse.success("Employee fetched successfully", manageUsersUseCase.getById(id)));
     }
 
     @PostMapping
-    @Operation(summary = "Create user", description = "Creates a new system user")
+    @Operation(summary = "Create employee", description = "Creates a new employee")
     public ResponseEntity<ApiResponse<UserDto>> create(@Valid @RequestBody CreateUserRequest request) {
-        return ResponseEntity.ok(ApiResponse.success("User created successfully", manageUsersUseCase.create(request)));
+        return ResponseEntity
+                .ok(ApiResponse.success("Employee created successfully", manageUsersUseCase.create(request)));
     }
 
     @PutMapping("/{id}")
-    @Operation(summary = "Update user", description = "Updates an existing user")
+    @Operation(summary = "Update employee", description = "Updates an existing employee")
     public ResponseEntity<ApiResponse<UserDto>> update(@PathVariable Long id,
             @Valid @RequestBody UpdateUserRequest request) {
         return ResponseEntity
-                .ok(ApiResponse.success("User updated successfully", manageUsersUseCase.update(id, request)));
+                .ok(ApiResponse.success("Employee updated successfully", manageUsersUseCase.update(id, request)));
     }
 
     @PatchMapping("/{id}/pin")
-    @Operation(summary = "Change POS PIN", description = "Changes POS PIN for a user")
+    @Operation(summary = "Change POS PIN", description = "Changes POS PIN for an employee")
     public ResponseEntity<ApiResponse<Void>> changePosPin(@PathVariable Long id,
             @RequestBody Map<String, String> body) {
         manageUsersUseCase.changePosPin(id, body.get("pin"));
@@ -71,7 +72,7 @@ public class AdminUserController {
     }
 
     @PatchMapping("/{id}/password")
-    @Operation(summary = "Change password", description = "Changes backoffice password for a user")
+    @Operation(summary = "Change password", description = "Changes backoffice password for an employee")
     public ResponseEntity<ApiResponse<Void>> changeBackofficePassword(@PathVariable Long id,
             @RequestBody Map<String, String> body) {
         manageUsersUseCase.changeBackofficePassword(id, body.get("password"));

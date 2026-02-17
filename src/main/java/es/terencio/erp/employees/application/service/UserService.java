@@ -1,4 +1,4 @@
-package es.terencio.erp.users.application.service;
+package es.terencio.erp.employees.application.service;
 
 import java.util.Collections;
 import java.util.List;
@@ -11,11 +11,11 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import es.terencio.erp.shared.exception.DomainException;
-import es.terencio.erp.users.application.dto.CreateUserRequest;
-import es.terencio.erp.users.application.dto.UpdateUserRequest;
-import es.terencio.erp.users.application.dto.UserDto;
-import es.terencio.erp.users.application.port.in.ManageUsersUseCase;
-import es.terencio.erp.users.application.port.out.UserPort;
+import es.terencio.erp.employees.application.dto.CreateUserRequest;
+import es.terencio.erp.employees.application.dto.UpdateUserRequest;
+import es.terencio.erp.employees.application.dto.UserDto;
+import es.terencio.erp.employees.application.port.in.ManageUsersUseCase;
+import es.terencio.erp.employees.application.port.out.UserPort;
 
 @Service
 public class UserService implements ManageUsersUseCase {
@@ -53,6 +53,7 @@ public class UserService implements ManageUsersUseCase {
 
         Long id = userPort.save(request.username(), request.fullName(), request.role(), pinHash, passwordHash,
                 request.companyId(), request.storeId(), permissionsJson);
+        userPort.syncAccessGrants(id, request.role(), request.companyId(), request.storeId());
         return getById(id);
     }
 
@@ -63,6 +64,7 @@ public class UserService implements ManageUsersUseCase {
         String permissionsJson = toJson(
                 request.permissions() != null ? request.permissions() : Collections.emptyList());
         userPort.update(id, request.fullName(), request.role(), request.storeId(), request.isActive(), permissionsJson);
+        userPort.syncAccessGrants(id, request.role(), null, request.storeId());
         return getById(id);
     }
 

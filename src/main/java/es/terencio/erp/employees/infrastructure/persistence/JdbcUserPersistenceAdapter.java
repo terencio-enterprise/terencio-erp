@@ -1,4 +1,4 @@
-package es.terencio.erp.users.infrastructure.persistence;
+package es.terencio.erp.employees.infrastructure.persistence;
 
 import java.util.Collections;
 import java.util.List;
@@ -13,9 +13,9 @@ import org.springframework.stereotype.Repository;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import es.terencio.erp.users.application.dto.UserDto;
-import es.terencio.erp.users.application.dto.UserSyncDto;
-import es.terencio.erp.users.application.port.out.UserPort;
+import es.terencio.erp.employees.application.dto.UserDto;
+import es.terencio.erp.employees.application.dto.UserSyncDto;
+import es.terencio.erp.employees.application.port.out.UserPort;
 
 @Repository
 public class JdbcUserPersistenceAdapter implements UserPort {
@@ -30,26 +30,26 @@ public class JdbcUserPersistenceAdapter implements UserPort {
 
     @Override
     public List<UserDto> findAll() {
-        return jdbcClient.sql("SELECT * FROM users ORDER BY username")
+        return jdbcClient.sql("SELECT * FROM employees ORDER BY username")
                 .query((rs, rowNum) -> mapRow(rs)).list();
     }
 
     @Override
     public Optional<UserDto> findById(Long id) {
-        return jdbcClient.sql("SELECT * FROM users WHERE id = :id")
+        return jdbcClient.sql("SELECT * FROM employees WHERE id = :id")
                 .param("id", id).query((rs, rowNum) -> mapRow(rs)).optional();
     }
 
     @Override
     public Optional<UserDto> findByUsername(String username) {
-        return jdbcClient.sql("SELECT * FROM users WHERE username = :username")
+        return jdbcClient.sql("SELECT * FROM employees WHERE username = :username")
                 .param("username", username).query((rs, rowNum) -> mapRow(rs)).optional();
     }
 
     @Override
     public List<UserDto> findByStoreId(UUID storeId) {
         return jdbcClient.sql(
-                "SELECT * FROM users WHERE store_id = :storeId AND is_active = TRUE AND role != 'ADMIN' ORDER BY username")
+                "SELECT * FROM employees WHERE store_id = :storeId AND is_active = TRUE AND role != 'ADMIN' ORDER BY username")
                 .param("storeId", storeId).query((rs, rowNum) -> mapRow(rs)).list();
     }
 
@@ -57,7 +57,7 @@ public class JdbcUserPersistenceAdapter implements UserPort {
     public List<UserSyncDto> findSyncDataByStoreId(UUID storeId) {
         return jdbcClient.sql("""
                 SELECT id, username, full_name, role, pin_hash
-                FROM users
+                FROM employees
                 WHERE store_id = :storeId AND is_active = TRUE AND role != 'ADMIN'
                 ORDER BY username
                 """)
@@ -85,10 +85,12 @@ public class JdbcUserPersistenceAdapter implements UserPort {
         KeyHolder keyHolder = new GeneratedKeyHolder();
         jdbcClient
                 .sql("""
-                        INSERT INTO users (username, full_name, role, pin_hash, password_hash, company_id, store_id, permissions_json, is_active, created_at, updated_at)
-                        VALUES (:username, :fullName, :role, :pinHash, :passwordHash, :companyId, :storeId, CAST(:permissionsJson AS JSONB), TRUE, NOW(), NOW())
-                        RETURNING id
-                        """)
+                        INSERT INTO employees (username, full_name, role, pin_hash, password_hash, organization_id, store_id, permissions_json, is_active, created_at, updated_at)
+                        VALUES (:username, :fullName, :role, :pinHash, :passwordHash,
+                            (SELECT organization_id FROM companies WHERE id = :companyId),
+                            :storeId, CAST(:permissionsJson AS JSONB), TRUE, NOW(), NOW())
+                                RETURNING id
+                                """)
                 .param("username", username).param("fullName", fullName).param("role", role)
                 .param("pinHash", pinHash).param("passwordHash", passwordHash)
                 .param("companyId", companyId).param("storeId", storeId)
@@ -100,9 +102,62 @@ public class JdbcUserPersistenceAdapter implements UserPort {
     }
 
     @Override
+    public void syncAccessGrants(Long userId, String role, UUID companyId, UUID storeId) {
+        UUID existingCompanyGrantId = jdbcClient.sql("""
+                SELECT target_id
+                FROM employee_access_grants
+                WHERE employee_id = :id AND scope = 'COMPANY'
+                ORDER BY id
+                LIMIT 1
+                """)
+                .param("id", userId)
+                .query((rs, rowNum) -> rs.getObject("target_id", UUID.class))
+                .optional()
+                .orElse(null);
+
+        jdbcClient.sql("DELETE FROM employee_access_grants WHERE employee_id = :userId")
+                .param("userId", userId)
+                .update();
+
+        UUID organizationId = jdbcClient.sql("SELECT organization_id FROM employees WHERE id = :id")
+                .param("id", userId)
+                .query((rs, rowNum) -> rs.getObject("organization_id", UUID.class))
+                .optional()
+                .orElse(null);
+
+        UUID effectiveCompanyId = companyId != null ? companyId : existingCompanyGrantId;
+
+        if (storeId != null) {
+            insertGrant(userId, "STORE", storeId, role);
+            return;
+        }
+
+        if (effectiveCompanyId != null) {
+            insertGrant(userId, "COMPANY", effectiveCompanyId, role);
+            return;
+        }
+
+        if (organizationId != null) {
+            insertGrant(userId, "ORGANIZATION", organizationId, role);
+        }
+    }
+
+    private void insertGrant(Long userId, String scope, UUID targetId, String role) {
+        jdbcClient.sql("""
+                INSERT INTO employee_access_grants (employee_id, scope, target_id, role, created_at)
+                VALUES (:userId, :scope, :targetId, :role, NOW())
+                """)
+                .param("userId", userId)
+                .param("scope", scope)
+                .param("targetId", targetId)
+                .param("role", role)
+                .update();
+    }
+
+    @Override
     public void update(Long id, String fullName, String role, UUID storeId, boolean isActive, String permissionsJson) {
         jdbcClient.sql("""
-                UPDATE users SET full_name = :fullName, role = :role, store_id = :storeId,
+                UPDATE employees SET full_name = :fullName, role = :role, store_id = :storeId,
                     is_active = :isActive, permissions_json = CAST(:permissionsJson AS JSONB), updated_at = NOW()
                 WHERE id = :id
                 """)
@@ -113,13 +168,13 @@ public class JdbcUserPersistenceAdapter implements UserPort {
 
     @Override
     public void updatePin(Long id, String newPinHash) {
-        jdbcClient.sql("UPDATE users SET pin_hash = :pinHash, updated_at = NOW() WHERE id = :id")
+        jdbcClient.sql("UPDATE employees SET pin_hash = :pinHash, updated_at = NOW() WHERE id = :id")
                 .param("id", id).param("pinHash", newPinHash).update();
     }
 
     @Override
     public void updatePassword(Long id, String newPasswordHash) {
-        jdbcClient.sql("UPDATE users SET password_hash = :passwordHash, updated_at = NOW() WHERE id = :id")
+        jdbcClient.sql("UPDATE employees SET password_hash = :passwordHash, updated_at = NOW() WHERE id = :id")
                 .param("id", id).param("passwordHash", newPasswordHash).update();
     }
 

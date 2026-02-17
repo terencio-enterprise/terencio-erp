@@ -1,4 +1,4 @@
-package es.terencio.erp.users.application.dto;
+package es.terencio.erp.employees.application.dto;
 
 /**
  * DTO for User synchronization to POS devices.

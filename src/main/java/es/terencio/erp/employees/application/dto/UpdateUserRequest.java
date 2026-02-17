@@ -1,4 +1,4 @@
-package es.terencio.erp.users.application.dto;
+package es.terencio.erp.employees.application.dto;
 
 import java.util.List;
 import java.util.UUID;

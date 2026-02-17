@@ -1,10 +1,10 @@
-package es.terencio.erp.users.application.port.in;
+package es.terencio.erp.employees.application.port.in;
 
 import java.util.List;
 
-import es.terencio.erp.users.application.dto.CreateUserRequest;
-import es.terencio.erp.users.application.dto.UpdateUserRequest;
-import es.terencio.erp.users.application.dto.UserDto;
+import es.terencio.erp.employees.application.dto.CreateUserRequest;
+import es.terencio.erp.employees.application.dto.UpdateUserRequest;
+import es.terencio.erp.employees.application.dto.UserDto;
 
 public interface ManageUsersUseCase {
     List<UserDto> listAll();

@@ -18,10 +18,10 @@ import es.terencio.erp.devices.application.port.in.ManageDevicesUseCase;
 import es.terencio.erp.devices.application.port.in.SetupDeviceUseCase;
 import es.terencio.erp.devices.application.port.out.DevicePort;
 import es.terencio.erp.devices.infrastructure.security.DeviceApiKeyGenerator;
+import es.terencio.erp.employees.application.port.out.UserPort;
 import es.terencio.erp.shared.domain.SerialGenerator;
 import es.terencio.erp.shared.exception.RegistrationException;
 import es.terencio.erp.shared.exception.ResourceNotFoundException;
-import es.terencio.erp.users.application.port.out.UserPort;
 
 @Service
 public class DeviceService implements ManageDevicesUseCase, SetupDeviceUseCase {

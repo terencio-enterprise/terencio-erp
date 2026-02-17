@@ -75,7 +75,7 @@ public class JdbcStoreAdapter implements StorePort {
 
     @Override
     public boolean hasDependencies(UUID id) {
-        Integer userCount = jdbcClient.sql("SELECT COUNT(*) FROM users WHERE store_id = :id AND is_active = TRUE")
+        Integer userCount = jdbcClient.sql("SELECT COUNT(*) FROM employees WHERE store_id = :id AND is_active = TRUE")
                 .param("id", id)
                 .query(Integer.class)
                 .single();

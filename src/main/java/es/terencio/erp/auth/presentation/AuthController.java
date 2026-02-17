@@ -225,7 +225,10 @@ public class AuthController {
                 userDetails.getUsername(),
                 userDetails.getFullName(),
                 userDetails.getRole(),
+                userDetails.getOrganizationId(),
+                userDetails.getCompanyId(),
                 userDetails.getStoreId(),
+                userDetails.getAccessGrants(),
                 userDetails.isEnabled());
 
         return ResponseEntity.ok(ApiResponse.success("User info fetched successfully", userInfo));

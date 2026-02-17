@@ -1,11 +1,11 @@
-package es.terencio.erp.users.application.port.out;
+package es.terencio.erp.employees.application.port.out;
 
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-import es.terencio.erp.users.application.dto.UserDto;
-import es.terencio.erp.users.application.dto.UserSyncDto;
+import es.terencio.erp.employees.application.dto.UserDto;
+import es.terencio.erp.employees.application.dto.UserSyncDto;
 
 public interface UserPort {
     List<UserDto> findAll();
@@ -22,6 +22,8 @@ public interface UserPort {
             UUID storeId, String permissionsJson);
 
     void update(Long id, String fullName, String role, UUID storeId, boolean isActive, String permissionsJson);
+
+    void syncAccessGrants(Long userId, String role, UUID companyId, UUID storeId);
 
     void updatePin(Long id, String newPinHash);
 
