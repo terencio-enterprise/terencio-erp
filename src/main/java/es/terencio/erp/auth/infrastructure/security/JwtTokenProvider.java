@@ -16,44 +16,82 @@ import io.jsonwebtoken.security.Keys;
 @Component
 public class JwtTokenProvider {
 
-    // Default key for dev. In prod, use env var: APP_JWT_SECRET
-    @Value("${app.jwt.secret:9a4f2c8d3b7a1e6f4c8d0b2a5e7d1c9f8b4a6e2d0f3c5b9a8e7d6c5b4a3f2e1}")
-    private String jwtSecret;
+    @Value("${app.jwt.access.secret}")
+    private String accessSecret;
 
-    @Value("${app.jwt.expiration-ms:86400000}") // 24 hours
-    private long jwtExpirationMs;
+    @Value("${app.jwt.access.expiration-ms}")
+    private long accessExpirationMs;
 
-    private SecretKey getSigningKey() {
-        byte[] keyBytes = Decoders.BASE64.decode(jwtSecret);
+    @Value("${app.jwt.refresh.secret}")
+    private String refreshSecret;
+
+    @Value("${app.jwt.refresh.expiration-ms}")
+    private long refreshExpirationMs;
+
+    private SecretKey getSignInKey(String secret) {
+        byte[] keyBytes = Decoders.BASE64.decode(secret);
         return Keys.hmacShaKeyFor(keyBytes);
     }
 
-    public String generateToken(Authentication authentication) {
+    // ==========================================
+    // ACCESS TOKEN
+    // ==========================================
+    public String generateAccessToken(Authentication authentication) {
         CustomUserDetails userPrincipal = (CustomUserDetails) authentication.getPrincipal();
+        return buildToken(userPrincipal, accessExpirationMs, getSignInKey(accessSecret));
+    }
 
+    public String getUsernameFromAccessToken(String token) {
+        return getUsernameFromToken(token, getSignInKey(accessSecret));
+    }
+
+    public boolean validateAccessToken(String token) {
+        return validateToken(token, getSignInKey(accessSecret));
+    }
+
+    // ==========================================
+    // REFRESH TOKEN
+    // ==========================================
+    public String generateRefreshToken(Authentication authentication) {
+        CustomUserDetails userPrincipal = (CustomUserDetails) authentication.getPrincipal();
+        return buildToken(userPrincipal, refreshExpirationMs, getSignInKey(refreshSecret));
+    }
+
+    public String getUsernameFromRefreshToken(String token) {
+        return getUsernameFromToken(token, getSignInKey(refreshSecret));
+    }
+
+    public boolean validateRefreshToken(String token) {
+        return validateToken(token, getSignInKey(refreshSecret));
+    }
+
+    // ==========================================
+    // PRIVATE HELPERS
+    // ==========================================
+    private String buildToken(CustomUserDetails userPrincipal, long expiration, SecretKey key) {
         return Jwts.builder()
                 .subject(userPrincipal.getUsername())
                 .claim("role", userPrincipal.getAuthorities().toString())
                 .claim("storeId", userPrincipal.getStoreId())
                 .issuedAt(new Date())
-                .expiration(new Date((new Date()).getTime() + jwtExpirationMs))
-                .signWith(getSigningKey())
+                .expiration(new Date((new Date()).getTime() + expiration))
+                .signWith(key)
                 .compact();
     }
 
-    public String getUsernameFromToken(String token) {
+    private String getUsernameFromToken(String token, SecretKey key) {
         return Jwts.parser()
-                .verifyWith(getSigningKey())
+                .verifyWith(key)
                 .build()
                 .parseSignedClaims(token)
                 .getPayload()
                 .getSubject();
     }
 
-    public boolean validateToken(String token) {
+    private boolean validateToken(String token, SecretKey key) {
         try {
             Jwts.parser()
-                    .verifyWith(getSigningKey())
+                    .verifyWith(key)
                     .build()
                     .parseSignedClaims(token);
             return true;

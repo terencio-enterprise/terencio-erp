@@ -56,6 +56,11 @@ dependencies {
     testImplementation("org.testcontainers:postgresql")
     testImplementation("org.testcontainers:junit-jupiter")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+
+    // 7. MARKETING (AWS SES/S3 & MAIL)
+    implementation("software.amazon.awssdk:ses:2.21.0")
+    implementation("software.amazon.awssdk:s3:2.21.0")
+    implementation("org.springframework.boot:spring-boot-starter-mail")
 }
 
 tasks.withType<Test> {

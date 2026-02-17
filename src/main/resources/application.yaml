@@ -73,6 +73,33 @@ springdoc:
     operations-sorter: method
     tags-sorter: alpha
 
+# ==========================================
+# SECURITY & AUTHENTICATION
+# ==========================================
+app:
+  jwt:
+    # ACCESS TOKEN CONFIGURATION
+    access:
+      secret: ${JWT_ACCESS_SECRET:9a4f2c8d3b7a1e6f4c8d0b2a5e7d1c9f8b4a6e2d0f3c5b9a8e7d6c5b4a3f2e1}
+      expiration-ms: ${JWT_ACCESS_EXPIRATION_MS:900000} # 15 minutes
+      cookie:
+        name: ${JWT_ACCESS_COOKIE_NAME:ACCESS_TOKEN}
+        path: ${JWT_ACCESS_COOKIE_PATH:/}
+        http-only: ${JWT_ACCESS_COOKIE_HTTP_ONLY:true}
+        secure: ${JWT_ACCESS_COOKIE_SECURE:false}
+        same-site: ${JWT_ACCESS_COOKIE_SAME_SITE:Lax}
+
+    # REFRESH TOKEN CONFIGURATION
+    refresh:
+      secret: ${JWT_REFRESH_SECRET:e1f2c3d4b5a67890123456789abcdef0123456789abcdef0123456789abcdef0}
+      expiration-ms: ${JWT_REFRESH_EXPIRATION_MS:604800000} # 7 days
+      cookie:
+        name: ${JWT_REFRESH_COOKIE_NAME:REFRESH_TOKEN}
+        path: ${JWT_REFRESH_COOKIE_PATH:/api/v1/auth/refresh}
+        http-only: ${JWT_REFRESH_COOKIE_HTTP_ONLY:true}
+        secure: ${JWT_REFRESH_COOKIE_SECURE:false}
+        same-site: ${JWT_REFRESH_COOKIE_SAME_SITE:Lax}
+
 # CORS Configuration
 cors:
   allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:5173}
@@ -85,3 +112,12 @@ cors:
 security:
   device:
     api-secret: ${DEVICE_API_SECRET:default_dev_secret_change_me}
+
+# ==========================================
+# MARKETING MODULE
+# ==========================================
+terencio:
+  marketing:
+    s3:
+      bucket: ${MARKETING_S3_BUCKET:terencio-marketing-assets}
+      region: ${MARKETING_S3_REGION:eu-west-1}

@@ -1,5 +1,6 @@
 package es.terencio.erp.auth.presentation;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
@@ -9,6 +10,9 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -20,6 +24,7 @@ import es.terencio.erp.auth.application.dto.LoginResponse;
 import es.terencio.erp.auth.application.dto.UserInfoDto;
 import es.terencio.erp.auth.infrastructure.security.CustomUserDetails;
 import es.terencio.erp.auth.infrastructure.security.JwtTokenProvider;
+import es.terencio.erp.shared.presentation.ApiErrorResponse;
 import es.terencio.erp.shared.presentation.ApiResponse;
 import jakarta.validation.Valid;
 
@@ -27,81 +32,194 @@ import jakarta.validation.Valid;
 @RequestMapping("/api/v1/auth")
 public class AuthController {
 
-    private final AuthenticationManager authenticationManager;
-    private final JwtTokenProvider tokenProvider;
+        private final AuthenticationManager authenticationManager;
+        private final JwtTokenProvider tokenProvider;
+        private final UserDetailsService userDetailsService;
 
-    public AuthController(AuthenticationManager authenticationManager, JwtTokenProvider tokenProvider) {
-        this.authenticationManager = authenticationManager;
-        this.tokenProvider = tokenProvider;
-    }
+        // ACCESS TOKEN COOKIE CONFIG
+        @Value("${app.jwt.access.cookie.name}")
+        private String accessCookieName;
 
-    /**
-     * Login endpoint - authenticates user and returns JWT in HTTP-only cookie.
-     * Also returns user info in response body.
-     */
-    @PostMapping("/login")
-    public ResponseEntity<ApiResponse<LoginResponse>> login(@Valid @RequestBody LoginRequest request) {
-        Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(request.username(), request.password()));
+        @Value("${app.jwt.access.cookie.path}")
+        private String accessCookiePath;
 
-        SecurityContextHolder.getContext().setAuthentication(authentication);
+        @Value("${app.jwt.access.cookie.http-only}")
+        private boolean accessCookieHttpOnly;
 
-        String jwt = tokenProvider.generateToken(authentication);
-        String role = authentication.getAuthorities().stream()
-                .map(GrantedAuthority::getAuthority)
-                .findFirst()
-                .orElse("ROLE_USER");
+        @Value("${app.jwt.access.cookie.secure}")
+        private boolean accessCookieSecure;
 
-        // Create HTTP-only cookie for JWT
-        ResponseCookie jwtCookie = ResponseCookie.from("JWT-TOKEN", jwt)
-                .httpOnly(true)
-                .secure(false) // Set to true in production with HTTPS
-                .path("/")
-                .maxAge(24 * 60 * 60) // 24 hours
-                .sameSite("Lax")
-                .build();
+        @Value("${app.jwt.access.cookie.same-site}")
+        private String accessCookieSameSite;
 
-        return ResponseEntity.ok()
-                .header(HttpHeaders.SET_COOKIE, jwtCookie.toString())
-                .body(ApiResponse.success("Login successful", new LoginResponse(jwt, authentication.getName(), role)));
-    }
+        @Value("${app.jwt.access.expiration-ms}")
+        private long accessExpirationMs;
 
-    /**
-     * Logout endpoint - clears JWT cookie.
-     */
-    @PostMapping("/logout")
-    public ResponseEntity<ApiResponse<Void>> logout() {
-        ResponseCookie jwtCookie = ResponseCookie.from("JWT-TOKEN", "")
-                .httpOnly(true)
-                .secure(false)
-                .path("/")
-                .maxAge(0)
-                .sameSite("Lax")
-                .build();
+        // REFRESH TOKEN COOKIE CONFIG
+        @Value("${app.jwt.refresh.cookie.name}")
+        private String refreshCookieName;
 
-        return ResponseEntity.ok()
-                .header(HttpHeaders.SET_COOKIE, jwtCookie.toString())
-                .body(ApiResponse.success("Logout successful"));
-    }
+        @Value("${app.jwt.refresh.cookie.path}")
+        private String refreshCookiePath;
 
-    /**
-     * Get current authenticated user information.
-     */
-    @GetMapping("/me")
-    public ResponseEntity<ApiResponse<UserInfoDto>> getCurrentUser(
-            @AuthenticationPrincipal CustomUserDetails userDetails) {
-        if (userDetails == null) {
-            return ResponseEntity.status(401).build();
+        @Value("${app.jwt.refresh.cookie.http-only}")
+        private boolean refreshCookieHttpOnly;
+
+        @Value("${app.jwt.refresh.cookie.secure}")
+        private boolean refreshCookieSecure;
+
+        @Value("${app.jwt.refresh.cookie.same-site}")
+        private String refreshCookieSameSite;
+
+        @Value("${app.jwt.refresh.expiration-ms}")
+        private long refreshExpirationMs;
+
+        public AuthController(AuthenticationManager authenticationManager, JwtTokenProvider tokenProvider,
+                        UserDetailsService userDetailsService) {
+                this.authenticationManager = authenticationManager;
+                this.tokenProvider = tokenProvider;
+                this.userDetailsService = userDetailsService;
         }
 
-        UserInfoDto userInfo = new UserInfoDto(
-                userDetails.getId(),
-                userDetails.getUsername(),
-                userDetails.getFullName(),
-                userDetails.getRole(),
-                userDetails.getStoreId(),
-                userDetails.isEnabled());
+        /**
+         * Login endpoint - authenticates user, sets Access and Refresh tokens in
+         * cookies.
+         */
+        @PostMapping("/login")
+        public ResponseEntity<ApiResponse<LoginResponse>> login(@Valid @RequestBody LoginRequest request) {
+                Authentication authentication = authenticationManager.authenticate(
+                                new UsernamePasswordAuthenticationToken(request.username(), request.password()));
 
-        return ResponseEntity.ok(ApiResponse.success("User info fetched successfully", userInfo));
-    }
+                SecurityContextHolder.getContext().setAuthentication(authentication);
+
+                String accessToken = tokenProvider.generateAccessToken(authentication);
+                String refreshToken = tokenProvider.generateRefreshToken(authentication);
+
+                String role = authentication.getAuthorities().stream()
+                                .map(GrantedAuthority::getAuthority)
+                                .findFirst()
+                                .orElse("ROLE_USER");
+
+                // Create Access Token Cookie
+                ResponseCookie accessCookie = ResponseCookie.from(accessCookieName, accessToken)
+                                .httpOnly(accessCookieHttpOnly)
+                                .secure(accessCookieSecure)
+                                .path(accessCookiePath)
+                                .maxAge(accessExpirationMs / 1000)
+                                .sameSite(accessCookieSameSite)
+                                .build();
+
+                // Create Refresh Token Cookie
+                ResponseCookie refreshCookie = ResponseCookie.from(refreshCookieName, refreshToken)
+                                .httpOnly(refreshCookieHttpOnly)
+                                .secure(refreshCookieSecure)
+                                .path(refreshCookiePath)
+                                .maxAge(refreshExpirationMs / 1000)
+                                .sameSite(refreshCookieSameSite)
+                                .build();
+
+                return ResponseEntity.ok()
+                                .header(HttpHeaders.SET_COOKIE, accessCookie.toString())
+                                .header(HttpHeaders.SET_COOKIE, refreshCookie.toString())
+                                .body(ApiResponse.success("Login successful",
+                                                new LoginResponse(accessToken, authentication.getName(), role)));
+        }
+
+        /**
+         * Refresh Token endpoint - generates new Access Token using valid Refresh Token
+         * from cookie.
+         */
+        @PostMapping("/refresh")
+        public ResponseEntity<?> refresh(
+                        @CookieValue(name = "${app.jwt.refresh.cookie.name}", required = false) String refreshToken) {
+                if (refreshToken != null && tokenProvider.validateRefreshToken(refreshToken)) {
+                        String username = tokenProvider.getUsernameFromRefreshToken(refreshToken);
+
+                        UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+
+                        if (!userDetails.isEnabled()) {
+                                return ResponseEntity.status(401)
+                                                .body(ApiErrorResponse.error("User account is disabled",
+                                                                "ACCOUNT_DISABLED"));
+                        }
+
+                        UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
+                                        userDetails, null, userDetails.getAuthorities());
+
+                        String newAccessToken = tokenProvider.generateAccessToken(authentication);
+
+                        String role = userDetails.getAuthorities().stream()
+                                        .map(GrantedAuthority::getAuthority)
+                                        .findFirst()
+                                        .orElse("ROLE_USER");
+
+                        // Create new Access Token Cookie
+                        ResponseCookie newAccessCookie = ResponseCookie.from(accessCookieName, newAccessToken)
+                                        .httpOnly(accessCookieHttpOnly)
+                                        .secure(accessCookieSecure)
+                                        .path(accessCookiePath)
+                                        .maxAge(accessExpirationMs / 1000)
+                                        .sameSite(accessCookieSameSite)
+                                        .build();
+
+                        return ResponseEntity.ok()
+                                        .header(HttpHeaders.SET_COOKIE, newAccessCookie.toString())
+                                        .body(ApiResponse.success("Token refreshed successfully",
+                                                        new LoginResponse(newAccessToken, userDetails.getUsername(),
+                                                                        role)));
+                }
+
+                return ResponseEntity.status(401)
+                                .body(ApiErrorResponse.error("Invalid Refresh Token", "INVALID_TOKEN"));
+        }
+
+        /**
+         * Logout endpoint - clears Access and Refresh Token cookies.
+         */
+        @PostMapping("/logout")
+        public ResponseEntity<ApiResponse<Void>> logout() {
+                // Clear Access Token Cookie
+                ResponseCookie accessCookie = ResponseCookie.from(accessCookieName, "")
+                                .httpOnly(accessCookieHttpOnly)
+                                .secure(accessCookieSecure)
+                                .path(accessCookiePath)
+                                .maxAge(0)
+                                .sameSite(accessCookieSameSite)
+                                .build();
+
+                // Clear Refresh Token Cookie
+                ResponseCookie refreshCookie = ResponseCookie.from(refreshCookieName, "")
+                                .httpOnly(refreshCookieHttpOnly)
+                                .secure(refreshCookieSecure)
+                                .path(refreshCookiePath)
+                                .maxAge(0)
+                                .sameSite(refreshCookieSameSite)
+                                .build();
+
+                return ResponseEntity.ok()
+                                .header(HttpHeaders.SET_COOKIE, accessCookie.toString())
+                                .header(HttpHeaders.SET_COOKIE, refreshCookie.toString())
+                                .body(ApiResponse.success("Logout successful"));
+        }
+
+        /**
+         * Get current authenticated user information.
+         */
+        @GetMapping("/me")
+        public ResponseEntity<ApiResponse<UserInfoDto>> getCurrentUser(
+                        @AuthenticationPrincipal CustomUserDetails userDetails) {
+                if (userDetails == null) {
+                        return ResponseEntity.status(401).build();
+                }
+
+                UserInfoDto userInfo = new UserInfoDto(
+                                userDetails.getId(),
+                                userDetails.getUsername(),
+                                userDetails.getFullName(),
+                                userDetails.getRole(),
+                                userDetails.getStoreId(),
+                                userDetails.isEnabled());
+
+                return ResponseEntity.ok(ApiResponse.success("User info fetched successfully", userInfo));
+        }
 }

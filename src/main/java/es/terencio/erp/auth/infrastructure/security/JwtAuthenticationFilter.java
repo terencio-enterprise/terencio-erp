@@ -2,6 +2,7 @@ package es.terencio.erp.auth.infrastructure.security;
 
 import java.io.IOException;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.lang.NonNull;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -14,6 +15,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
+import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
@@ -22,6 +24,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtTokenProvider tokenProvider;
     private final UserDetailsService userDetailsService;
+
+    @Value("${app.jwt.access.cookie.name}")
+    private String accessCookieName;
 
     public JwtAuthenticationFilter(JwtTokenProvider tokenProvider, UserDetailsService userDetailsService) {
         this.tokenProvider = tokenProvider;
@@ -35,8 +40,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         String token = getJwtFromRequest(request);
 
-        if (StringUtils.hasText(token) && tokenProvider.validateToken(token)) {
-            String username = tokenProvider.getUsernameFromToken(token);
+        if (StringUtils.hasText(token) && tokenProvider.validateAccessToken(token)) {
+            String username = tokenProvider.getUsernameFromAccessToken(token);
             UserDetails userDetails = userDetailsService.loadUserByUsername(username);
 
             UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
@@ -51,20 +56,19 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     }
 
     private String getJwtFromRequest(HttpServletRequest request) {
-        // First, try to get JWT from Authorization header
-        String bearerToken = request.getHeader("Authorization");
-        if (StringUtils.hasText(bearerToken) && bearerToken.startsWith("Bearer ")) {
-            return bearerToken.substring(7);
-        }
-
-        // Second, try to get JWT from cookie
-        jakarta.servlet.http.Cookie[] cookies = request.getCookies();
-        if (cookies != null) {
-            for (jakarta.servlet.http.Cookie cookie : cookies) {
-                if ("JWT-TOKEN".equals(cookie.getName())) {
+        // First, try to get JWT from ACCESS_TOKEN cookie
+        if (request.getCookies() != null) {
+            for (Cookie cookie : request.getCookies()) {
+                if (accessCookieName.equals(cookie.getName())) {
                     return cookie.getValue();
                 }
             }
+        }
+
+        // Second, try to get JWT from Authorization header (Fallback/API support)
+        String bearerToken = request.getHeader("Authorization");
+        if (StringUtils.hasText(bearerToken) && bearerToken.startsWith("Bearer ")) {
+            return bearerToken.substring(7);
         }
 
         return null;

@@ -36,6 +36,16 @@ public class Customer {
     private final Instant createdAt;
     private Instant updatedAt;
 
+    // Marketing Fields
+    private String type; // LEAD, CLIENT, PROSPECT
+    private String origin;
+    private String[] tags;
+    private boolean marketingConsent;
+    private String marketingStatus;
+    private String unsubscribeToken;
+    private Instant lastInteractionAt;
+    private Instant snoozedUntil;
+
     public Customer(
             CustomerId id,
             UUID uuid,
@@ -208,5 +218,86 @@ public class Customer {
 
     public Instant updatedAt() {
         return updatedAt;
+    }
+
+    // Marketing Accessors
+
+    public String getType() {
+        return type;
+    }
+
+    public void setType(String type) {
+        this.type = type;
+    }
+
+    public String getOrigin() {
+        return origin;
+    }
+
+    public void setOrigin(String origin) {
+        this.origin = origin;
+    }
+
+    public String[] getTags() {
+        return tags;
+    }
+
+    public void setTags(String[] tags) {
+        this.tags = tags;
+    }
+
+    public boolean isMarketingConsent() {
+        return marketingConsent;
+    }
+
+    public void setMarketingConsent(boolean consent) {
+        this.marketingConsent = consent;
+        this.updatedAt = Instant.now();
+    }
+
+    public String getMarketingStatus() {
+        return marketingStatus;
+    }
+
+    public void setMarketingStatus(String status) {
+        this.marketingStatus = status;
+        this.updatedAt = Instant.now();
+    }
+
+    public String getUnsubscribeToken() {
+        return unsubscribeToken;
+    }
+
+    public void setUnsubscribeToken(String token) {
+        this.unsubscribeToken = token;
+    }
+
+    public Instant getLastInteractionAt() {
+        return lastInteractionAt;
+    }
+
+    public void setLastInteractionAt(Instant at) {
+        this.lastInteractionAt = at;
+    }
+
+    public Instant getSnoozedUntil() {
+        return snoozedUntil;
+    }
+
+    public void setSnoozedUntil(Instant until) {
+        this.snoozedUntil = until;
+        this.updatedAt = Instant.now();
+    }
+
+    public boolean canReceiveMarketing() {
+        if (!marketingConsent)
+            return false;
+        if ("UNSUBSCRIBED".equals(marketingStatus))
+            return false;
+        if ("BOUNCED".equals(marketingStatus))
+            return false;
+        if (snoozedUntil != null && snoozedUntil.isAfter(Instant.now()))
+            return false;
+        return true;
     }
 }

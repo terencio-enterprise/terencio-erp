@@ -28,379 +28,369 @@ import es.terencio.erp.shared.presentation.ApiResponse;
  * Integration test for Authentication endpoints.
  * Tests the complete user authentication flow:
  * 1. User login with credentials
- * 2. Receive JWT token in cookie and response
- * 3. Access protected endpoint with JWT cookie
+ * 2. Receive Access and Refresh tokens in cookies
+ * 3. Access protected endpoint with Access Token cookie
  * 4. Get current user info
- * 5. Logout and verify cookie is cleared
+ * 5. Logout and verify cookies are cleared
  */
 class AuthenticationIntegrationTest extends AbstractIntegrationTest {
 
-    @Autowired
-    private TestRestTemplate restTemplate;
+        @Autowired
+        private TestRestTemplate restTemplate;
 
-    @Autowired
-    private JdbcClient jdbcClient;
+        @Autowired
+        private JdbcClient jdbcClient;
 
-    @Autowired
-    private PasswordEncoder passwordEncoder;
+        @Autowired
+        private PasswordEncoder passwordEncoder;
 
-    private UUID testCompanyId;
-    private UUID testStoreId;
-    private Long adminUserId;
-    private Long cashierUserId;
-    private Long managerUserId;
+        private UUID testCompanyId;
+        private UUID testStoreId;
+        private Long adminUserId;
+        private Long cashierUserId;
+        private Long managerUserId;
 
-    @BeforeEach
-    void setUp() {
-        cleanDatabase();
+        @BeforeEach
+        void setUp() {
+                cleanDatabase();
 
-        // Create test company
-        testCompanyId = UUID.randomUUID();
-        jdbcClient.sql("""
-                INSERT INTO companies (id, name, tax_id, is_active)
-                VALUES (:id, 'Test Company', 'B11111111', TRUE)
-                """)
-                .param("id", testCompanyId)
-                .update();
+                // Create test company
+                testCompanyId = UUID.randomUUID();
+                jdbcClient.sql("""
+                                INSERT INTO companies (id, name, tax_id, is_active)
+                                VALUES (:id, 'Test Company', 'B11111111', TRUE)
+                                """)
+                                .param("id", testCompanyId)
+                                .update();
 
-        // Create test store
-        testStoreId = UUID.randomUUID();
-        jdbcClient.sql("""
-                INSERT INTO stores (id, company_id, code, name, address, is_active)
-                VALUES (:id, :companyId, 'TEST-STORE', 'Test Store', 'Test Address', TRUE)
-                """)
-                .param("id", testStoreId)
-                .param("companyId", testCompanyId)
-                .update();
+                // Create test store
+                testStoreId = UUID.randomUUID();
+                jdbcClient.sql("""
+                                INSERT INTO stores (id, company_id, code, name, address, is_active)
+                                VALUES (:id, :companyId, 'TEST-STORE', 'Test Store', 'Test Address', TRUE)
+                                """)
+                                .param("id", testStoreId)
+                                .param("companyId", testCompanyId)
+                                .update();
 
-        // Create admin user
-        String adminPassword = passwordEncoder.encode("admin123");
-        adminUserId = jdbcClient.sql("""
-                INSERT INTO users (username, full_name, role, pin_hash, password_hash,
-                    company_id, store_id, permissions_json, is_active)
-                VALUES ('admin', 'Admin User', 'ADMIN', 'pin123', :password,
-                    :companyId, :storeId, '[]', TRUE)
-                RETURNING id
-                """)
-                .param("password", adminPassword)
-                .param("companyId", testCompanyId)
-                .param("storeId", testStoreId)
-                .query(Long.class)
-                .single();
+                // Create admin user
+                String adminPassword = passwordEncoder.encode("admin123");
+                adminUserId = jdbcClient.sql("""
+                                INSERT INTO users (username, full_name, role, pin_hash, password_hash,
+                                    company_id, store_id, permissions_json, is_active)
+                                VALUES ('admin', 'Admin User', 'ADMIN', 'pin123', :password,
+                                    :companyId, :storeId, '[]', TRUE)
+                                RETURNING id
+                                """)
+                                .param("password", adminPassword)
+                                .param("companyId", testCompanyId)
+                                .param("storeId", testStoreId)
+                                .query(Long.class)
+                                .single();
 
-        // Create cashier user
-        String cashierPassword = passwordEncoder.encode("cashier123");
-        cashierUserId = jdbcClient.sql("""
-                INSERT INTO users (username, full_name, role, pin_hash, password_hash,
-                    company_id, store_id, permissions_json, is_active)
-                VALUES ('cashier', 'Cashier User', 'CASHIER', 'pin456', :password,
-                    :companyId, :storeId, '[]', TRUE)
-                RETURNING id
-                """)
-                .param("password", cashierPassword)
-                .param("companyId", testCompanyId)
-                .param("storeId", testStoreId)
-                .query(Long.class)
-                .single();
+                // Create cashier user
+                String cashierPassword = passwordEncoder.encode("cashier123");
+                cashierUserId = jdbcClient.sql("""
+                                INSERT INTO users (username, full_name, role, pin_hash, password_hash,
+                                    company_id, store_id, permissions_json, is_active)
+                                VALUES ('cashier', 'Cashier User', 'CASHIER', 'pin456', :password,
+                                    :companyId, :storeId, '[]', TRUE)
+                                RETURNING id
+                                """)
+                                .param("password", cashierPassword)
+                                .param("companyId", testCompanyId)
+                                .param("storeId", testStoreId)
+                                .query(Long.class)
+                                .single();
 
-        // Create manager user
-        String managerPassword = passwordEncoder.encode("manager123");
-        managerUserId = jdbcClient.sql("""
-                INSERT INTO users (username, full_name, role, pin_hash, password_hash,
-                    company_id, store_id, permissions_json, is_active)
-                VALUES ('manager', 'Manager User', 'MANAGER', 'pin789', :password,
-                    :companyId, :storeId, '[]', TRUE)
-                RETURNING id
-                """)
-                .param("password", managerPassword)
-                .param("companyId", testCompanyId)
-                .param("storeId", testStoreId)
-                .query(Long.class)
-                .single();
-    }
+                // Create manager user
+                String managerPassword = passwordEncoder.encode("manager123");
+                managerUserId = jdbcClient.sql("""
+                                INSERT INTO users (username, full_name, role, pin_hash, password_hash,
+                                    company_id, store_id, permissions_json, is_active)
+                                VALUES ('manager', 'Manager User', 'MANAGER', 'pin789', :password,
+                                    :companyId, :storeId, '[]', TRUE)
+                                RETURNING id
+                                """)
+                                .param("password", managerPassword)
+                                .param("companyId", testCompanyId)
+                                .param("storeId", testStoreId)
+                                .query(Long.class)
+                                .single();
+        }
 
-    @Test
-    void testSuccessfulLogin() {
-        // Given
-        LoginRequest loginRequest = new LoginRequest("admin", "admin123");
+        @Test
+        void testSuccessfulLogin() {
+                // Given
+                LoginRequest loginRequest = new LoginRequest("admin", "admin123");
 
-        // When
-        ResponseEntity<ApiResponse<LoginResponse>> response = restTemplate.exchange(
-                "/api/v1/auth/login",
-                HttpMethod.POST,
-                new HttpEntity<>(loginRequest),
-                new ParameterizedTypeReference<ApiResponse<LoginResponse>>() {
-                });
+                // When
+                ResponseEntity<ApiResponse<LoginResponse>> response = restTemplate.exchange(
+                                "/api/v1/auth/login",
+                                HttpMethod.POST,
+                                new HttpEntity<>(loginRequest),
+                                new ParameterizedTypeReference<ApiResponse<LoginResponse>>() {
+                                });
 
-        // Then
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(response.getBody()).isNotNull();
-        assertThat(response.getBody().isSuccess()).isTrue();
+                // Then
+                assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+                assertThat(response.getBody()).isNotNull();
+                assertThat(response.getBody().isSuccess()).isTrue();
 
-        LoginResponse loginResponse = response.getBody().getData();
-        assertThat(loginResponse.token()).isNotBlank();
-        assertThat(loginResponse.username()).isEqualTo("admin");
-        assertThat(loginResponse.role()).isEqualTo("ROLE_ADMIN");
-        assertThat(loginResponse.type()).isEqualTo("Bearer");
+                LoginResponse loginResponse = response.getBody().getData();
+                assertThat(loginResponse.token()).isNotBlank();
+                assertThat(loginResponse.username()).isEqualTo("admin");
+                assertThat(loginResponse.role()).isEqualTo("ROLE_ADMIN");
 
-        // Verify JWT cookie is set
-        List<String> cookies = response.getHeaders().get(HttpHeaders.SET_COOKIE);
-        assertThat(cookies).isNotNull();
-        assertThat(cookies).anyMatch(cookie -> cookie.startsWith("JWT-TOKEN="));
-        assertThat(cookies).anyMatch(cookie -> cookie.contains("HttpOnly"));
-        assertThat(cookies).anyMatch(cookie -> cookie.contains("Path=/"));
-        assertThat(cookies).anyMatch(cookie -> cookie.contains("Max-Age=86400")); // 24 hours
-    }
+                // Verify Access Token cookie is set
+                List<String> cookies = response.getHeaders().get(HttpHeaders.SET_COOKIE);
+                assertThat(cookies).isNotNull();
+                assertThat(cookies).anyMatch(cookie -> cookie.startsWith("ACCESS_TOKEN="));
+                assertThat(cookies).anyMatch(cookie -> cookie.contains("HttpOnly"));
+                assertThat(cookies).anyMatch(cookie -> cookie.contains("Path=/"));
+                assertThat(cookies).anyMatch(cookie -> cookie.contains("Max-Age="));
 
-    @Test
-    void testLoginWithInvalidCredentials() {
-        // Given
-        LoginRequest loginRequest = new LoginRequest("admin", "wrongpassword");
+                // Verify Refresh Token cookie is set
+                assertThat(cookies).anyMatch(cookie -> cookie.startsWith("REFRESH_TOKEN="));
+                assertThat(cookies).anyMatch(cookie -> cookie.contains("Path=/api/v1/auth/refresh"));
+        }
 
-        // When
-        ResponseEntity<ApiResponse<LoginResponse>> response = restTemplate.exchange(
-                "/api/v1/auth/login",
-                HttpMethod.POST,
-                new HttpEntity<>(loginRequest),
-                new ParameterizedTypeReference<ApiResponse<LoginResponse>>() {
-                });
+        @Test
+        void testLogout() {
+                // Given - Login first
+                LoginRequest loginRequest = new LoginRequest("admin", "admin123");
+                ResponseEntity<ApiResponse<LoginResponse>> loginResponse = restTemplate.exchange(
+                                "/api/v1/auth/login",
+                                HttpMethod.POST,
+                                new HttpEntity<>(loginRequest),
+                                new ParameterizedTypeReference<ApiResponse<LoginResponse>>() {
+                                });
 
-        // Then
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
-    }
+                assertThat(loginResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
 
-    @Test
-    void testLoginWithNonExistentUser() {
-        // Given
-        LoginRequest loginRequest = new LoginRequest("nonexistent", "password");
+                // When - Logout
+                ResponseEntity<ApiResponse<Void>> logoutResponse = restTemplate.exchange(
+                                "/api/v1/auth/logout",
+                                HttpMethod.POST,
+                                null,
+                                new ParameterizedTypeReference<ApiResponse<Void>>() {
+                                });
 
-        // When
-        ResponseEntity<ApiResponse<LoginResponse>> response = restTemplate.exchange(
-                "/api/v1/auth/login",
-                HttpMethod.POST,
-                new HttpEntity<>(loginRequest),
-                new ParameterizedTypeReference<ApiResponse<LoginResponse>>() {
-                });
+                // Then
+                assertThat(logoutResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
+                assertThat(logoutResponse.getBody()).isNotNull();
+                assertThat(logoutResponse.getBody().isSuccess()).isTrue();
 
-        // Then
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
-    }
+                // Verify cookies are cleared
+                List<String> cookies = logoutResponse.getHeaders().get(HttpHeaders.SET_COOKIE);
+                assertThat(cookies).isNotNull();
+                assertThat(cookies)
+                                .anyMatch(cookie -> cookie.startsWith("ACCESS_TOKEN=;")
+                                                || cookie.startsWith("ACCESS_TOKEN=\"\";"));
+                assertThat(cookies)
+                                .anyMatch(cookie -> cookie.startsWith("REFRESH_TOKEN=;")
+                                                || cookie.startsWith("REFRESH_TOKEN=\"\";"));
+                assertThat(cookies).anyMatch(cookie -> cookie.contains("Max-Age=0"));
+        }
 
-    @Test
-    void testGetCurrentUserWithValidToken() {
-        // Given - Login first
-        LoginRequest loginRequest = new LoginRequest("cashier", "cashier123");
-        ResponseEntity<ApiResponse<LoginResponse>> loginResponse = restTemplate.exchange(
-                "/api/v1/auth/login",
-                HttpMethod.POST,
-                new HttpEntity<>(loginRequest),
-                new ParameterizedTypeReference<ApiResponse<LoginResponse>>() {
-                });
+        @Test
+        void testLoginWithInvalidCredentials() {
+                // Given
+                LoginRequest loginRequest = new LoginRequest("admin", "wrongpassword");
 
-        assertThat(loginResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
-        String jwtToken = loginResponse.getBody().getData().token();
+                // When
+                ResponseEntity<ApiResponse<LoginResponse>> response = restTemplate.exchange(
+                                "/api/v1/auth/login",
+                                HttpMethod.POST,
+                                new HttpEntity<>(loginRequest),
+                                new ParameterizedTypeReference<ApiResponse<LoginResponse>>() {
+                                });
 
-        // When - Get current user info with JWT cookie
-        HttpHeaders headers = new HttpHeaders();
-        headers.add(HttpHeaders.COOKIE, "JWT-TOKEN=" + jwtToken);
-        HttpEntity<Void> entity = new HttpEntity<>(headers);
+                // Then
+                assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        }
 
-        ResponseEntity<ApiResponse<UserInfoDto>> response = restTemplate.exchange(
-                "/api/v1/auth/me",
-                HttpMethod.GET,
-                entity,
-                new ParameterizedTypeReference<ApiResponse<UserInfoDto>>() {
-                });
+        @Test
+        void testLoginWithNonExistentUser() {
+                // Given
+                LoginRequest loginRequest = new LoginRequest("nonexistent", "password");
 
-        // Then
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(response.getBody()).isNotNull();
-        assertThat(response.getBody().isSuccess()).isTrue();
+                // When
+                ResponseEntity<ApiResponse<LoginResponse>> response = restTemplate.exchange(
+                                "/api/v1/auth/login",
+                                HttpMethod.POST,
+                                new HttpEntity<>(loginRequest),
+                                new ParameterizedTypeReference<ApiResponse<LoginResponse>>() {
+                                });
 
-        UserInfoDto userInfo = response.getBody().getData();
-        assertThat(userInfo.id()).isEqualTo(cashierUserId);
-        assertThat(userInfo.username()).isEqualTo("cashier");
-        assertThat(userInfo.fullName()).isEqualTo("Cashier User");
-        assertThat(userInfo.role()).isEqualTo("CASHIER");
-        assertThat(userInfo.storeId()).isEqualTo(testStoreId);
-        assertThat(userInfo.isActive()).isTrue();
-    }
+                // Then
+                assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        }
 
-    @Test
-    void testGetCurrentUserWithBearerToken() {
-        // Given - Login first
-        LoginRequest loginRequest = new LoginRequest("manager", "manager123");
-        ResponseEntity<ApiResponse<LoginResponse>> loginResponse = restTemplate.exchange(
-                "/api/v1/auth/login",
-                HttpMethod.POST,
-                new HttpEntity<>(loginRequest),
-                new ParameterizedTypeReference<ApiResponse<LoginResponse>>() {
-                });
+        @Test
+        void testGetCurrentUserWithAccessCookie() {
+                // Given - Login first
+                LoginRequest loginRequest = new LoginRequest("cashier", "cashier123");
+                ResponseEntity<ApiResponse<LoginResponse>> loginResponse = restTemplate.exchange(
+                                "/api/v1/auth/login",
+                                HttpMethod.POST,
+                                new HttpEntity<>(loginRequest),
+                                new ParameterizedTypeReference<ApiResponse<LoginResponse>>() {
+                                });
 
-        assertThat(loginResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
-        String jwtToken = loginResponse.getBody().getData().token();
+                assertThat(loginResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
 
-        // When - Get current user info with Bearer token
-        HttpHeaders headers = new HttpHeaders();
-        headers.setBearerAuth(jwtToken);
-        HttpEntity<Void> entity = new HttpEntity<>(headers);
+                // Extract Access Token from cookie (simulating browser)
+                String accessTokenCookie = loginResponse.getHeaders().get(HttpHeaders.SET_COOKIE).stream()
+                                .filter(c -> c.startsWith("ACCESS_TOKEN="))
+                                .findFirst()
+                                .orElseThrow();
 
-        ResponseEntity<ApiResponse<UserInfoDto>> response = restTemplate.exchange(
-                "/api/v1/auth/me",
-                HttpMethod.GET,
-                entity,
-                new ParameterizedTypeReference<ApiResponse<UserInfoDto>>() {
-                });
+                // When - Get current user info with Access Token cookie
+                HttpHeaders headers = new HttpHeaders();
+                headers.add(HttpHeaders.COOKIE, accessTokenCookie);
+                HttpEntity<Void> entity = new HttpEntity<>(headers);
 
-        // Then
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(response.getBody()).isNotNull();
-        assertThat(response.getBody().isSuccess()).isTrue();
+                ResponseEntity<ApiResponse<UserInfoDto>> response = restTemplate.exchange(
+                                "/api/v1/auth/me",
+                                HttpMethod.GET,
+                                entity,
+                                new ParameterizedTypeReference<ApiResponse<UserInfoDto>>() {
+                                });
 
-        UserInfoDto userInfo = response.getBody().getData();
-        assertThat(userInfo.id()).isEqualTo(managerUserId);
-        assertThat(userInfo.username()).isEqualTo("manager");
-        assertThat(userInfo.role()).isEqualTo("MANAGER");
-    }
+                // Then
+                assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+                assertThat(response.getBody()).isNotNull();
+                assertThat(response.getBody().isSuccess()).isTrue();
 
-    @Test
-    void testGetCurrentUserWithoutToken() {
-        // When - Try to access protected endpoint without token
-        ResponseEntity<UserInfoDto> response = restTemplate.getForEntity(
-                "/api/v1/auth/me",
-                UserInfoDto.class);
+                UserInfoDto userInfo = response.getBody().getData();
+                assertThat(userInfo.id()).isEqualTo(cashierUserId);
+                assertThat(userInfo.username()).isEqualTo("cashier");
+                assertThat(userInfo.role()).isEqualTo("CASHIER");
+        }
 
-        // Then
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
-    }
+        @Test
+        void testGetCurrentUserWithBearerToken() {
+                // Given - Login first
+                LoginRequest loginRequest = new LoginRequest("manager", "manager123");
+                ResponseEntity<ApiResponse<LoginResponse>> loginResponse = restTemplate.exchange(
+                                "/api/v1/auth/login",
+                                HttpMethod.POST,
+                                new HttpEntity<>(loginRequest),
+                                new ParameterizedTypeReference<ApiResponse<LoginResponse>>() {
+                                });
 
-    @Test
-    void testLogout() {
-        // Given - Login first
-        LoginRequest loginRequest = new LoginRequest("admin", "admin123");
-        ResponseEntity<ApiResponse<LoginResponse>> loginResponse = restTemplate.exchange(
-                "/api/v1/auth/login",
-                HttpMethod.POST,
-                new HttpEntity<>(loginRequest),
-                new ParameterizedTypeReference<ApiResponse<LoginResponse>>() {
-                });
+                assertThat(loginResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
+                String jwtToken = loginResponse.getBody().getData().token();
 
-        assertThat(loginResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
+                // When - Get current user info with Bearer token
+                HttpHeaders headers = new HttpHeaders();
+                headers.setBearerAuth(jwtToken);
+                HttpEntity<Void> entity = new HttpEntity<>(headers);
 
-        // When - Logout
-        ResponseEntity<ApiResponse<Void>> logoutResponse = restTemplate.exchange(
-                "/api/v1/auth/logout",
-                HttpMethod.POST,
-                null,
-                new ParameterizedTypeReference<ApiResponse<Void>>() {
-                });
+                ResponseEntity<ApiResponse<UserInfoDto>> response = restTemplate.exchange(
+                                "/api/v1/auth/me",
+                                HttpMethod.GET,
+                                entity,
+                                new ParameterizedTypeReference<ApiResponse<UserInfoDto>>() {
+                                });
 
-        // Then
-        assertThat(logoutResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(logoutResponse.getBody()).isNotNull();
-        assertThat(logoutResponse.getBody().isSuccess()).isTrue();
+                // Then
+                assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+                assertThat(response.getBody()).isNotNull();
+                assertThat(response.getBody().isSuccess()).isTrue();
 
-        // Verify JWT cookie is cleared
-        List<String> cookies = logoutResponse.getHeaders().get(HttpHeaders.SET_COOKIE);
-        assertThat(cookies).isNotNull();
-        assertThat(cookies)
-                .anyMatch(cookie -> cookie.startsWith("JWT-TOKEN=;") || cookie.startsWith("JWT-TOKEN=\"\";"));
-        assertThat(cookies).anyMatch(cookie -> cookie.contains("Max-Age=0"));
-    }
+                UserInfoDto userInfo = response.getBody().getData();
+                assertThat(userInfo.id()).isEqualTo(managerUserId);
+                assertThat(userInfo.username()).isEqualTo("manager");
+                assertThat(userInfo.role()).isEqualTo("MANAGER");
+        }
 
-    @Test
-    void testMultipleUsersCanLoginSimultaneously() {
-        // Login as admin
-        LoginRequest adminLogin = new LoginRequest("admin", "admin123");
-        ResponseEntity<ApiResponse<LoginResponse>> adminResponse = restTemplate.exchange(
-                "/api/v1/auth/login",
-                HttpMethod.POST,
-                new HttpEntity<>(adminLogin),
-                new ParameterizedTypeReference<ApiResponse<LoginResponse>>() {
-                });
-        assertThat(adminResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
-        String adminToken = adminResponse.getBody().getData().token();
+        @Test
+        void testGetCurrentUserWithoutToken() {
+                // When - Try to access protected endpoint without token
+                ResponseEntity<UserInfoDto> response = restTemplate.getForEntity(
+                                "/api/v1/auth/me",
+                                UserInfoDto.class);
 
-        // Login as cashier
-        LoginRequest cashierLogin = new LoginRequest("cashier", "cashier123");
-        ResponseEntity<ApiResponse<LoginResponse>> cashierResponse = restTemplate.exchange(
-                "/api/v1/auth/login",
-                HttpMethod.POST,
-                new HttpEntity<>(cashierLogin),
-                new ParameterizedTypeReference<ApiResponse<LoginResponse>>() {
-                });
-        assertThat(cashierResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
-        String cashierToken = cashierResponse.getBody().getData().token();
+                // Then
+                assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        }
 
-        // Verify both tokens are different
-        assertThat(adminToken).isNotEqualTo(cashierToken);
+        @Test
+        void testMultipleUsersCanLoginSimultaneously() {
+                // Login as admin
+                LoginRequest adminLogin = new LoginRequest("admin", "admin123");
+                ResponseEntity<ApiResponse<LoginResponse>> adminResponse = restTemplate.exchange(
+                                "/api/v1/auth/login",
+                                HttpMethod.POST,
+                                new HttpEntity<>(adminLogin),
+                                new ParameterizedTypeReference<ApiResponse<LoginResponse>>() {
+                                });
+                assertThat(adminResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
+                String adminToken = adminResponse.getBody().getData().token();
 
-        // Verify both tokens work
-        HttpHeaders adminHeaders = new HttpHeaders();
-        adminHeaders.setBearerAuth(adminToken);
-        ResponseEntity<ApiResponse<UserInfoDto>> adminMeResponse = restTemplate.exchange(
-                "/api/v1/auth/me",
-                HttpMethod.GET,
-                new HttpEntity<>(adminHeaders),
-                new ParameterizedTypeReference<ApiResponse<UserInfoDto>>() {
-                });
-        assertThat(adminMeResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(adminMeResponse.getBody().getData().username()).isEqualTo("admin");
+                // Login as cashier
+                LoginRequest cashierLogin = new LoginRequest("cashier", "cashier123");
+                ResponseEntity<ApiResponse<LoginResponse>> cashierResponse = restTemplate.exchange(
+                                "/api/v1/auth/login",
+                                HttpMethod.POST,
+                                new HttpEntity<>(cashierLogin),
+                                new ParameterizedTypeReference<ApiResponse<LoginResponse>>() {
+                                });
+                assertThat(cashierResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
+                String cashierToken = cashierResponse.getBody().getData().token();
 
-        HttpHeaders cashierHeaders = new HttpHeaders();
-        cashierHeaders.setBearerAuth(cashierToken);
-        ResponseEntity<ApiResponse<UserInfoDto>> cashierMeResponse = restTemplate.exchange(
-                "/api/v1/auth/me",
-                HttpMethod.GET,
-                new HttpEntity<>(cashierHeaders),
-                new ParameterizedTypeReference<ApiResponse<UserInfoDto>>() {
-                });
-        assertThat(cashierMeResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(cashierMeResponse.getBody().getData().username()).isEqualTo("cashier");
-    }
+                // Verify both tokens are different
+                assertThat(adminToken).isNotEqualTo(cashierToken);
 
-    @Test
-    void testLoginValidationErrors() {
-        // Test empty username
-        LoginRequest emptyUsername = new LoginRequest("", "password");
-        ResponseEntity<LoginResponse> response1 = restTemplate.postForEntity(
-                "/api/v1/auth/login",
-                emptyUsername,
-                LoginResponse.class);
-        assertThat(response1.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+                // Verify both tokens work
+                HttpHeaders adminHeaders = new HttpHeaders();
+                adminHeaders.setBearerAuth(adminToken);
+                ResponseEntity<ApiResponse<UserInfoDto>> adminMeResponse = restTemplate.exchange(
+                                "/api/v1/auth/me",
+                                HttpMethod.GET,
+                                new HttpEntity<>(adminHeaders),
+                                new ParameterizedTypeReference<ApiResponse<UserInfoDto>>() {
+                                });
+                assertThat(adminMeResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
+                assertThat(adminMeResponse.getBody().getData().username()).isEqualTo("admin");
 
-        // Test empty password
-        LoginRequest emptyPassword = new LoginRequest("admin", "");
-        ResponseEntity<LoginResponse> response2 = restTemplate.postForEntity(
-                "/api/v1/auth/login",
-                emptyPassword,
-                LoginResponse.class);
-        assertThat(response2.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-    }
+                HttpHeaders cashierHeaders = new HttpHeaders();
+                cashierHeaders.setBearerAuth(cashierToken);
+                ResponseEntity<ApiResponse<UserInfoDto>> cashierMeResponse = restTemplate.exchange(
+                                "/api/v1/auth/me",
+                                HttpMethod.GET,
+                                new HttpEntity<>(cashierHeaders),
+                                new ParameterizedTypeReference<ApiResponse<UserInfoDto>>() {
+                                });
+                assertThat(cashierMeResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
+                assertThat(cashierMeResponse.getBody().getData().username()).isEqualTo("cashier");
+        }
 
-    @Test
-    void testInactiveUserCannotLogin() {
-        // Create inactive user
-        String inactivePassword = passwordEncoder.encode("inactive123");
-        jdbcClient.sql("""
-                INSERT INTO users (username, full_name, role, pin_hash, password_hash,
-                    company_id, store_id, permissions_json, is_active)
-                VALUES ('inactive', 'Inactive User', 'CASHIER', 'pin999', :password,
-                    :companyId, :storeId, '[]', FALSE)
-                """)
-                .param("password", inactivePassword)
-                .param("companyId", testCompanyId)
-                .param("storeId", testStoreId)
-                .update();
+        @Test
+        void testInactiveUserCannotLogin() {
+                // Create inactive user
+                String inactivePassword = passwordEncoder.encode("inactive123");
+                jdbcClient.sql("""
+                                INSERT INTO users (username, full_name, role, pin_hash, password_hash,
+                                    company_id, store_id, permissions_json, is_active)
+                                VALUES ('inactive', 'Inactive User', 'CASHIER', 'pin999', :password,
+                                    :companyId, :storeId, '[]', FALSE)
+                                """)
+                                .param("password", inactivePassword)
+                                .param("companyId", testCompanyId)
+                                .param("storeId", testStoreId)
+                                .update();
 
-        // Try to login as inactive user
-        LoginRequest loginRequest = new LoginRequest("inactive", "inactive123");
-        ResponseEntity<LoginResponse> response = restTemplate.postForEntity(
-                "/api/v1/auth/login",
-                loginRequest,
-                LoginResponse.class);
+                // Try to login as inactive user
+                LoginRequest loginRequest = new LoginRequest("inactive", "inactive123");
+                ResponseEntity<LoginResponse> response = restTemplate.postForEntity(
+                                "/api/v1/auth/login",
+                                loginRequest,
+                                LoginResponse.class);
 
-        // Should be unauthorized (Spring Security disables inactive users)
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
-    }
+                // Should be unauthorized (Spring Security disables inactive users)
+                assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        }
 }

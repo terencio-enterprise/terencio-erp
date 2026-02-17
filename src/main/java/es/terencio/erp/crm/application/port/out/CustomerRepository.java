@@ -22,4 +22,9 @@ public interface CustomerRepository {
     List<Customer> findByCompanyId(CompanyId companyId);
 
     List<Customer> searchCustomers(CompanyId companyId, String searchTerm);
+
+    // Marketing Filters
+    List<Customer> findByMarketingCriteria(List<String> tags, String customerType, java.math.BigDecimal minSpent);
+
+    Optional<Customer> findByUnsubscribeToken(String token);
 }

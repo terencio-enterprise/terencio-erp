@@ -45,15 +45,18 @@ public class JdbcCustomerPersistenceAdapter implements CustomerRepository {
         UUID uuid = customer.uuid() != null ? customer.uuid() : UUID.randomUUID();
         KeyHolder keyHolder = new GeneratedKeyHolder();
 
-        jdbcClient.sql("""
-                INSERT INTO customers (uuid, company_id, tax_id, legal_name, commercial_name,
-                    email, phone, address, zip_code, city, country, tariff_id, allow_credit,
-                    credit_limit, surcharge_apply, notes, active, created_at, updated_at)
-                VALUES (:uuid, :companyId, :taxId, :legalName, :commercialName, :email, :phone,
-                    :address, :zipCode, :city, :country, :tariffId, :allowCredit, :creditLimit,
-                    :surchargeApply, :notes, :active, :createdAt, :updatedAt)
-                RETURNING id
-                """)
+        jdbcClient
+                .sql("""
+                        INSERT INTO customers (uuid, company_id, tax_id, legal_name, commercial_name,
+                            email, phone, address, zip_code, city, country, tariff_id, allow_credit,
+                            credit_limit, surcharge_apply, notes, active, created_at, updated_at,
+                            type, origin, tags, marketing_consent, marketing_status, unsubscribe_token, last_interaction_at, snoozed_until)
+                        VALUES (:uuid, :companyId, :taxId, :legalName, :commercialName, :email, :phone,
+                            :address, :zipCode, :city, :country, :tariffId, :allowCredit, :creditLimit,
+                            :surchargeApply, :notes, :active, :createdAt, :updatedAt,
+                            :type, :origin, :tags, :marketingConsent, :marketingStatus, :unsubscribeToken, :lastInteractionAt, :snoozedUntil)
+                        RETURNING id
+                        """)
                 .param("uuid", uuid)
                 .param("companyId", customer.companyId().value())
                 .param("taxId", customer.taxId() != null ? customer.taxId().value() : null)
@@ -73,11 +76,22 @@ public class JdbcCustomerPersistenceAdapter implements CustomerRepository {
                 .param("active", customer.isActive())
                 .param("createdAt", Timestamp.from(customer.createdAt()))
                 .param("updatedAt", Timestamp.from(customer.updatedAt()))
+                .param("type", customer.getType())
+                .param("origin", customer.getOrigin())
+                .param("tags", customer.getTags())
+                .param("marketingConsent", customer.isMarketingConsent())
+                .param("marketingStatus", customer.getMarketingStatus())
+                .param("unsubscribeToken", customer.getUnsubscribeToken())
+                .param("lastInteractionAt",
+                        customer.getLastInteractionAt() != null ? Timestamp.from(customer.getLastInteractionAt())
+                                : null)
+                .param("snoozedUntil",
+                        customer.getSnoozedUntil() != null ? Timestamp.from(customer.getSnoozedUntil()) : null)
                 .update(keyHolder);
 
         Long generatedId = ((Number) keyHolder.getKeys().get("id")).longValue();
 
-        return new Customer(
+        Customer newCustomer = new Customer(
                 new CustomerId(generatedId),
                 uuid,
                 customer.companyId(),
@@ -98,6 +112,17 @@ public class JdbcCustomerPersistenceAdapter implements CustomerRepository {
                 customer.isActive(),
                 customer.createdAt(),
                 customer.updatedAt());
+
+        newCustomer.setType(customer.getType());
+        newCustomer.setOrigin(customer.getOrigin());
+        newCustomer.setTags(customer.getTags());
+        newCustomer.setMarketingConsent(customer.isMarketingConsent());
+        newCustomer.setMarketingStatus(customer.getMarketingStatus());
+        newCustomer.setUnsubscribeToken(customer.getUnsubscribeToken());
+        newCustomer.setLastInteractionAt(customer.getLastInteractionAt());
+        newCustomer.setSnoozedUntil(customer.getSnoozedUntil());
+
+        return newCustomer;
     }
 
     private Customer update(Customer customer) {
@@ -117,7 +142,15 @@ public class JdbcCustomerPersistenceAdapter implements CustomerRepository {
                     surcharge_apply = :surchargeApply,
                     notes = :notes,
                     active = :active,
-                    updated_at = :updatedAt
+                    updated_at = :updatedAt,
+                    type = :type,
+                    origin = :origin,
+                    tags = :tags,
+                    marketing_consent = :marketingConsent,
+                    marketing_status = :marketingStatus,
+                    unsubscribe_token = :unsubscribeToken,
+                    last_interaction_at = :lastInteractionAt,
+                    snoozed_until = :snoozedUntil
                 WHERE id = :id
                 """)
                 .param("id", customer.id().value())
@@ -136,6 +169,17 @@ public class JdbcCustomerPersistenceAdapter implements CustomerRepository {
                 .param("notes", customer.notes())
                 .param("active", customer.isActive())
                 .param("updatedAt", Timestamp.from(customer.updatedAt()))
+                .param("type", customer.getType())
+                .param("origin", customer.getOrigin())
+                .param("tags", customer.getTags())
+                .param("marketingConsent", customer.isMarketingConsent())
+                .param("marketingStatus", customer.getMarketingStatus())
+                .param("unsubscribeToken", customer.getUnsubscribeToken())
+                .param("lastInteractionAt",
+                        customer.getLastInteractionAt() != null ? Timestamp.from(customer.getLastInteractionAt())
+                                : null)
+                .param("snoozedUntil",
+                        customer.getSnoozedUntil() != null ? Timestamp.from(customer.getSnoozedUntil()) : null)
                 .update();
 
         return customer;
@@ -184,11 +228,41 @@ public class JdbcCustomerPersistenceAdapter implements CustomerRepository {
                 .list();
     }
 
+    @Override
+    public List<Customer> findByMarketingCriteria(List<String> tags, String customerType,
+            java.math.BigDecimal minSpent) {
+        StringBuilder sql = new StringBuilder("SELECT * FROM customers WHERE active = TRUE");
+        List<Object> params = new java.util.ArrayList<>();
+
+        if (customerType != null) {
+            sql.append(" AND type = ?");
+            params.add(customerType);
+        }
+
+        if (tags != null && !tags.isEmpty()) {
+            sql.append(" AND tags && ?::text[]");
+            params.add(tags.toArray(new String[0]));
+        }
+
+        return jdbcClient.sql(sql.toString())
+                .params(params)
+                .query(this::mapRow)
+                .list();
+    }
+
+    @Override
+    public Optional<Customer> findByUnsubscribeToken(String token) {
+        return jdbcClient.sql("SELECT * FROM customers WHERE unsubscribe_token = :token")
+                .param("token", token)
+                .query(this::mapRow)
+                .optional();
+    }
+
     private Customer mapRow(ResultSet rs, int rowNum) throws SQLException {
         String taxIdStr = rs.getString("tax_id");
         String emailStr = rs.getString("email");
 
-        return new Customer(
+        Customer c = new Customer(
                 new CustomerId(rs.getLong("id")),
                 (UUID) rs.getObject("uuid"),
                 new CompanyId((UUID) rs.getObject("company_id")),
@@ -209,5 +283,23 @@ public class JdbcCustomerPersistenceAdapter implements CustomerRepository {
                 rs.getBoolean("active"),
                 rs.getTimestamp("created_at").toInstant(),
                 rs.getTimestamp("updated_at").toInstant());
+
+        c.setType(rs.getString("type"));
+        c.setOrigin(rs.getString("origin"));
+        java.sql.Array tagsArray = rs.getArray("tags");
+        if (tagsArray != null) {
+            c.setTags((String[]) tagsArray.getArray());
+        }
+        c.setMarketingConsent(rs.getBoolean("marketing_consent"));
+        c.setMarketingStatus(rs.getString("marketing_status"));
+        c.setUnsubscribeToken(rs.getString("unsubscribe_token"));
+        if (rs.getTimestamp("last_interaction_at") != null) {
+            c.setLastInteractionAt(rs.getTimestamp("last_interaction_at").toInstant());
+        }
+        if (rs.getTimestamp("snoozed_until") != null) {
+            c.setSnoozedUntil(rs.getTimestamp("snoozed_until").toInstant());
+        }
+
+        return c;
     }
 }

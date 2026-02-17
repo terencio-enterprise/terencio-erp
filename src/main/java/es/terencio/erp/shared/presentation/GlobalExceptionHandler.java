@@ -109,6 +109,17 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error);
     }
 
+    @ExceptionHandler({ org.springframework.security.access.AccessDeniedException.class,
+            org.springframework.security.authorization.AuthorizationDeniedException.class })
+    public ResponseEntity<ApiErrorResponse> handleAccessDeniedException(RuntimeException ex) {
+        log.warn("Access denied: {}", ex.getMessage());
+
+        ApiErrorResponse error = ApiErrorResponse.error(
+                "Access denied",
+                "ACCESS_DENIED");
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error);
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiErrorResponse> handleGenericException(Exception ex) {
         // CRITICAL: Log the full stack trace for unexpected 500 errors

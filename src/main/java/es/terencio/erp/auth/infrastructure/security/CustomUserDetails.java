@@ -21,9 +21,10 @@ public class CustomUserDetails implements UserDetails {
     private final String password; // This maps to pin_hash in DB
     private final Collection<? extends GrantedAuthority> authorities;
     private final UUID storeId;
+    private final UUID companyId;
 
     public CustomUserDetails(Long id, UUID uuid, String username, String fullName, String password, String role,
-            UUID storeId) {
+            UUID storeId, UUID companyId) {
         this.id = id;
         this.uuid = uuid;
         this.username = username;
@@ -31,6 +32,7 @@ public class CustomUserDetails implements UserDetails {
         this.password = password;
         this.role = role;
         this.storeId = storeId;
+        this.companyId = companyId;
         this.authorities = List.of(new SimpleGrantedAuthority("ROLE_" + role));
     }
 
@@ -52,6 +54,10 @@ public class CustomUserDetails implements UserDetails {
 
     public UUID getStoreId() {
         return storeId;
+    }
+
+    public UUID getCompanyId() {
+        return companyId;
     }
 
     @Override

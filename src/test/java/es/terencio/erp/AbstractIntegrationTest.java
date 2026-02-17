@@ -42,6 +42,10 @@ public abstract class AbstractIntegrationTest {
     protected void cleanDatabase() {
         // Level 1: Most dependent tables (leaf nodes)
         jdbcClient.sql("DELETE FROM audit_user_actions").update();
+        jdbcClient.sql("DELETE FROM marketing_bounce_events").update();
+        jdbcClient.sql("DELETE FROM marketing_logs").update();
+        jdbcClient.sql("DELETE FROM marketing_attachments").update();
+        jdbcClient.sql("DELETE FROM marketing_templates").update();
         jdbcClient.sql("DELETE FROM accounting_entry_lines").update();
         jdbcClient.sql("DELETE FROM fiscal_audit_log").update();
         jdbcClient.sql("DELETE FROM payments").update();
