@@ -47,16 +47,18 @@ class InventoryIntegrationTest extends AbstractIntegrationTest {
                                 .update();
 
                 // Create test store and admin user for auth
-                UUID storeId = createStore(testCompanyId);
-                createAdminUser(testCompanyId, storeId, "admin", "admin123");
+                // Create test store and admin user for auth
+                UUID authStoreId = createStore(testCompanyId);
+                createAdminUser(testCompanyId, authStoreId, "admin", "admin123");
                 authHeaders = loginAndGetHeaders("admin", "admin123");
 
                 // Create test store and warehouse
+                UUID testStoreId = UUID.randomUUID();
                 jdbcClient.sql("""
                                 INSERT INTO stores (id, company_id, code, name, is_active, timezone, created_at, updated_at, version)
                                 VALUES (?, ?, 'STORE001', 'Test Store', TRUE, 'Europe/Madrid', NOW(), NOW(), 1)
                                 """)
-                                .param(storeId)
+                                .param(testStoreId)
                                 .param(testCompanyId)
                                 .update();
 
@@ -66,7 +68,7 @@ class InventoryIntegrationTest extends AbstractIntegrationTest {
                                 VALUES (?, ?, 'Main Warehouse', 'WH-001', NOW())
                                 """)
                                 .param(testWarehouseId)
-                                .param(storeId)
+                                .param(testStoreId)
                                 .update();
 
                 // Create test tax
@@ -177,7 +179,7 @@ class InventoryIntegrationTest extends AbstractIntegrationTest {
                 ResponseEntity<ApiResponse<List<Map>>> response = restTemplate.exchange(
                                 "/api/v1/inventory/products/" + testProductId + "/movements",
                                 HttpMethod.GET,
-                                null,
+                                new HttpEntity<>(authHeaders),
                                 new ParameterizedTypeReference<ApiResponse<List<Map>>>() {
                                 });
 
@@ -253,7 +255,7 @@ class InventoryIntegrationTest extends AbstractIntegrationTest {
                 ResponseEntity<ApiResponse<List<Map>>> response = restTemplate.exchange(
                                 "/api/v1/inventory/products/" + testProductId + "/movements",
                                 HttpMethod.GET,
-                                null,
+                                new HttpEntity<>(authHeaders),
                                 new ParameterizedTypeReference<ApiResponse<List<Map>>>() {
                                 });
 

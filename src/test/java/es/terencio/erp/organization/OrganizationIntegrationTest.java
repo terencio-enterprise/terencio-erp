@@ -49,20 +49,18 @@ class OrganizationIntegrationTest extends AbstractIntegrationTest {
                                 "roundingMode", "LINE");
 
                 // When
-                // Special case: Creating a company might be public or require super-admin.
-                // Assuming public for initial setup or self-registration, OR we need a
-                // pre-existing user if it's protected.
-                // If protected, we need to bootstrap an admin first.
-                // Let's assume for now we use the auth headers if we have them, BUT for company
-                // creation usually it's open or super-admin.
-                // However, if we don't have a company, we don't have a user.
-                // Let's bootstrap a dummy company/user just to get a token if needed, or check
-                // if this endpoint is public.
-                // IF endpoint is public:
+                // Bootstrap a dummy company and admin to get a valid token
+                UUID bootstrapCompanyId = createTestCompany();
+                UUID bootstrapStoreId = createStore(bootstrapCompanyId);
+                createAdminUser(bootstrapCompanyId, bootstrapStoreId, "bootstrap_admin", "admin123");
+                org.springframework.http.HttpHeaders bootstrapHeaders = loginAndGetHeaders("bootstrap_admin",
+                                "admin123");
+
+                // When
                 ResponseEntity<ApiResponse<Map>> response = restTemplate.exchange(
                                 "/api/v1/companies",
                                 HttpMethod.POST,
-                                new HttpEntity<>(createRequest),
+                                new HttpEntity<>(createRequest, bootstrapHeaders),
                                 new ParameterizedTypeReference<ApiResponse<Map>>() {
                                 });
 
@@ -231,7 +229,9 @@ class OrganizationIntegrationTest extends AbstractIntegrationTest {
                 assertThat(response.getBody()).isNotNull();
                 assertThat(response.getBody().isSuccess()).isTrue();
                 List<Map> stores = response.getBody().getData();
-                assertThat(stores).hasSize(2);
+                // Expect 3 stores: STORE001, STORE002, and the auth store created by
+                // createStore()
+                assertThat(stores).hasSize(3);
         }
 
         @Test
