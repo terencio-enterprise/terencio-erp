@@ -1,4 +1,4 @@
-package es.terencio.erp.security.domain.model;
+package es.terencio.erp.devices.domain.model;
 
 /**
  * Device status lifecycle.

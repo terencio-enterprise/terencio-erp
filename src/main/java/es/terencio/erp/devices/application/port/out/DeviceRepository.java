@@ -1,10 +1,10 @@
-package es.terencio.erp.security.application.port.out;
-
-import es.terencio.erp.security.domain.model.Device;
-import es.terencio.erp.shared.domain.identifier.DeviceId;
-import es.terencio.erp.shared.domain.identifier.StoreId;
+package es.terencio.erp.devices.application.port.out;
 
 import java.util.Optional;
+
+import es.terencio.erp.devices.domain.model.Device;
+import es.terencio.erp.shared.domain.identifier.DeviceId;
+import es.terencio.erp.shared.domain.identifier.StoreId;
 
 /**
  * Output port for Device persistence.

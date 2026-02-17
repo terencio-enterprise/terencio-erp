@@ -1,11 +1,11 @@
-package es.terencio.erp.security.domain.model;
+package es.terencio.erp.devices.domain.model;
+
+import java.time.Instant;
 
 import es.terencio.erp.shared.domain.exception.InvalidStateException;
 import es.terencio.erp.shared.domain.exception.InvariantViolationException;
 import es.terencio.erp.shared.domain.identifier.DeviceId;
 import es.terencio.erp.shared.domain.identifier.StoreId;
-
-import java.time.Instant;
 
 /**
  * RegistrationCode entity.

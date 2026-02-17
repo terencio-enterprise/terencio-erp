@@ -1,12 +1,12 @@
-package es.terencio.erp.security.application.usecase;
+package es.terencio.erp.devices.application.usecase;
 
 import java.util.UUID;
 
-import es.terencio.erp.security.application.port.in.RegisterDeviceUseCase;
-import es.terencio.erp.security.application.port.out.DeviceRepository;
-import es.terencio.erp.security.application.port.out.RegistrationCodeRepository;
-import es.terencio.erp.security.domain.model.Device;
-import es.terencio.erp.security.domain.model.RegistrationCode;
+import es.terencio.erp.devices.application.port.in.RegisterDeviceUseCase;
+import es.terencio.erp.devices.application.port.out.DeviceRepository;
+import es.terencio.erp.devices.application.port.out.RegistrationCodeRepository;
+import es.terencio.erp.devices.domain.model.Device;
+import es.terencio.erp.devices.domain.model.RegistrationCode;
 import es.terencio.erp.shared.exception.DomainException;
 
 /**

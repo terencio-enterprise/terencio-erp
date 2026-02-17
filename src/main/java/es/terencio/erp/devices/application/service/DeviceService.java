@@ -9,7 +9,6 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import es.terencio.erp.auth.infrastructure.security.DeviceApiKeyGenerator;
 import es.terencio.erp.devices.application.dto.DeviceDto;
 import es.terencio.erp.devices.application.dto.GenerateCodeRequest;
 import es.terencio.erp.devices.application.dto.GeneratedCodeDto;
@@ -18,6 +17,7 @@ import es.terencio.erp.devices.application.dto.SetupResultDto;
 import es.terencio.erp.devices.application.port.in.ManageDevicesUseCase;
 import es.terencio.erp.devices.application.port.in.SetupDeviceUseCase;
 import es.terencio.erp.devices.application.port.out.DevicePort;
+import es.terencio.erp.devices.infrastructure.security.DeviceApiKeyGenerator;
 import es.terencio.erp.shared.domain.SerialGenerator;
 import es.terencio.erp.shared.exception.RegistrationException;
 import es.terencio.erp.shared.exception.ResourceNotFoundException;

@@ -1,11 +1,11 @@
-package es.terencio.erp.auth.infrastructure.security;
+package es.terencio.erp.devices.infrastructure.security;
 
 import java.nio.charset.StandardCharsets;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.util.Base64;
-import java.util.UUID;
+import java.util.UUID;      
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
