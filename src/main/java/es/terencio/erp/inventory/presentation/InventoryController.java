@@ -24,6 +24,9 @@ import es.terencio.erp.shared.domain.identifier.ProductId;
 import es.terencio.erp.shared.domain.identifier.WarehouseId;
 import es.terencio.erp.shared.domain.valueobject.Quantity;
 import es.terencio.erp.shared.presentation.ApiResponse;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 
 /**
@@ -32,6 +35,7 @@ import jakarta.validation.Valid;
 @RestController
 @RequestMapping("/api/v1/inventory")
 @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'WAREHOUSE')")
+@Tag(name = "Inventory", description = "Inventory stock, movements and adjustments")
 public class InventoryController {
 
     private final InventoryStockRepository inventoryStockRepository;
@@ -45,10 +49,11 @@ public class InventoryController {
     }
 
     @GetMapping("/stock")
+    @Operation(summary = "Get stock", description = "Returns stock by warehouse and optionally by product")
     public ResponseEntity<ApiResponse<List<StockResponse>>> getStock(
-            @RequestParam UUID companyId,
-            @RequestParam UUID warehouseId,
-            @RequestParam(required = false) Long productId) {
+            @Parameter(description = "Company identifier") @RequestParam UUID companyId,
+            @Parameter(description = "Warehouse identifier") @RequestParam UUID warehouseId,
+            @Parameter(description = "Product identifier") @RequestParam(required = false) Long productId) {
 
         List<InventoryStock> stocks;
 
@@ -72,6 +77,7 @@ public class InventoryController {
     }
 
     @GetMapping("/products/{productId}/movements")
+    @Operation(summary = "Get product movements", description = "Returns inventory movement history for a product")
     public ResponseEntity<ApiResponse<List<MovementResponse>>> getProductMovements(@PathVariable Long productId) {
         List<StockMovement> movements = stockMovementRepository.findByProduct(new ProductId(productId));
 
@@ -90,6 +96,7 @@ public class InventoryController {
     }
 
     @PostMapping("/adjustments")
+    @Operation(summary = "Create stock adjustment", description = "Creates an inventory adjustment and stores resulting stock movement")
     public ResponseEntity<ApiResponse<AdjustmentResponse>> createAdjustment(
             @Valid @RequestBody AdjustmentRequest request) {
         ProductId productId = new ProductId(request.productId());

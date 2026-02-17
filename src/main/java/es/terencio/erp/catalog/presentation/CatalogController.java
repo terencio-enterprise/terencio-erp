@@ -32,6 +32,9 @@ import es.terencio.erp.shared.domain.identifier.CompanyId;
 import es.terencio.erp.shared.domain.identifier.ProductId;
 import es.terencio.erp.shared.domain.valueobject.Money;
 import es.terencio.erp.shared.presentation.ApiResponse;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 
 /**
@@ -40,6 +43,7 @@ import jakarta.validation.Valid;
 @RestController
 @RequestMapping("/api/v1/catalog")
 @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
+@Tag(name = "Catalog", description = "Catalog management endpoints for taxes, categories, products and tariffs")
 public class CatalogController {
 
     private final TaxRepository taxRepository;
@@ -67,6 +71,7 @@ public class CatalogController {
     // ==================== TAX ENDPOINTS ====================
 
     @GetMapping("/taxes")
+    @Operation(summary = "List taxes", description = "Returns taxes configured for a company")
     public ResponseEntity<ApiResponse<List<TaxResponse>>> listTaxes(@RequestParam UUID companyId) {
         List<Tax> taxes = taxRepository.findByCompanyId(new CompanyId(companyId));
         List<TaxResponse> response = taxes.stream()
@@ -78,6 +83,7 @@ public class CatalogController {
     // ==================== CATEGORY ENDPOINTS ====================
 
     @GetMapping("/categories")
+    @Operation(summary = "List categories", description = "Returns product categories for a company")
     public ResponseEntity<ApiResponse<List<CategoryResponse>>> listCategories(@RequestParam UUID companyId) {
         List<Category> categories = categoryRepository.findByCompanyId(new CompanyId(companyId));
         List<CategoryResponse> response = categories.stream()
@@ -87,6 +93,7 @@ public class CatalogController {
     }
 
     @PostMapping("/categories")
+    @Operation(summary = "Create category", description = "Creates a new catalog category")
     public ResponseEntity<ApiResponse<CategoryResponse>> createCategory(
             @Valid @RequestBody CreateCategoryRequest request) {
         Category category = Category.create(new CompanyId(request.companyId()), request.name());
@@ -99,13 +106,14 @@ public class CatalogController {
     // ==================== PRODUCT ENDPOINTS ====================
 
     @GetMapping("/products")
+    @Operation(summary = "Search products", description = "Searches products by filters with pagination")
     public ResponseEntity<ApiResponse<List<ProductResponse>>> searchProducts(
-            @RequestParam UUID companyId,
-            @RequestParam(required = false) String name,
-            @RequestParam(required = false) String reference,
-            @RequestParam(required = false) Long categoryId,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
+            @Parameter(description = "Company identifier") @RequestParam UUID companyId,
+            @Parameter(description = "Product name filter") @RequestParam(required = false) String name,
+            @Parameter(description = "Product reference filter") @RequestParam(required = false) String reference,
+            @Parameter(description = "Category identifier filter") @RequestParam(required = false) Long categoryId,
+            @Parameter(description = "Zero-based page number") @RequestParam(defaultValue = "0") int page,
+            @Parameter(description = "Page size") @RequestParam(defaultValue = "20") int size) {
 
         List<Product> products = jdbcProductPersistenceAdapter.searchProducts(
                 new CompanyId(companyId), name, reference, categoryId, page, size);
@@ -126,6 +134,7 @@ public class CatalogController {
     }
 
     @PostMapping("/products")
+    @Operation(summary = "Create product", description = "Creates a new product in catalog")
     public ResponseEntity<ApiResponse<ProductResponse>> createProduct(
             @Valid @RequestBody CreateProductRequest request) {
         CompanyId companyId = new CompanyId(request.companyId());
@@ -155,8 +164,9 @@ public class CatalogController {
     }
 
     @PutMapping("/products/{id}")
+    @Operation(summary = "Update product", description = "Updates basic product information")
     public ResponseEntity<ApiResponse<ProductResponse>> updateProduct(
-            @PathVariable Long id,
+            @Parameter(description = "Product identifier") @PathVariable Long id,
             @Valid @RequestBody UpdateProductRequest request) {
 
         Product product = productRepository.findById(new ProductId(id))
@@ -182,8 +192,9 @@ public class CatalogController {
     }
 
     @GetMapping("/products/{id}/prices")
+    @Operation(summary = "Get product prices", description = "Returns configured prices for a product across tariffs")
     public ResponseEntity<ApiResponse<List<ProductPriceResponse>>> getProductPrices(
-            @PathVariable Long id,
+            @Parameter(description = "Product identifier") @PathVariable Long id,
             @RequestParam UUID companyId) {
         // Get all tariffs and check prices for each
         List<Tariff> tariffs = tariffRepository.findByCompanyId(new CompanyId(companyId));
@@ -199,8 +210,9 @@ public class CatalogController {
     }
 
     @PutMapping("/products/{id}/prices")
+    @Operation(summary = "Update product prices", description = "Creates or updates prices for product tariffs")
     public ResponseEntity<ApiResponse<Void>> updateProductPrices(
-            @PathVariable Long id,
+            @Parameter(description = "Product identifier") @PathVariable Long id,
             @Valid @RequestBody UpdateProductPricesRequest request) {
 
         ProductId productId = new ProductId(id);
@@ -219,6 +231,7 @@ public class CatalogController {
     // ==================== TARIFF ENDPOINTS ====================
 
     @GetMapping("/tariffs")
+    @Operation(summary = "List tariffs", description = "Returns tariffs configured for a company")
     public ResponseEntity<ApiResponse<List<TariffResponse>>> listTariffs(@RequestParam UUID companyId) {
         List<Tariff> tariffs = tariffRepository.findByCompanyId(new CompanyId(companyId));
         List<TariffResponse> response = tariffs.stream()

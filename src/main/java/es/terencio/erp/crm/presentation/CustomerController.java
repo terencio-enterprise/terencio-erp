@@ -24,6 +24,9 @@ import es.terencio.erp.shared.domain.valueobject.Email;
 import es.terencio.erp.shared.domain.valueobject.Money;
 import es.terencio.erp.shared.domain.valueobject.TaxId;
 import es.terencio.erp.shared.presentation.ApiResponse;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 
 /**
@@ -32,6 +35,7 @@ import jakarta.validation.Valid;
 @RestController
 @RequestMapping("/api/v1/customers")
 @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
+@Tag(name = "Customers", description = "CRM customer and pricing management endpoints")
 public class CustomerController {
 
     private final CustomerRepository customerRepository;
@@ -45,9 +49,10 @@ public class CustomerController {
     }
 
     @GetMapping
+    @Operation(summary = "Search customers", description = "Returns company customers, optionally filtered by search term")
     public ResponseEntity<ApiResponse<List<CustomerResponse>>> searchCustomers(
-            @RequestParam UUID companyId,
-            @RequestParam(required = false) String search) {
+            @Parameter(description = "Company identifier") @RequestParam UUID companyId,
+            @Parameter(description = "Free-text customer search") @RequestParam(required = false) String search) {
 
         List<Customer> customers;
 
@@ -73,6 +78,7 @@ public class CustomerController {
     }
 
     @PostMapping
+    @Operation(summary = "Create customer", description = "Creates a new customer in CRM")
     public ResponseEntity<ApiResponse<CustomerResponse>> createCustomer(
             @Valid @RequestBody CreateCustomerRequest request) {
         CompanyId companyId = new CompanyId(request.companyId());
@@ -103,8 +109,9 @@ public class CustomerController {
     }
 
     @PutMapping("/{id}")
+    @Operation(summary = "Update customer", description = "Updates customer contact data")
     public ResponseEntity<ApiResponse<CustomerResponse>> updateCustomer(
-            @PathVariable UUID id,
+            @Parameter(description = "Customer UUID") @PathVariable UUID id,
             @Valid @RequestBody UpdateCustomerRequest request) {
 
         Customer customer = customerRepository.findByUuid(id)
@@ -133,8 +140,9 @@ public class CustomerController {
     }
 
     @PutMapping("/{id}/commercial-terms")
+    @Operation(summary = "Update commercial terms", description = "Updates tariff and credit settings for a customer")
     public ResponseEntity<ApiResponse<Void>> updateCommercialTerms(
-            @PathVariable UUID id,
+            @Parameter(description = "Customer UUID") @PathVariable UUID id,
             @Valid @RequestBody UpdateCommercialTermsRequest request) {
 
         Customer customer = customerRepository.findByUuid(id)
@@ -156,6 +164,7 @@ public class CustomerController {
     }
 
     @GetMapping("/{id}/special-prices")
+    @Operation(summary = "Get special prices", description = "Returns product-specific special prices for a customer")
     public ResponseEntity<ApiResponse<List<SpecialPriceResponse>>> getSpecialPrices(@PathVariable UUID id) {
         Customer customer = customerRepository.findByUuid(id)
                 .orElseThrow(() -> new RuntimeException("Customer not found"));
@@ -170,8 +179,9 @@ public class CustomerController {
     }
 
     @PutMapping("/{id}/special-prices")
+    @Operation(summary = "Update special prices", description = "Creates or updates product-specific special prices for a customer")
     public ResponseEntity<ApiResponse<Void>> updateSpecialPrices(
-            @PathVariable UUID id,
+            @Parameter(description = "Customer UUID") @PathVariable UUID id,
             @Valid @RequestBody UpdateSpecialPricesRequest request) {
 
         Customer customer = customerRepository.findByUuid(id)

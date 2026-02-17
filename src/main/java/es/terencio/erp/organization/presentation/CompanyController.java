@@ -22,6 +22,9 @@ import es.terencio.erp.organization.application.usecase.UpdateFiscalSettingsServ
 import es.terencio.erp.organization.domain.model.Company;
 import es.terencio.erp.shared.domain.identifier.CompanyId;
 import es.terencio.erp.shared.presentation.ApiResponse;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 
 /**
@@ -30,6 +33,7 @@ import jakarta.validation.Valid;
 @RestController
 @RequestMapping("/api/v1/companies")
 @PreAuthorize("hasRole('ADMIN')")
+@Tag(name = "Companies", description = "Company profile and fiscal settings management")
 public class CompanyController {
 
     private final CreateCompanyUseCase createCompanyUseCase;
@@ -46,6 +50,7 @@ public class CompanyController {
     }
 
     @PostMapping
+    @Operation(summary = "Create company", description = "Creates a new company and initial configuration")
     public ResponseEntity<ApiResponse<CreateCompanyResult>> createCompany(
             @Valid @RequestBody CreateCompanyCommand command) {
         CreateCompanyResult result = createCompanyUseCase.execute(command);
@@ -53,6 +58,7 @@ public class CompanyController {
     }
 
     @GetMapping("/{id}")
+    @Operation(summary = "Get company", description = "Returns company details by identifier")
     public ResponseEntity<ApiResponse<CompanyResponse>> getCompany(@PathVariable UUID id) {
         Company company = companyRepository.findById(new CompanyId(id))
                 .orElseThrow(() -> new RuntimeException("Company not found"));
@@ -69,8 +75,9 @@ public class CompanyController {
     }
 
     @PutMapping("/{id}/fiscal-settings")
+    @Operation(summary = "Update fiscal settings", description = "Updates company fiscal configuration settings")
     public ResponseEntity<ApiResponse<UpdateFiscalSettingsResult>> updateFiscalSettings(
-            @PathVariable UUID id,
+            @Parameter(description = "Company identifier") @PathVariable UUID id,
             @Valid @RequestBody UpdateFiscalSettingsCommand command) {
         UpdateFiscalSettingsResult result = updateFiscalSettingsService.execute(id, command);
         return ResponseEntity.ok(ApiResponse.success("Fiscal settings updated successfully", result));

@@ -26,6 +26,9 @@ import es.terencio.erp.organization.domain.model.StoreSettings;
 import es.terencio.erp.shared.domain.identifier.CompanyId;
 import es.terencio.erp.shared.domain.identifier.StoreId;
 import es.terencio.erp.shared.presentation.ApiResponse;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 
 /**
@@ -34,6 +37,7 @@ import jakarta.validation.Valid;
 @RestController
 @RequestMapping("/api/v1/stores")
 @PreAuthorize("hasRole('ADMIN')")
+@Tag(name = "Stores", description = "Store management and store settings endpoints")
 public class StoreController {
 
     private final CreateStoreUseCase createStoreUseCase;
@@ -53,12 +57,14 @@ public class StoreController {
     }
 
     @PostMapping
+    @Operation(summary = "Create store", description = "Creates a new store for a company")
     public ResponseEntity<ApiResponse<CreateStoreResult>> createStore(@Valid @RequestBody CreateStoreCommand command) {
         CreateStoreResult result = createStoreUseCase.execute(command);
         return ResponseEntity.ok(ApiResponse.success("Store created successfully", result));
     }
 
     @GetMapping
+    @Operation(summary = "List stores", description = "Returns stores for a given company")
     public ResponseEntity<ApiResponse<List<StoreResponse>>> listStores(@RequestParam UUID companyId) {
         List<Store> stores = storeRepository.findByCompanyId(new CompanyId(companyId));
         List<StoreResponse> response = stores.stream()
@@ -73,6 +79,7 @@ public class StoreController {
     }
 
     @GetMapping("/{id}/settings")
+    @Operation(summary = "Get store settings", description = "Returns configuration settings for one store")
     public ResponseEntity<ApiResponse<StoreSettingsResponse>> getStoreSettings(@PathVariable UUID id) {
         StoreSettings settings = storeSettingsRepository.findByStoreId(new StoreId(id))
                 .orElseThrow(() -> new RuntimeException("Store settings not found"));
@@ -85,8 +92,9 @@ public class StoreController {
     }
 
     @PutMapping("/{id}/settings")
+    @Operation(summary = "Update store settings", description = "Updates store operational settings")
     public ResponseEntity<ApiResponse<Void>> updateStoreSettings(
-            @PathVariable UUID id,
+            @Parameter(description = "Store identifier") @PathVariable UUID id,
             @Valid @RequestBody UpdateStoreSettingsCommand command) {
         updateStoreSettingsUseCase.execute(command);
         return ResponseEntity.ok(ApiResponse.success("Store settings updated successfully"));
