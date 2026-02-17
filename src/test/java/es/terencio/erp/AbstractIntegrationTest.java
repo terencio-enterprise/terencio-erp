@@ -20,6 +20,12 @@ public abstract class AbstractIntegrationTest {
     @Autowired
     protected JdbcClient jdbcClient;
 
+    @Autowired
+    protected org.springframework.boot.test.web.client.TestRestTemplate restTemplate;
+
+    @Autowired
+    protected org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
+
     static final PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>(
             DockerImageName.parse("postgres:17-alpine"));
 
@@ -83,5 +89,61 @@ public abstract class AbstractIntegrationTest {
 
         // Level 5: Root tables
         jdbcClient.sql("DELETE FROM companies").update();
+    }
+
+    // ==================== AUTH HELPER METHODS ====================
+
+    protected java.util.UUID createStore(java.util.UUID companyId) {
+        java.util.UUID storeId = java.util.UUID.randomUUID();
+        jdbcClient.sql("""
+                INSERT INTO stores (id, company_id, code, name, address, is_active)
+                VALUES (:id, :companyId, 'TEST-STORE', 'Test Store', 'Test Address', TRUE)
+                """)
+                .param("id", storeId)
+                .param("companyId", companyId)
+                .update();
+        return storeId;
+    }
+
+    protected void createAdminUser(java.util.UUID companyId, java.util.UUID storeId, String username, String password) {
+        String encodedPassword = passwordEncoder.encode(password);
+        jdbcClient.sql("""
+                INSERT INTO users (username, full_name, role, pin_hash, password_hash,
+                    company_id, store_id, permissions_json, is_active)
+                VALUES (:username, 'Admin User', 'ADMIN', 'pin123', :password,
+                    :companyId, :storeId, '[]', TRUE)
+                """)
+                .param("username", username)
+                .param("password", encodedPassword)
+                .param("companyId", companyId)
+                .param("storeId", storeId)
+                .update();
+    }
+
+    protected org.springframework.http.HttpHeaders loginAndGetHeaders(String username, String password) {
+        es.terencio.erp.auth.application.dto.LoginRequest loginRequest = new es.terencio.erp.auth.application.dto.LoginRequest(
+                username, password);
+
+        org.springframework.http.ResponseEntity<es.terencio.erp.shared.presentation.ApiResponse<es.terencio.erp.auth.application.dto.LoginResponse>> response = restTemplate
+                .exchange(
+                        "/api/v1/auth/login",
+                        org.springframework.http.HttpMethod.POST,
+                        new org.springframework.http.HttpEntity<>(loginRequest),
+                        new org.springframework.core.ParameterizedTypeReference<>() {
+                        });
+
+        if (response.getStatusCode() != org.springframework.http.HttpStatus.OK) {
+            throw new RuntimeException("Login failed for user: " + username);
+        }
+
+        // Extract Access Token from cookie
+        String accessTokenCookie = response.getHeaders().get(org.springframework.http.HttpHeaders.SET_COOKIE).stream()
+                .filter(c -> c.startsWith("ACCESS_TOKEN="))
+                .findFirst()
+                .orElseThrow(() -> new RuntimeException("ACCESS_TOKEN cookie not found"));
+
+        org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
+        headers.add(org.springframework.http.HttpHeaders.COOKIE, accessTokenCookie);
+        return headers;
     }
 }
