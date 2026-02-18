@@ -86,6 +86,8 @@ class DashboardIntegrationTest extends AbstractIntegrationTest {
                 DashboardContextDto context = response.getBody().getData().context();
                 assertThat(context.activeStore().id()).isEqualTo(storeId);
                 assertThat(context.activeCompany().id()).isEqualTo(companyId); // Should derive company from store
+                assertThat(context.availableCompanies()).isNotEmpty();
+                assertThat(context.availableCompanies().get(0).stores()).isNotEmpty();
 
                 // 2. Switch Context (Same context, should succeed and update DB)
                 SwitchContextRequest switchRequest = new SwitchContextRequest(companyId, storeId);

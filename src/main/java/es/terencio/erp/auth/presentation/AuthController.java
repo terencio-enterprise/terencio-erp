@@ -223,7 +223,7 @@ public class AuthController {
                                 userDetails.getUsername(),
                                 userDetails.getFullName(),
                                 userDetails.isEnabled(),
-                                organizationTreeService.getDashboardContext(userDetails.getId()));
+                                organizationTreeService.getCompanyTreeForEmployee(userDetails.getId()));
 
                 return ResponseEntity.ok(ApiResponse.success("User info fetched successfully", userInfo));
         }

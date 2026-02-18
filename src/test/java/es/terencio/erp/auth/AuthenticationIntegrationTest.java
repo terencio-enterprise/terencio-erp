@@ -279,6 +279,8 @@ class AuthenticationIntegrationTest extends AbstractIntegrationTest {
                 EmployeeInfoDto userInfo = response.getBody().getData();
                 assertThat(userInfo.id()).isEqualTo(cashierEmployeeId);
                 assertThat(userInfo.username()).isEqualTo("cashier");
+                assertThat(userInfo.companies()).isNotEmpty();
+                assertThat(userInfo.companies().get(0).id()).isEqualTo(testCompanyId);
         }
 
         @Test

@@ -5,9 +5,9 @@ package es.terencio.erp.auth.application.dto;
  * Returned by the /me endpoint.
  */
 public record EmployeeInfoDto(
-        Long id,
-        String username,
-        String fullName,
-        boolean isActive,
-        es.terencio.erp.organization.application.dto.DashboardContextDto context) {
+                Long id,
+                String username,
+                String fullName,
+                boolean isActive,
+                java.util.List<es.terencio.erp.organization.application.dto.CompanyTreeDto> companies) {
 }

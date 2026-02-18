@@ -12,7 +12,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import es.terencio.erp.auth.infrastructure.security.CustomUserDetails;
-import es.terencio.erp.organization.application.dto.OrganizationTreeDto;
 import es.terencio.erp.organization.application.service.OrganizationTreeService;
 import es.terencio.erp.shared.presentation.ApiResponse;
 
@@ -31,11 +30,8 @@ public class OrganizationController {
             @AuthenticationPrincipal CustomUserDetails userDetails) {
 
         Long employeeId = userDetails.getId();
-        // flatten to companies
-        List<OrganizationTreeDto> orgTree = organizationTreeService.getOrganizationTreeForEmployee(employeeId);
-        List<es.terencio.erp.organization.application.dto.CompanyTreeDto> companies = orgTree.stream()
-                .flatMap(o -> o.companies().stream())
-                .collect(java.util.stream.Collectors.toList());
+        List<es.terencio.erp.organization.application.dto.CompanyTreeDto> companies = organizationTreeService
+                .getCompanyTreeForEmployee(employeeId);
 
         return ResponseEntity.ok(ApiResponse.success("Organization tree retrieved successfully", companies));
     }

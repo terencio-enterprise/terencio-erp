@@ -14,7 +14,6 @@ import es.terencio.erp.auth.domain.model.AccessGrant;
 import es.terencio.erp.auth.domain.model.AccessScope;
 import es.terencio.erp.employees.application.port.out.EmployeePort;
 import es.terencio.erp.organization.application.dto.CompanyTreeDto;
-import es.terencio.erp.organization.application.dto.OrganizationTreeDto;
 import es.terencio.erp.organization.application.dto.StoreTreeDto;
 import es.terencio.erp.organization.application.port.out.OrganizationRepository;
 
@@ -30,7 +29,7 @@ public class OrganizationTreeService {
         this.organizationRepository = organizationRepository;
     }
 
-    public List<OrganizationTreeDto> getOrganizationTreeForEmployee(Long employeeId) {
+    public List<CompanyTreeDto> getCompanyTreeForEmployee(Long employeeId) {
         Set<UUID> visibleOrganizationIds = new HashSet<>();
         Set<UUID> visibleCompanyIds = new HashSet<>();
         Set<UUID> visibleStoreIds = new HashSet<>();
@@ -64,12 +63,8 @@ public class OrganizationTreeService {
         if (!visibleStoreIds.isEmpty()) {
             visibleCompanyIds.addAll(organizationRepository.findCompanyIdsByStoreIds(visibleStoreIds));
         }
-        if (!visibleCompanyIds.isEmpty()) {
-            visibleOrganizationIds.addAll(organizationRepository.findOrganizationIdsByCompanyIds(visibleCompanyIds));
-        }
 
         // 4. Fetch All Entities
-        List<OrganizationTreeDto> organizations = organizationRepository.findOrganizationsByIds(visibleOrganizationIds);
         List<CompanyTreeDto> companies = organizationRepository.findCompaniesByIds(visibleCompanyIds);
         List<StoreTreeDto> stores = organizationRepository.findStoresByIds(visibleStoreIds);
 
@@ -78,7 +73,7 @@ public class OrganizationTreeService {
                 .filter(s -> s.companyId() != null)
                 .collect(Collectors.groupingBy(StoreTreeDto::companyId));
 
-        List<CompanyTreeDto> enrichedCompanies = companies.stream()
+        return companies.stream()
                 .map(c -> new CompanyTreeDto(
                         c.id(),
                         c.name(),
@@ -86,107 +81,24 @@ public class OrganizationTreeService {
                         c.organizationId(),
                         storesByCompany.getOrDefault(c.id(), Collections.emptyList())))
                 .collect(Collectors.toList());
-
-        java.util.Map<UUID, List<CompanyTreeDto>> companiesByOrganization = enrichedCompanies.stream()
-                .filter(c -> c.organizationId() != null)
-                .collect(Collectors.groupingBy(CompanyTreeDto::organizationId));
-
-        return organizations.stream()
-                .map(o -> new OrganizationTreeDto(
-                        o.id(),
-                        o.name(),
-                        o.slug(),
-                        companiesByOrganization.getOrDefault(o.id(), Collections.emptyList())))
-                .collect(Collectors.toList());
-    }
-
-    public es.terencio.erp.organization.application.dto.DashboardContextDto getDashboardContext(Long employeeId) {
-        // 1. Get Tree (Available Context)
-        List<OrganizationTreeDto> tree = getOrganizationTreeForEmployee(employeeId);
-
-        // 2. Flatten available for easier lookup/return
-        List<CompanyTreeDto> availableCompanies = tree.stream()
-                .flatMap(o -> o.companies().stream())
-                .collect(Collectors.toList());
-
-        List<StoreTreeDto> availableStores = availableCompanies.stream()
-                .flatMap(c -> c.stores().stream())
-                .collect(Collectors.toList());
-
-        // 3. Resolve Active Context
-        var employee = employeePort.findById(employeeId).orElseThrow(() -> new RuntimeException("Employee not found"));
-
-        UUID activeCompanyId = employee.lastActiveCompanyId();
-        UUID activeStoreId = employee.lastActiveStoreId();
-
-        // If not set, try to default to first available
-        if (activeCompanyId == null && !availableCompanies.isEmpty()) {
-            activeCompanyId = availableCompanies.get(0).id();
-            // If company selected, try to select its first store
-            if (activeStoreId == null && !availableCompanies.get(0).stores().isEmpty()) {
-                activeStoreId = availableCompanies.get(0).stores().get(0).id();
-            }
-        }
-
-        // Find DTOs for active
-        CompanyTreeDto activeCompany = null;
-        if (activeCompanyId != null) {
-            UUID finalCompId = activeCompanyId;
-            activeCompany = availableCompanies.stream().filter(c -> c.id().equals(finalCompId)).findFirst()
-                    .orElse(null);
-        }
-
-        StoreTreeDto activeStore = null;
-        if (activeStoreId != null) {
-            UUID finalStoreId = activeStoreId;
-            activeStore = availableStores.stream().filter(s -> s.id().equals(finalStoreId)).findFirst().orElse(null);
-        }
-
-        // If activeStore is set but activeCompany is not (edge case?), derive company
-        // from store
-        if (activeStore != null && activeCompany == null && activeStore.companyId() != null) {
-            UUID parentCompId = activeStore.companyId();
-            activeCompany = availableCompanies.stream().filter(c -> c.id().equals(parentCompId)).findFirst()
-                    .orElse(null);
-        }
-
-        // Return Context
-        return new es.terencio.erp.organization.application.dto.DashboardContextDto(
-                activeCompany,
-                activeStore,
-                availableCompanies);
     }
 
     @Transactional
     public void switchContext(Long employeeId, UUID companyId, UUID storeId) {
-        // Validate access
-        List<OrganizationTreeDto> tree = getOrganizationTreeForEmployee(employeeId);
+        List<CompanyTreeDto> companies = getCompanyTreeForEmployee(employeeId);
 
         boolean companyValid = companyId == null;
         boolean storeValid = storeId == null;
 
         if (companyId != null) {
-            companyValid = tree.stream()
-                    .flatMap(o -> o.companies().stream())
+            companyValid = companies.stream()
                     .anyMatch(c -> c.id().equals(companyId));
         }
 
         if (storeId != null) {
-            storeValid = tree.stream()
-                    .flatMap(o -> o.companies().stream())
+            storeValid = companies.stream()
                     .flatMap(c -> c.stores().stream())
                     .anyMatch(s -> s.id().equals(storeId));
-
-            // Also validate store belongs to company if both provided?
-            // Logic: If store is provided, company MUST match its parent?
-            // Or we trust the frontend/user to send consistent pair.
-            // Let's enforce consistency if both present.
-            if (companyId != null && storeId != null && storeValid) {
-                // Re-check parentage
-                // We can check if store's parent company id matches companyId
-                // But we don't have easy lookup here without re-traversing
-                // Let's rely on basic existence validation for now.
-            }
         }
 
         if (!companyValid || !storeValid) {
