@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import es.terencio.erp.shared.exception.DomainException;
 import es.terencio.erp.shared.exception.RegistrationException;
 import es.terencio.erp.shared.exception.ResourceNotFoundException;
+import es.terencio.erp.shared.presentation.ApiError.ErrorDetail;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -26,108 +27,85 @@ import lombok.extern.slf4j.Slf4j;
 public class GlobalExceptionHandler {
 
     @ExceptionHandler(ResourceNotFoundException.class)
-    public ResponseEntity<ApiErrorResponse> handleResourceNotFoundException(ResourceNotFoundException ex) {
+    public ResponseEntity<ApiResponse<Void>> handleResourceNotFoundException(ResourceNotFoundException ex) {
         log.warn("Resource not found: {}", ex.getMessage());
 
-        ApiErrorResponse error = ApiErrorResponse.error(
-                ex.getMessage(),
-                "RESOURCE_NOT_FOUND");
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
+        ApiError error = new ApiError("RESOURCE_NOT_FOUND", ex.getMessage(), null);
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.error(ex.getMessage(), error));
     }
 
     @ExceptionHandler(RegistrationException.class)
-    public ResponseEntity<ApiErrorResponse> handleRegistrationException(RegistrationException ex) {
-        // Log at WARN level because it's usually a user error (wrong code, expired,
-        // etc.)
+    public ResponseEntity<ApiResponse<Void>> handleRegistrationException(RegistrationException ex) {
         log.warn("Registration failed: {}", ex.getMessage());
 
-        ApiErrorResponse error = ApiErrorResponse.error(
-                ex.getMessage(),
-                "REGISTRATION_ERROR");
-        return ResponseEntity.badRequest().body(error);
+        ApiError error = new ApiError("REGISTRATION_ERROR", ex.getMessage(), null);
+        return ResponseEntity.badRequest().body(ApiResponse.error(ex.getMessage(), error));
     }
 
     @ExceptionHandler(DomainException.class)
-    public ResponseEntity<ApiErrorResponse> handleDomainException(DomainException ex) {
+    public ResponseEntity<ApiResponse<Void>> handleDomainException(DomainException ex) {
         log.warn("Domain rule violation: {}", ex.getMessage());
 
-        ApiErrorResponse error = ApiErrorResponse.error(
-                ex.getMessage(),
-                "DOMAIN_ERROR");
-        return ResponseEntity.badRequest().body(error);
+        ApiError error = new ApiError("DOMAIN_ERROR", ex.getMessage(), null);
+        return ResponseEntity.badRequest().body(ApiResponse.error(ex.getMessage(), error));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<ApiErrorResponse> handleValidationException(
+    public ResponseEntity<ApiResponse<Void>> handleValidationException(
             MethodArgumentNotValidException ex) {
 
-        // Log basic validation failure info
         log.warn("Validation failed for request: {}", ex.getBindingResult().getObjectName());
 
-        List<ApiErrorResponse.FieldError> fieldErrors = new ArrayList<>();
+        List<ErrorDetail> details = new ArrayList<>();
         ex.getBindingResult().getAllErrors().forEach(error -> {
             String fieldName = ((org.springframework.validation.FieldError) error).getField();
             String errorMessage = error.getDefaultMessage();
-            fieldErrors.add(new ApiErrorResponse.FieldError(fieldName, errorMessage));
+            details.add(new ApiError.ErrorDetail(fieldName, errorMessage));
         });
 
-        ApiErrorResponse response = ApiErrorResponse.error(
-                "Validation failed",
-                "VALIDATION_ERROR",
-                fieldErrors);
+        ApiError error = new ApiError("VALIDATION_ERROR", "One or more inputs are invalid", details);
 
-        return ResponseEntity.badRequest().body(response);
+        return ResponseEntity.badRequest().body(ApiResponse.error("Validation failed", error));
     }
 
     @ExceptionHandler(BadCredentialsException.class)
-    public ResponseEntity<ApiErrorResponse> handleBadCredentialsException(BadCredentialsException ex) {
+    public ResponseEntity<ApiResponse<Void>> handleBadCredentialsException(BadCredentialsException ex) {
         log.warn("Authentication failed: bad credentials");
 
-        ApiErrorResponse error = ApiErrorResponse.error(
-                "Invalid username or password",
-                "BAD_CREDENTIALS");
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error);
+        ApiError error = new ApiError("BAD_CREDENTIALS", "Invalid username or password", null);
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ApiResponse.error("Authentication failed", error));
     }
 
     @ExceptionHandler(AccountStatusException.class)
-    public ResponseEntity<ApiErrorResponse> handleAccountStatusException(AccountStatusException ex) {
+    public ResponseEntity<ApiResponse<Void>> handleAccountStatusException(AccountStatusException ex) {
         log.warn("Authentication failed: account status issue - {}", ex.getMessage());
 
-        ApiErrorResponse error = ApiErrorResponse.error(
-                "Account is disabled or locked",
-                "ACCOUNT_STATUS_ERROR");
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error);
+        ApiError error = new ApiError("ACCOUNT_STATUS_ERROR", "Account is disabled or locked", null);
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ApiResponse.error("Authentication failed", error));
     }
 
     @ExceptionHandler(AuthenticationException.class)
-    public ResponseEntity<ApiErrorResponse> handleAuthenticationException(AuthenticationException ex) {
+    public ResponseEntity<ApiResponse<Void>> handleAuthenticationException(AuthenticationException ex) {
         log.warn("Authentication failed: {}", ex.getMessage());
 
-        ApiErrorResponse error = ApiErrorResponse.error(
-                "Authentication failed",
-                "AUTHENTICATION_ERROR");
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error);
+        ApiError error = new ApiError("AUTHENTICATION_ERROR", "Authentication failed", null);
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ApiResponse.error("Authentication failed", error));
     }
 
     @ExceptionHandler({ org.springframework.security.access.AccessDeniedException.class,
             org.springframework.security.authorization.AuthorizationDeniedException.class })
-    public ResponseEntity<ApiErrorResponse> handleAccessDeniedException(RuntimeException ex) {
+    public ResponseEntity<ApiResponse<Void>> handleAccessDeniedException(RuntimeException ex) {
         log.warn("Access denied: {}", ex.getMessage());
 
-        ApiErrorResponse error = ApiErrorResponse.error(
-                "Access denied",
-                "ACCESS_DENIED");
-        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error);
+        ApiError error = new ApiError("ACCESS_DENIED", "Access denied", null);
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ApiResponse.error("Access denied", error));
     }
 
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<ApiErrorResponse> handleGenericException(Exception ex) {
-        // CRITICAL: Log the full stack trace for unexpected 500 errors
+    public ResponseEntity<ApiResponse<Void>> handleGenericException(Exception ex) {
         log.error("Unexpected system error occurred", ex);
 
-        ApiErrorResponse error = ApiErrorResponse.error(
-                "An unexpected error occurred",
-                "INTERNAL_SERVER_ERROR");
-        return ResponseEntity.internalServerError().body(error);
+        ApiError error = new ApiError("INTERNAL_SERVER_ERROR", "An unexpected error occurred", null);
+        return ResponseEntity.internalServerError().body(ApiResponse.error("An unexpected error occurred", error));
     }
 }
