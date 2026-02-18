@@ -151,20 +151,10 @@ public class OrganizationTreeService {
         }
 
         // Return Context
-        // We filter "availableStores" to be only those of the active company?
-        // User asked: "I can see all store to select... normally one preselected"
-        // Usually "availableStores" in context means "stores of the active company".
-        List<StoreTreeDto> siblingStores = Collections.emptyList();
-        if (activeCompany != null) {
-            siblingStores = activeCompany.stores();
-        }
-
         return new es.terencio.erp.organization.application.dto.DashboardContextDto(
                 activeCompany,
                 activeStore,
-                tree,
-                availableCompanies,
-                siblingStores);
+                availableCompanies);
     }
 
     @Transactional

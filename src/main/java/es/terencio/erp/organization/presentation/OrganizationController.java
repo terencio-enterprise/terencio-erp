@@ -27,13 +27,17 @@ public class OrganizationController {
     }
 
     @GetMapping("/tree")
-    public ResponseEntity<ApiResponse<List<OrganizationTreeDto>>> getOrganizationTree(
+    public ResponseEntity<ApiResponse<List<es.terencio.erp.organization.application.dto.CompanyTreeDto>>> getOrganizationTree(
             @AuthenticationPrincipal CustomUserDetails userDetails) {
 
         Long employeeId = userDetails.getId();
-        List<OrganizationTreeDto> tree = organizationTreeService.getOrganizationTreeForEmployee(employeeId);
+        // flatten to companies
+        List<OrganizationTreeDto> orgTree = organizationTreeService.getOrganizationTreeForEmployee(employeeId);
+        List<es.terencio.erp.organization.application.dto.CompanyTreeDto> companies = orgTree.stream()
+                .flatMap(o -> o.companies().stream())
+                .collect(java.util.stream.Collectors.toList());
 
-        return ResponseEntity.ok(ApiResponse.success("Organization tree retrieved successfully", tree));
+        return ResponseEntity.ok(ApiResponse.success("Organization tree retrieved successfully", companies));
     }
 
     @PutMapping("/context")
