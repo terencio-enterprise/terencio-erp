@@ -9,5 +9,7 @@ public record EmployeeInfoDto(
                 String username,
                 String fullName,
                 boolean isActive,
+                java.util.UUID lastCompanyId,
+                java.util.UUID lastStoreId,
                 java.util.List<es.terencio.erp.organization.application.dto.CompanyTreeDto> companies) {
 }

@@ -281,6 +281,9 @@ class AuthenticationIntegrationTest extends AbstractIntegrationTest {
                 assertThat(userInfo.username()).isEqualTo("cashier");
                 assertThat(userInfo.companies()).isNotEmpty();
                 assertThat(userInfo.companies().get(0).id()).isEqualTo(testCompanyId);
+                // Last active context should be null as not set yet (unless I set it)
+                assertThat(userInfo.lastCompanyId()).isNull();
+                assertThat(userInfo.lastStoreId()).isNull();
         }
 
         @Test

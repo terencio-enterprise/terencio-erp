@@ -23,6 +23,7 @@ import es.terencio.erp.auth.application.dto.LoginRequest;
 import es.terencio.erp.auth.application.dto.LoginResponse;
 import es.terencio.erp.auth.infrastructure.security.CustomUserDetails;
 import es.terencio.erp.auth.infrastructure.security.JwtTokenProvider;
+import es.terencio.erp.employees.application.port.out.EmployeePort;
 import es.terencio.erp.shared.presentation.ApiError;
 import es.terencio.erp.shared.presentation.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -78,14 +79,17 @@ public class AuthController {
         private long refreshExpirationMs;
 
         private final es.terencio.erp.organization.application.service.OrganizationTreeService organizationTreeService;
+        private final EmployeePort employeePort;
 
         public AuthController(AuthenticationManager authenticationManager, JwtTokenProvider tokenProvider,
                         UserDetailsService userDetailsService,
-                        es.terencio.erp.organization.application.service.OrganizationTreeService organizationTreeService) {
+                        es.terencio.erp.organization.application.service.OrganizationTreeService organizationTreeService,
+                        EmployeePort employeePort) {
                 this.authenticationManager = authenticationManager;
                 this.tokenProvider = tokenProvider;
                 this.userDetailsService = userDetailsService;
                 this.organizationTreeService = organizationTreeService;
+                this.employeePort = employeePort;
         }
 
         /**
@@ -218,11 +222,17 @@ public class AuthController {
                         return ResponseEntity.status(401).build();
                 }
 
+                es.terencio.erp.employees.application.dto.EmployeeDto employee = employeePort
+                                .findById(userDetails.getId())
+                                .orElseThrow(() -> new RuntimeException("Employee not found"));
+
                 EmployeeInfoDto userInfo = new EmployeeInfoDto(
                                 userDetails.getId(),
                                 userDetails.getUsername(),
                                 userDetails.getFullName(),
                                 userDetails.isEnabled(),
+                                employee.lastActiveCompanyId(),
+                                employee.lastActiveStoreId(),
                                 organizationTreeService.getCompanyTreeForEmployee(userDetails.getId()));
 
                 return ResponseEntity.ok(ApiResponse.success("User info fetched successfully", userInfo));
