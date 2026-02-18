@@ -6,7 +6,7 @@ import java.util.UUID;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
-public record UpdateUserRequest(
+public record UpdateEmployeeRequest(
     @NotBlank String fullName,
     @NotBlank String role,
     @NotNull UUID storeId,

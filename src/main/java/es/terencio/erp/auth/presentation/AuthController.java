@@ -21,7 +21,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import es.terencio.erp.auth.application.dto.LoginRequest;
 import es.terencio.erp.auth.application.dto.LoginResponse;
-import es.terencio.erp.auth.application.dto.UserInfoDto;
+import es.terencio.erp.auth.application.dto.EmployeeInfoDto;
 import es.terencio.erp.auth.infrastructure.security.CustomUserDetails;
 import es.terencio.erp.auth.infrastructure.security.JwtTokenProvider;
 import es.terencio.erp.shared.presentation.ApiErrorResponse;
@@ -214,13 +214,13 @@ public class AuthController {
      */
     @GetMapping("/me")
     @Operation(summary = "Get current user", description = "Returns information for the currently authenticated user")
-    public ResponseEntity<ApiResponse<UserInfoDto>> getCurrentUser(
+    public ResponseEntity<ApiResponse<EmployeeInfoDto>> getCurrentUser(
             @Parameter(description = "Authenticated principal") @AuthenticationPrincipal CustomUserDetails userDetails) {
         if (userDetails == null) {
             return ResponseEntity.status(401).build();
         }
 
-        UserInfoDto userInfo = new UserInfoDto(
+        EmployeeInfoDto userInfo = new EmployeeInfoDto(
                 userDetails.getId(),
                 userDetails.getUsername(),
                 userDetails.getFullName(),

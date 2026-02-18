@@ -18,7 +18,7 @@ import es.terencio.erp.devices.application.port.in.ManageDevicesUseCase;
 import es.terencio.erp.devices.application.port.in.SetupDeviceUseCase;
 import es.terencio.erp.devices.application.port.out.DevicePort;
 import es.terencio.erp.devices.infrastructure.security.DeviceApiKeyGenerator;
-import es.terencio.erp.employees.application.port.out.UserPort;
+import es.terencio.erp.employees.application.port.out.EmployeePort;
 import es.terencio.erp.shared.domain.SerialGenerator;
 import es.terencio.erp.shared.exception.RegistrationException;
 import es.terencio.erp.shared.exception.ResourceNotFoundException;
@@ -27,14 +27,14 @@ import es.terencio.erp.shared.exception.ResourceNotFoundException;
 public class DeviceService implements ManageDevicesUseCase, SetupDeviceUseCase {
 
     private final DevicePort devicePort;
-    private final UserPort userPort;
+    private final EmployeePort EmployeePort;
     private final DeviceApiKeyGenerator apiKeyGenerator;
     private final SecureRandom random = new SecureRandom();
 
-    public DeviceService(DevicePort devicePort, UserPort userPort,
+    public DeviceService(DevicePort devicePort, EmployeePort EmployeePort,
             DeviceApiKeyGenerator apiKeyGenerator) {
         this.devicePort = devicePort;
-        this.userPort = userPort;
+        this.EmployeePort = EmployeePort;
         this.apiKeyGenerator = apiKeyGenerator;
     }
 
@@ -85,7 +85,7 @@ public class DeviceService implements ManageDevicesUseCase, SetupDeviceUseCase {
         validateCode(info);
 
         // Load users associated with this store
-        var storeUsers = userPort.findByStoreId(info.storeId());
+        var storeUsers = EmployeePort.findByStoreId(info.storeId());
 
         return new SetupPreviewDto(
                 "POS-" + info.storeCode() + "-" + info.code(),

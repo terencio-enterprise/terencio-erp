@@ -13,48 +13,48 @@ import org.springframework.stereotype.Repository;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import es.terencio.erp.employees.application.dto.UserDto;
-import es.terencio.erp.employees.application.dto.UserSyncDto;
-import es.terencio.erp.employees.application.port.out.UserPort;
+import es.terencio.erp.employees.application.dto.EmployeeDto;
+import es.terencio.erp.employees.application.dto.EmployeeSyncDto;
+import es.terencio.erp.employees.application.port.out.EmployeePort;
 
 @Repository
-public class JdbcUserPersistenceAdapter implements UserPort {
+public class JdbcEmployeePersistenceAdapter implements EmployeePort {
 
     private final JdbcClient jdbcClient;
     private final ObjectMapper objectMapper;
 
-    public JdbcUserPersistenceAdapter(JdbcClient jdbcClient, ObjectMapper objectMapper) {
+    public JdbcEmployeePersistenceAdapter(JdbcClient jdbcClient, ObjectMapper objectMapper) {
         this.jdbcClient = jdbcClient;
         this.objectMapper = objectMapper;
     }
 
     @Override
-    public List<UserDto> findAll() {
+    public List<EmployeeDto> findAll() {
         return jdbcClient.sql("SELECT * FROM employees ORDER BY username")
                 .query((rs, rowNum) -> mapRow(rs)).list();
     }
 
     @Override
-    public Optional<UserDto> findById(Long id) {
+    public Optional<EmployeeDto> findById(Long id) {
         return jdbcClient.sql("SELECT * FROM employees WHERE id = :id")
                 .param("id", id).query((rs, rowNum) -> mapRow(rs)).optional();
     }
 
     @Override
-    public Optional<UserDto> findByUsername(String username) {
+    public Optional<EmployeeDto> findByUsername(String username) {
         return jdbcClient.sql("SELECT * FROM employees WHERE username = :username")
                 .param("username", username).query((rs, rowNum) -> mapRow(rs)).optional();
     }
 
     @Override
-    public List<UserDto> findByStoreId(UUID storeId) {
+    public List<EmployeeDto> findByStoreId(UUID storeId) {
         return jdbcClient.sql(
                 "SELECT * FROM employees WHERE store_id = :storeId AND is_active = TRUE AND role != 'ADMIN' ORDER BY username")
                 .param("storeId", storeId).query((rs, rowNum) -> mapRow(rs)).list();
     }
 
     @Override
-    public List<UserSyncDto> findSyncDataByStoreId(UUID storeId) {
+    public List<EmployeeSyncDto> findSyncDataByStoreId(UUID storeId) {
         return jdbcClient.sql("""
                 SELECT id, username, full_name, role, pin_hash
                 FROM employees
@@ -62,7 +62,7 @@ public class JdbcUserPersistenceAdapter implements UserPort {
                 ORDER BY username
                 """)
                 .param("storeId", storeId)
-                .query((rs, rowNum) -> new UserSyncDto(
+                .query((rs, rowNum) -> new EmployeeSyncDto(
                         rs.getLong("id"),
                         rs.getString("username"),
                         rs.getString("full_name"),
@@ -71,8 +71,8 @@ public class JdbcUserPersistenceAdapter implements UserPort {
                 .list();
     }
 
-    private UserDto mapRow(java.sql.ResultSet rs) throws java.sql.SQLException {
-        return new UserDto(
+    private EmployeeDto mapRow(java.sql.ResultSet rs) throws java.sql.SQLException {
+        return new EmployeeDto(
                 rs.getLong("id"), rs.getString("username"), rs.getString("full_name"),
                 rs.getString("role"), rs.getBoolean("is_active") ? 1 : 0,
                 parsePermissions(rs.getString("permissions_json")),
@@ -102,7 +102,7 @@ public class JdbcUserPersistenceAdapter implements UserPort {
     }
 
     @Override
-    public void syncAccessGrants(Long userId, String role, UUID companyId, UUID storeId) {
+    public void syncAccessGrants(Long EmployeeId, String role, UUID companyId, UUID storeId) {
         UUID existingCompanyGrantId = jdbcClient.sql("""
                 SELECT target_id
                 FROM employee_access_grants
@@ -110,17 +110,17 @@ public class JdbcUserPersistenceAdapter implements UserPort {
                 ORDER BY id
                 LIMIT 1
                 """)
-                .param("id", userId)
+                .param("id", EmployeeId)
                 .query((rs, rowNum) -> rs.getObject("target_id", UUID.class))
                 .optional()
                 .orElse(null);
 
-        jdbcClient.sql("DELETE FROM employee_access_grants WHERE employee_id = :userId")
-                .param("userId", userId)
+        jdbcClient.sql("DELETE FROM employee_access_grants WHERE employee_id = :EmployeeId")
+                .param("EmployeeId", EmployeeId)
                 .update();
 
         UUID organizationId = jdbcClient.sql("SELECT organization_id FROM employees WHERE id = :id")
-                .param("id", userId)
+                .param("id", EmployeeId)
                 .query((rs, rowNum) -> rs.getObject("organization_id", UUID.class))
                 .optional()
                 .orElse(null);
@@ -128,26 +128,26 @@ public class JdbcUserPersistenceAdapter implements UserPort {
         UUID effectiveCompanyId = companyId != null ? companyId : existingCompanyGrantId;
 
         if (storeId != null) {
-            insertGrant(userId, "STORE", storeId, role);
+            insertGrant(EmployeeId, "STORE", storeId, role);
             return;
         }
 
         if (effectiveCompanyId != null) {
-            insertGrant(userId, "COMPANY", effectiveCompanyId, role);
+            insertGrant(EmployeeId, "COMPANY", effectiveCompanyId, role);
             return;
         }
 
         if (organizationId != null) {
-            insertGrant(userId, "ORGANIZATION", organizationId, role);
+            insertGrant(EmployeeId, "ORGANIZATION", organizationId, role);
         }
     }
 
-    private void insertGrant(Long userId, String scope, UUID targetId, String role) {
+    private void insertGrant(Long EmployeeId, String scope, UUID targetId, String role) {
         jdbcClient.sql("""
                 INSERT INTO employee_access_grants (employee_id, scope, target_id, role, created_at)
-                VALUES (:userId, :scope, :targetId, :role, NOW())
+                VALUES (:EmployeeId, :scope, :targetId, :role, NOW())
                 """)
-                .param("userId", userId)
+                .param("EmployeeId", EmployeeId)
                 .param("scope", scope)
                 .param("targetId", targetId)
                 .param("role", role)

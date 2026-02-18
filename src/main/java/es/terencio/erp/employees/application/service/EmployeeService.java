@@ -10,40 +10,40 @@ import org.springframework.transaction.annotation.Transactional;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import es.terencio.erp.employees.application.dto.CreateEmployeeRequest;
+import es.terencio.erp.employees.application.dto.EmployeeDto;
+import es.terencio.erp.employees.application.dto.UpdateEmployeeRequest;
+import es.terencio.erp.employees.application.port.in.ManageEmployeesUseCase;
+import es.terencio.erp.employees.application.port.out.EmployeePort;
 import es.terencio.erp.shared.exception.DomainException;
-import es.terencio.erp.employees.application.dto.CreateUserRequest;
-import es.terencio.erp.employees.application.dto.UpdateUserRequest;
-import es.terencio.erp.employees.application.dto.UserDto;
-import es.terencio.erp.employees.application.port.in.ManageUsersUseCase;
-import es.terencio.erp.employees.application.port.out.UserPort;
 
 @Service
-public class UserService implements ManageUsersUseCase {
+public class EmployeeService implements ManageEmployeesUseCase {
 
-    private final UserPort userPort;
+    private final EmployeePort employeePort;
     private final PasswordEncoder passwordEncoder;
     private final ObjectMapper objectMapper;
 
-    public UserService(UserPort userPort, PasswordEncoder passwordEncoder, ObjectMapper objectMapper) {
-        this.userPort = userPort;
+    public EmployeeService(EmployeePort employeePort, PasswordEncoder passwordEncoder, ObjectMapper objectMapper) {
+        this.employeePort = employeePort;
         this.passwordEncoder = passwordEncoder;
         this.objectMapper = objectMapper;
     }
 
     @Override
-    public List<UserDto> listAll() {
-        return userPort.findAll();
+    public List<EmployeeDto> listAll() {
+        return employeePort.findAll();
     }
 
     @Override
-    public UserDto getById(Long id) {
-        return userPort.findById(id).orElseThrow(() -> new DomainException("User not found"));
+    public EmployeeDto getById(Long id) {
+        return employeePort.findById(id).orElseThrow(() -> new DomainException("Employee not found"));
     }
 
     @Override
     @Transactional
-    public UserDto create(CreateUserRequest request) {
-        if (userPort.findByUsername(request.username()).isPresent()) {
+    public EmployeeDto create(CreateEmployeeRequest request) {
+        if (employeePort.findByUsername(request.username()).isPresent()) {
             throw new DomainException("Username already exists");
         }
         String pinHash = passwordEncoder.encode(request.posPin());
@@ -51,20 +51,21 @@ public class UserService implements ManageUsersUseCase {
         String permissionsJson = toJson(
                 request.permissions() != null ? request.permissions() : Collections.emptyList());
 
-        Long id = userPort.save(request.username(), request.fullName(), request.role(), pinHash, passwordHash,
+        Long id = employeePort.save(request.username(), request.fullName(), request.role(), pinHash, passwordHash,
                 request.companyId(), request.storeId(), permissionsJson);
-        userPort.syncAccessGrants(id, request.role(), request.companyId(), request.storeId());
+        employeePort.syncAccessGrants(id, request.role(), request.companyId(), request.storeId());
         return getById(id);
     }
 
     @Override
     @Transactional
-    public UserDto update(Long id, UpdateUserRequest request) {
+    public EmployeeDto update(Long id, UpdateEmployeeRequest request) {
         getById(id);
         String permissionsJson = toJson(
                 request.permissions() != null ? request.permissions() : Collections.emptyList());
-        userPort.update(id, request.fullName(), request.role(), request.storeId(), request.isActive(), permissionsJson);
-        userPort.syncAccessGrants(id, request.role(), null, request.storeId());
+        employeePort.update(id, request.fullName(), request.role(), request.storeId(), request.isActive(),
+                permissionsJson);
+        employeePort.syncAccessGrants(id, request.role(), null, request.storeId());
         return getById(id);
     }
 
@@ -72,14 +73,14 @@ public class UserService implements ManageUsersUseCase {
     @Transactional
     public void changePosPin(Long id, String newPin) {
         getById(id);
-        userPort.updatePin(id, passwordEncoder.encode(newPin));
+        employeePort.updatePin(id, passwordEncoder.encode(newPin));
     }
 
     @Override
     @Transactional
     public void changeBackofficePassword(Long id, String newPassword) {
         getById(id);
-        userPort.updatePassword(id, passwordEncoder.encode(newPassword));
+        employeePort.updatePassword(id, passwordEncoder.encode(newPassword));
     }
 
     private String toJson(List<String> permissions) {

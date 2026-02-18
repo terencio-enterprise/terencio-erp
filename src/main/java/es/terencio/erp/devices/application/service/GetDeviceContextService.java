@@ -9,8 +9,8 @@ import es.terencio.erp.devices.application.dto.DeviceContextDto;
 import es.terencio.erp.devices.application.dto.DeviceDto;
 import es.terencio.erp.devices.application.port.in.GetDeviceContextUseCase;
 import es.terencio.erp.devices.application.port.out.DevicePort;
-import es.terencio.erp.employees.application.dto.UserSyncDto;
-import es.terencio.erp.employees.application.port.out.UserPort;
+import es.terencio.erp.employees.application.dto.EmployeeSyncDto;
+import es.terencio.erp.employees.application.port.out.EmployeePort;
 import es.terencio.erp.shared.exception.RegistrationException;
 import es.terencio.erp.stores.application.dto.StoreDto;
 import es.terencio.erp.stores.application.dto.StoreSettingsDto;
@@ -27,17 +27,17 @@ public class GetDeviceContextService implements GetDeviceContextUseCase {
     private final DevicePort devicePort;
     private final StorePort storePort;
     private final StoreSettingsPort storeSettingsPort;
-    private final UserPort userPort;
+    private final EmployeePort EmployeePort;
 
     public GetDeviceContextService(
             DevicePort devicePort,
             StorePort storePort,
             StoreSettingsPort storeSettingsPort,
-            UserPort userPort) {
+            EmployeePort EmployeePort) {
         this.devicePort = devicePort;
         this.storePort = storePort;
         this.storeSettingsPort = storeSettingsPort;
-        this.userPort = userPort;
+        this.EmployeePort = EmployeePort;
     }
 
     @Override
@@ -60,7 +60,7 @@ public class GetDeviceContextService implements GetDeviceContextUseCase {
 
         // 4. Fetch all active users for this store (with pinHash for offline
         // verification)
-        List<UserSyncDto> users = userPort.findSyncDataByStoreId(device.storeId());
+        List<EmployeeSyncDto> users = EmployeePort.findSyncDataByStoreId(device.storeId());
 
         return new DeviceContextDto(store, settings, users);
     }

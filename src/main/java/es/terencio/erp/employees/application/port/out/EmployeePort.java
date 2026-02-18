@@ -4,26 +4,26 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-import es.terencio.erp.employees.application.dto.UserDto;
-import es.terencio.erp.employees.application.dto.UserSyncDto;
+import es.terencio.erp.employees.application.dto.EmployeeDto;
+import es.terencio.erp.employees.application.dto.EmployeeSyncDto;
 
-public interface UserPort {
-    List<UserDto> findAll();
+public interface EmployeePort {
+    List<EmployeeDto> findAll();
 
-    Optional<UserDto> findById(Long id);
+    Optional<EmployeeDto> findById(Long id);
 
-    Optional<UserDto> findByUsername(String username);
+    Optional<EmployeeDto> findByUsername(String username);
 
-    List<UserDto> findByStoreId(UUID storeId);
+    List<EmployeeDto> findByStoreId(UUID storeId);
 
-    List<UserSyncDto> findSyncDataByStoreId(UUID storeId);
+    List<EmployeeSyncDto> findSyncDataByStoreId(UUID storeId);
 
     Long save(String username, String fullName, String role, String pinHash, String passwordHash, UUID companyId,
             UUID storeId, String permissionsJson);
 
     void update(Long id, String fullName, String role, UUID storeId, boolean isActive, String permissionsJson);
 
-    void syncAccessGrants(Long userId, String role, UUID companyId, UUID storeId);
+    void syncAccessGrants(Long EmployeeId, String role, UUID companyId, UUID storeId);
 
     void updatePin(Long id, String newPinHash);
 
