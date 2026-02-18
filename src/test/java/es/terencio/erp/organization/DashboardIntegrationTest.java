@@ -17,7 +17,6 @@ import org.springframework.http.ResponseEntity;
 import es.terencio.erp.AbstractIntegrationTest;
 import es.terencio.erp.auth.application.dto.EmployeeInfoDto;
 import es.terencio.erp.employees.application.port.out.EmployeePort;
-import es.terencio.erp.organization.application.dto.DashboardContextDto;
 import es.terencio.erp.organization.presentation.OrganizationController.SwitchContextRequest;
 import es.terencio.erp.shared.presentation.ApiResponse;
 
@@ -83,11 +82,11 @@ class DashboardIntegrationTest extends AbstractIntegrationTest {
                                                 });
 
                 assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-                DashboardContextDto context = response.getBody().getData().context();
-                assertThat(context.activeStore().id()).isEqualTo(storeId);
-                assertThat(context.activeCompany().id()).isEqualTo(companyId); // Should derive company from store
-                assertThat(context.availableCompanies()).isNotEmpty();
-                assertThat(context.availableCompanies().get(0).stores()).isNotEmpty();
+                var companies = response.getBody().getData().companies();
+                assertThat(companies).isNotEmpty();
+                assertThat(companies.get(0).id()).isEqualTo(companyId);
+                assertThat(companies.get(0).stores()).isNotEmpty();
+                assertThat(companies.get(0).stores().get(0).id()).isEqualTo(storeId);
 
                 // 2. Switch Context (Same context, should succeed and update DB)
                 SwitchContextRequest switchRequest = new SwitchContextRequest(companyId, storeId);
