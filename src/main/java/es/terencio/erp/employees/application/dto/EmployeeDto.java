@@ -1,15 +1,17 @@
 package es.terencio.erp.employees.application.dto;
 
 import java.time.Instant;
-import java.util.List;
+import java.util.UUID;
 
 public record EmployeeDto(
-        Long id,
-        String username,
-        String fullName,
-        String role,
-        Integer isActive,
-        List<String> permissions,
-        Instant createdAt,
-        Instant updatedAt) {
+                Long id,
+                String username,
+                String fullName,
+                String role,
+                Integer isActive,
+                String permissionsJson,
+                UUID lastActiveCompanyId,
+                UUID lastActiveStoreId,
+                Instant createdAt,
+                Instant updatedAt) {
 }

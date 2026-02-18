@@ -20,30 +20,6 @@ CREATE TABLE IF NOT EXISTS role_permissions (
     PRIMARY KEY (role_name, permission_code)
 );
 
--- Seed existing roles
-INSERT INTO roles (name, description, is_system_defined) VALUES
-('ADMIN', 'Administrator - Full access', TRUE),
-('MANAGER', 'Store Manager - Can manage stock and overrides', TRUE),
-('CASHIER', 'Cashier - POS sales only', TRUE),
-('WAREHOUSE', 'Warehouse Staff - Stock management only', TRUE)
-ON CONFLICT (name) DO NOTHING;
-
--- Seed Marketing Permissions
-INSERT INTO permissions (code, name, description, module) VALUES
-('marketing:leads:view', 'Ver Leads', 'Permite consultar el listado de leads', 'MARKETING'),
-('marketing:campaign:create', 'Crear Campaña', 'Permite diseñar nuevas campañas', 'MARKETING'),
-('marketing:email:preview', 'Previsualizar Email', 'Permite previsualizar emails antes del envío', 'MARKETING'),
-('marketing:campaign:launch', 'Lanzar Campaña', 'Permite ejecutar el envío de campañas', 'MARKETING')
-ON CONFLICT (code) DO NOTHING;
-
--- Assign Marketing permissions to ADMIN (and maybe Manager later, but for now just Admin gets full suite)
-INSERT INTO role_permissions (role_name, permission_code) VALUES
-('ADMIN', 'marketing:leads:view'),
-('ADMIN', 'marketing:campaign:create'),
-('ADMIN', 'marketing:email:preview'),
-('ADMIN', 'marketing:campaign:launch')
-ON CONFLICT DO NOTHING;
-
 -- 4. Update employee_access_grants with JSONB columns for overrides
 ALTER TABLE employee_access_grants
 ADD COLUMN IF NOT EXISTS extra_permissions JSONB DEFAULT '[]'::jsonb,
@@ -58,3 +34,38 @@ WHERE EXISTS (
     WHERE g.employee_id = e.id
     AND g.scope = 'ORGANIZATION'
 );
+
+-- 6. Add Slugs to Organizations, Companies, Stores (Squashed from V101)
+-- 1) Columns
+ALTER TABLE organizations ADD COLUMN IF NOT EXISTS slug VARCHAR(255);
+ALTER TABLE companies ADD COLUMN IF NOT EXISTS slug VARCHAR(255);
+ALTER TABLE stores ADD COLUMN IF NOT EXISTS slug VARCHAR(255);
+
+-- 2) One-time backfill from name (for existing data)
+UPDATE organizations
+SET slug = regexp_replace(regexp_replace(lower(name), '[^a-z0-9]+', '-', 'g'), '(^-+|-+$)', '', 'g')
+WHERE slug IS NULL OR btrim(slug) = '';
+
+UPDATE companies
+SET slug = regexp_replace(regexp_replace(lower(name), '[^a-z0-9]+', '-', 'g'), '(^-+|-+$)', '', 'g')
+WHERE slug IS NULL OR btrim(slug) = '';
+
+UPDATE stores
+SET slug = regexp_replace(regexp_replace(lower(name), '[^a-z0-9]+', '-', 'g'), '(^-+|-+$)', '', 'g')
+WHERE slug IS NULL OR btrim(slug) = '';
+
+-- 3) Default + required
+ALTER TABLE organizations ALTER COLUMN slug SET DEFAULT 'slug-pending';
+ALTER TABLE companies ALTER COLUMN slug SET DEFAULT 'slug-pending';
+ALTER TABLE stores ALTER COLUMN slug SET DEFAULT 'slug-pending';
+
+-- We use DO blocks or separate statements, but Flyway splits by ; usually. 
+-- We'll try to enforce NOT NULL. If it fails due to nulls, the previous updates should have fixed it.
+ALTER TABLE organizations ALTER COLUMN slug SET NOT NULL;
+ALTER TABLE companies ALTER COLUMN slug SET NOT NULL;
+ALTER TABLE stores ALTER COLUMN slug SET NOT NULL;
+
+-- 4) Indexes
+CREATE INDEX IF NOT EXISTS idx_organizations_slug ON organizations(slug);
+CREATE INDEX IF NOT EXISTS idx_companies_slug ON companies(slug);
+CREATE INDEX IF NOT EXISTS idx_stores_slug ON stores(slug);

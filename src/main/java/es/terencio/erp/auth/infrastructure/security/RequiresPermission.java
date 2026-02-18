@@ -5,8 +5,14 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
+import es.terencio.erp.auth.domain.model.AccessScope;
+
 @Target(ElementType.METHOD)
 @Retention(RetentionPolicy.RUNTIME)
 public @interface RequiresPermission {
-    String value();
+    String permission();
+
+    AccessScope scope();
+
+    String targetIdParam() default "targetId";
 }

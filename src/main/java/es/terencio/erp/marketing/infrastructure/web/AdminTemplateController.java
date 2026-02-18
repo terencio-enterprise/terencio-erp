@@ -1,10 +1,10 @@
 package es.terencio.erp.marketing.infrastructure.web;
 
 import java.util.List;
+import java.util.UUID;
 
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -25,9 +25,9 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 
 @RestController
-@RequestMapping("/api/v1/marketing/templates")
+@RequestMapping("/api/v1/companies/{companyId}/marketing/templates")
 @RequiredArgsConstructor
-@PreAuthorize("hasRole('ADMIN') or hasRole('MARKETING_MANAGER')")
+
 @Tag(name = "Marketing Templates", description = "Template CRUD and attachment management endpoints")
 public class AdminTemplateController {
 
@@ -35,45 +35,57 @@ public class AdminTemplateController {
 
     @GetMapping
     @Operation(summary = "List templates", description = "Returns templates, optionally filtered by search")
-    @RequiresPermission("marketing:template:view")
-    public ResponseEntity<ApiResponse<List<TemplateDto>>> listTemplates(@RequestParam(required = false) String search) {
-        return ResponseEntity.ok(ApiResponse.success(manageTemplatesUseCase.listTemplates(search)));
+    @RequiresPermission(permission = "marketing:template:view", scope = es.terencio.erp.auth.domain.model.AccessScope.COMPANY, targetIdParam = "companyId")
+    public ResponseEntity<ApiResponse<List<TemplateDto>>> listTemplates(
+            @PathVariable UUID companyId,
+            @RequestParam(required = false) String search) {
+        return ResponseEntity.ok(ApiResponse.success(manageTemplatesUseCase.listTemplates(companyId, search)));
     }
 
     @PostMapping
     @Operation(summary = "Create template", description = "Creates a new marketing template")
-    @RequiresPermission("marketing:template:create")
-    public ResponseEntity<ApiResponse<TemplateDto>> createTemplate(@RequestBody TemplateDto template) {
-        return ResponseEntity.ok(ApiResponse.success(manageTemplatesUseCase.createTemplate(template)));
+    @RequiresPermission(permission = "marketing:template:create", scope = es.terencio.erp.auth.domain.model.AccessScope.COMPANY, targetIdParam = "companyId")
+    public ResponseEntity<ApiResponse<TemplateDto>> createTemplate(
+            @PathVariable UUID companyId,
+            @RequestBody TemplateDto template) {
+        return ResponseEntity.ok(ApiResponse.success(manageTemplatesUseCase.createTemplate(companyId, template)));
     }
 
     @GetMapping("/{id}")
     @Operation(summary = "Get template", description = "Returns one template by identifier")
-    @RequiresPermission("marketing:template:view")
-    public ResponseEntity<ApiResponse<TemplateDto>> getTemplate(@PathVariable Long id) {
+    @RequiresPermission(permission = "marketing:template:view", scope = es.terencio.erp.auth.domain.model.AccessScope.COMPANY, targetIdParam = "companyId")
+    public ResponseEntity<ApiResponse<TemplateDto>> getTemplate(
+            @PathVariable UUID companyId,
+            @PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success(manageTemplatesUseCase.getTemplate(id)));
     }
 
     @PutMapping("/{id}")
     @Operation(summary = "Update template", description = "Updates an existing template")
-    @RequiresPermission("marketing:template:edit")
-    public ResponseEntity<ApiResponse<TemplateDto>> updateTemplate(@PathVariable Long id,
+    @RequiresPermission(permission = "marketing:template:edit", scope = es.terencio.erp.auth.domain.model.AccessScope.COMPANY, targetIdParam = "companyId")
+    public ResponseEntity<ApiResponse<TemplateDto>> updateTemplate(
+            @PathVariable UUID companyId,
+            @PathVariable Long id,
             @RequestBody TemplateDto template) {
         return ResponseEntity.ok(ApiResponse.success(manageTemplatesUseCase.updateTemplate(id, template)));
     }
 
     @DeleteMapping("/{id}")
     @Operation(summary = "Delete template", description = "Deletes a template by identifier")
-    @RequiresPermission("marketing:template:delete")
-    public ResponseEntity<ApiResponse<Void>> deleteTemplate(@PathVariable Long id) {
+    @RequiresPermission(permission = "marketing:template:delete", scope = es.terencio.erp.auth.domain.model.AccessScope.COMPANY, targetIdParam = "companyId")
+    public ResponseEntity<ApiResponse<Void>> deleteTemplate(
+            @PathVariable UUID companyId,
+            @PathVariable Long id) {
         manageTemplatesUseCase.deleteTemplate(id);
         return ResponseEntity.ok(ApiResponse.success("Template deleted"));
     }
 
     @PostMapping(value = "/{id}/attachments", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(summary = "Upload attachment", description = "Uploads a template attachment file")
-    @RequiresPermission("marketing:template:edit")
-    public ResponseEntity<ApiResponse<Void>> uploadAttachment(@PathVariable Long id,
+    @RequiresPermission(permission = "marketing:template:edit", scope = es.terencio.erp.auth.domain.model.AccessScope.COMPANY, targetIdParam = "companyId")
+    public ResponseEntity<ApiResponse<Void>> uploadAttachment(
+            @PathVariable UUID companyId,
+            @PathVariable Long id,
             @RequestParam("file") MultipartFile file) {
         manageTemplatesUseCase.addAttachment(id, file);
         return ResponseEntity.ok(ApiResponse.success("Attachment uploaded"));
@@ -81,8 +93,11 @@ public class AdminTemplateController {
 
     @DeleteMapping("/{id}/attachments/{attId}")
     @Operation(summary = "Delete attachment", description = "Deletes a template attachment")
-    @RequiresPermission("marketing:template:edit")
-    public ResponseEntity<ApiResponse<Void>> deleteAttachment(@PathVariable Long id, @PathVariable Long attId) {
+    @RequiresPermission(permission = "marketing:template:edit", scope = es.terencio.erp.auth.domain.model.AccessScope.COMPANY, targetIdParam = "companyId")
+    public ResponseEntity<ApiResponse<Void>> deleteAttachment(
+            @PathVariable UUID companyId,
+            @PathVariable Long id,
+            @PathVariable Long attId) {
         manageTemplatesUseCase.removeAttachment(id, attId);
         return ResponseEntity.ok(ApiResponse.success("Attachment deleted"));
     }

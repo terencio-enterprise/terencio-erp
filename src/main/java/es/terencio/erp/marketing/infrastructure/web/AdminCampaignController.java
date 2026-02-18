@@ -2,9 +2,9 @@ package es.terencio.erp.marketing.infrastructure.web;
 
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -26,9 +26,9 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 
 @RestController
-@RequestMapping("/api/v1/marketing/campaigns")
+@RequestMapping("/api/v1/companies/{companyId}/marketing/campaigns")
 @RequiredArgsConstructor
-@PreAuthorize("hasRole('ADMIN') or hasRole('MARKETING_MANAGER')")
+
 @Tag(name = "Marketing Campaigns", description = "Campaign launch, history and analytics endpoints")
 public class AdminCampaignController {
 
@@ -37,8 +37,9 @@ public class AdminCampaignController {
 
     @GetMapping
     @Operation(summary = "List campaigns", description = "Returns campaign history, optionally filtered by status")
-    @RequiresPermission("marketing:campaign:view")
+    @RequiresPermission(permission = "marketing:campaign:view", scope = es.terencio.erp.auth.domain.model.AccessScope.COMPANY, targetIdParam = "companyId")
     public ResponseEntity<ApiResponse<List<Campaign>>> getCampaignHistory(
+            @PathVariable UUID companyId,
             @Parameter(description = "Campaign status filter") @RequestParam(required = false) String status) {
         List<Campaign> callbacks = campaignRepository.findLogsByStatus(status); // Simple implementation
         return ResponseEntity.ok(ApiResponse.success(callbacks));
@@ -46,20 +47,20 @@ public class AdminCampaignController {
 
     @GetMapping("/{id}/stats")
     @Operation(summary = "Get campaign stats", description = "Returns campaign analytics statistics")
-    @RequiresPermission("marketing:campaign:view")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> getCampaignStats(@PathVariable Long id) {
+    @RequiresPermission(permission = "marketing:campaign:view", scope = es.terencio.erp.auth.domain.model.AccessScope.COMPANY, targetIdParam = "companyId")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> getCampaignStats(
+            @PathVariable UUID companyId,
+            @PathVariable Long id) {
         // TODO: Implement aggregate stats. For now returning empty or mock.
-        // Since we don't have a "Campaign" aggregate root, 'id' here might be
-        // TemplateId or we need a CampaignBatch table.
-        // The prompt says "Dashboard de analítica".
-        // For V2 MVP, we'll return mock stats or aggregate from logs.
         return ResponseEntity.ok(ApiResponse.success(Map.of("sent", 1000, "bounced", 5, "openRate", "20%")));
     }
 
     @PostMapping("/dry-run")
     @Operation(summary = "Run campaign dry-run", description = "Sends test execution for campaign before launch")
-    @RequiresPermission("marketing:email:preview")
-    public ResponseEntity<ApiResponse<Void>> dryRun(@RequestBody Map<String, Object> payload) {
+    @RequiresPermission(permission = "marketing:email:preview", scope = es.terencio.erp.auth.domain.model.AccessScope.COMPANY, targetIdParam = "companyId")
+    public ResponseEntity<ApiResponse<Void>> dryRun(
+            @PathVariable UUID companyId,
+            @RequestBody Map<String, Object> payload) {
         Long templateId = ((Number) payload.get("templateId")).longValue();
         String testEmail = (String) payload.get("testEmail");
         launchCampaignUseCase.dryRun(templateId, testEmail);
@@ -68,9 +69,20 @@ public class AdminCampaignController {
 
     @PostMapping
     @Operation(summary = "Launch campaign", description = "Launches a campaign using template and audience filters")
-    @RequiresPermission("marketing:campaign:launch")
-    public ResponseEntity<ApiResponse<CampaignResult>> launchCampaign(@RequestBody CampaignRequest request) {
+    @RequiresPermission(permission = "marketing:campaign:launch", scope = es.terencio.erp.auth.domain.model.AccessScope.COMPANY, targetIdParam = "companyId")
+    public ResponseEntity<ApiResponse<CampaignResult>> launchCampaign(
+            @PathVariable UUID companyId,
+            @RequestBody CampaignRequest request) {
         CampaignResult result = launchCampaignUseCase.launch(request.getTemplateId(), request.getAudienceFilter());
         return ResponseEntity.ok(ApiResponse.success(result));
+    }
+
+    @PostMapping("/launch")
+    @Operation(summary = "Launch campaign (explicit)", description = "Launches a campaign (explicit endpoint)")
+    @RequiresPermission(permission = "marketing:campaign:launch", scope = es.terencio.erp.auth.domain.model.AccessScope.COMPANY, targetIdParam = "companyId")
+    public ResponseEntity<ApiResponse<CampaignResult>> launchCampaignExplicit(
+            @PathVariable UUID companyId,
+            @RequestBody CampaignRequest request) {
+        return launchCampaign(companyId, request);
     }
 }

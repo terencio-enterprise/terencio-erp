@@ -61,30 +61,39 @@ public class JdbcEmployeePersistenceAdapter implements EmployeePort {
 
     @Override
     public List<EmployeeSyncDto> findSyncDataByStoreId(UUID storeId) {
-        return jdbcClient.sql("""
-                SELECT e.id, e.username, e.full_name, e.role, e.pin_hash
-                FROM employees e
-                JOIN employee_access_grants g ON e.id = g.employee_id
-                WHERE g.scope = 'STORE' AND g.target_id = :storeId
-                AND e.is_active = TRUE AND e.role != 'ADMIN'
-                ORDER BY e.username
-                """)
+        return jdbcClient
+                .sql("""
+                        SELECT e.id, e.username, e.full_name, e.role, e.pin_hash, e.last_active_company_id, e.last_active_store_id
+                        FROM employees e
+                        JOIN employee_access_grants g ON e.id = g.employee_id
+                        WHERE g.scope = 'STORE' AND g.target_id = :storeId
+                        AND e.is_active = TRUE AND e.role != 'ADMIN'
+                        ORDER BY e.username
+                        """)
                 .param("storeId", storeId)
                 .query((rs, rowNum) -> new EmployeeSyncDto(
                         rs.getLong("id"),
                         rs.getString("username"),
                         rs.getString("full_name"),
                         rs.getString("role"),
-                        rs.getString("pin_hash")))
+                        rs.getString("pin_hash"),
+                        rs.getObject("last_active_company_id", UUID.class),
+                        rs.getObject("last_active_store_id", UUID.class)))
                 .list();
     }
 
     private EmployeeDto mapRow(java.sql.ResultSet rs) throws java.sql.SQLException {
         return new EmployeeDto(
-                rs.getLong("id"), rs.getString("username"), rs.getString("full_name"),
-                rs.getString("role"), rs.getBoolean("is_active") ? 1 : 0,
-                parsePermissions(rs.getString("permissions_json")),
-                rs.getTimestamp("created_at").toInstant(), rs.getTimestamp("updated_at").toInstant());
+                rs.getLong("id"),
+                rs.getString("username"),
+                rs.getString("full_name"),
+                rs.getString("role"),
+                rs.getBoolean("is_active") ? 1 : 0,
+                rs.getString("permissions_json"),
+                rs.getObject("last_active_company_id", UUID.class),
+                rs.getObject("last_active_store_id", UUID.class),
+                rs.getTimestamp("created_at").toInstant(),
+                rs.getTimestamp("updated_at").toInstant());
     }
 
     @Override
@@ -225,5 +234,48 @@ public class JdbcEmployeePersistenceAdapter implements EmployeePort {
         } catch (Exception e) {
             return Collections.emptyList();
         }
+    }
+
+    @Override
+    public List<es.terencio.erp.auth.domain.model.AccessGrant> findAccessGrants(Long employeeId) {
+        return jdbcClient.sql("""
+                SELECT scope, target_id, role, extra_permissions, excluded_permissions
+                FROM employee_access_grants
+                WHERE employee_id = :employeeId
+                """)
+                .param("employeeId", employeeId)
+                .query((rs, rowNum) -> new es.terencio.erp.auth.domain.model.AccessGrant(
+                        es.terencio.erp.auth.domain.model.AccessScope.valueOf(rs.getString("scope")),
+                        rs.getObject("target_id", UUID.class),
+                        rs.getString("role"),
+                        parsePermissionSet(rs.getString("extra_permissions")),
+                        parsePermissionSet(rs.getString("excluded_permissions"))))
+                .list();
+    }
+
+    private java.util.Set<String> parsePermissionSet(String json) {
+        if (json == null)
+            return Collections.emptySet();
+        try {
+            return objectMapper.readValue(json, new TypeReference<java.util.Set<String>>() {
+            });
+        } catch (Exception e) {
+            return Collections.emptySet();
+        }
+    }
+
+    @Override
+    public void updateLastActiveContext(Long id, UUID companyId, UUID storeId) {
+        jdbcClient.sql("""
+                UPDATE employees
+                SET last_active_company_id = :companyId,
+                    last_active_store_id = :storeId,
+                    updated_at = NOW()
+                WHERE id = :id
+                """)
+                .param("id", id)
+                .param("companyId", companyId)
+                .param("storeId", storeId)
+                .update();
     }
 }

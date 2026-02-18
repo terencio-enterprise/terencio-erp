@@ -1,17 +1,18 @@
 package es.terencio.erp.marketing.application.port.in;
 
 import java.util.List;
+import java.util.UUID;
 
 import org.springframework.web.multipart.MultipartFile;
 
 import es.terencio.erp.marketing.application.dto.TemplateDto;
 
 public interface ManageTemplatesUseCase {
-    List<TemplateDto> listTemplates(String search);
+    List<TemplateDto> listTemplates(UUID companyId, String search);
 
     TemplateDto getTemplate(Long id);
 
-    TemplateDto createTemplate(TemplateDto template);
+    TemplateDto createTemplate(UUID companyId, TemplateDto template);
 
     TemplateDto updateTemplate(Long id, TemplateDto template);
 

@@ -185,12 +185,4 @@ interface ErrorDetail {
 }
 ```
 
-## 5. Default Admin Employee
-On application startup, the system checks for the existence of a default admin employee. If not found, it is created automatically:
 
-- **Username:** `admin` (configurable via `app.admin.username`)
-- **Password:** `123` (configurable via `app.admin.password`)
-- **Role:** `ADMIN`
-- **Permissions:** Global access (no specific Store/Company restrictions).
-
-> **Note:** For production, it is highly recommended to change the admin password immediately after the first login.

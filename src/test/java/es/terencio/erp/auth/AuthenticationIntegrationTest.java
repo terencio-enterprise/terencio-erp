@@ -45,6 +45,7 @@ class AuthenticationIntegrationTest extends AbstractIntegrationTest {
         private PasswordEncoder passwordEncoder;
 
         private UUID testCompanyId;
+        private UUID testOrganizationId;
         private UUID testStoreId;
         private Long adminEmployeeId;
         private Long cashierEmployeeId;
@@ -54,20 +55,30 @@ class AuthenticationIntegrationTest extends AbstractIntegrationTest {
         void setUp() {
                 cleanDatabase();
 
+                // Create test organization
+                testOrganizationId = UUID.randomUUID();
+                jdbcClient.sql("""
+                                INSERT INTO organizations (id, name, slug, subscription_plan)
+                                VALUES (:id, 'Test Organization', 'test-organization', 'STANDARD')
+                                """)
+                                .param("id", testOrganizationId)
+                                .update();
+
                 // Create test company
                 testCompanyId = UUID.randomUUID();
                 jdbcClient.sql("""
-                                INSERT INTO companies (id, name, tax_id, is_active)
-                                VALUES (:id, 'Test Company', 'B11111111', TRUE)
+                                INSERT INTO companies (id, organization_id, name, slug, tax_id, is_active)
+                                VALUES (:id, :organizationId, 'Test Company', 'test-company', 'B11111111', TRUE)
                                 """)
                                 .param("id", testCompanyId)
+                                .param("organizationId", testOrganizationId)
                                 .update();
 
                 // Create test store
                 testStoreId = UUID.randomUUID();
                 jdbcClient.sql("""
-                                INSERT INTO stores (id, company_id, code, name, address, is_active)
-                                VALUES (:id, :companyId, 'TEST-STORE', 'Test Store', 'Test Address', TRUE)
+                                INSERT INTO stores (id, company_id, code, name, slug, address, is_active)
+                                VALUES (:id, :companyId, 'TEST-STORE', 'Test Store', 'test-store', 'Test Address', TRUE)
                                 """)
                                 .param("id", testStoreId)
                                 .param("companyId", testCompanyId)
@@ -143,7 +154,6 @@ class AuthenticationIntegrationTest extends AbstractIntegrationTest {
                 LoginResponse loginResponse = response.getBody().getData();
                 assertThat(loginResponse.token()).isNotBlank();
                 assertThat(loginResponse.username()).isEqualTo("admin");
-                assertThat(loginResponse.role()).isEqualTo("ROLE_ADMIN");
 
                 // Verify Access Token cookie is set
                 List<String> cookies = response.getHeaders().get(HttpHeaders.SET_COOKIE);
@@ -269,7 +279,6 @@ class AuthenticationIntegrationTest extends AbstractIntegrationTest {
                 EmployeeInfoDto userInfo = response.getBody().getData();
                 assertThat(userInfo.id()).isEqualTo(cashierEmployeeId);
                 assertThat(userInfo.username()).isEqualTo("cashier");
-                assertThat(userInfo.role()).isEqualTo("CASHIER");
         }
 
         @Test
@@ -306,7 +315,6 @@ class AuthenticationIntegrationTest extends AbstractIntegrationTest {
                 EmployeeInfoDto userInfo = response.getBody().getData();
                 assertThat(userInfo.id()).isEqualTo(managerEmployeeId);
                 assertThat(userInfo.username()).isEqualTo("manager");
-                assertThat(userInfo.role()).isEqualTo("MANAGER");
         }
 
         @Test

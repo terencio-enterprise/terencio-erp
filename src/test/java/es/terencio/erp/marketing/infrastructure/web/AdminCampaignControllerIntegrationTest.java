@@ -29,100 +29,137 @@ import es.terencio.erp.marketing.domain.model.MarketingTemplate;
 @AutoConfigureMockMvc
 class AdminCampaignControllerIntegrationTest extends AbstractIntegrationTest {
 
-    @Autowired
-    private MockMvc mockMvc;
+        @Autowired
+        private MockMvc mockMvc;
 
-    @Autowired
-    private ObjectMapper objectMapper;
+        @Autowired
+        private ObjectMapper objectMapper;
 
-    @Autowired
-    private CampaignRepositoryPort templateRepository;
+        @Autowired
+        private CampaignRepositoryPort templateRepository;
 
-    private UUID companyId;
+        private UUID companyId;
 
-    @BeforeEach
-    void setup() {
-        cleanDatabase();
-        companyId = UUID.randomUUID();
-        jdbcClient.sql("INSERT INTO companies (id, name, tax_id) VALUES (?, ?, ?)")
-                .params(companyId, "Test Company", "B12345678")
-                .update();
-    }
+        @BeforeEach
+        void setup() {
+                cleanDatabase();
+                companyId = UUID.randomUUID();
+                jdbcClient.sql("INSERT INTO companies (id, name, tax_id) VALUES (?, ?, ?)")
+                                .params(companyId, "Test Company", "B12345678")
+                                .update();
 
-    private CustomUserDetails createAdminUser() {
-        return new CustomUserDetails(1L, UUID.randomUUID(), "admin", "Admin", "pass", "ADMIN", null, companyId);
-    }
+                // Setup permissions and roles for runtime check
+                jdbcClient.sql("INSERT INTO permissions (code, name, description, module) VALUES (?, ?, ?, ?) ON CONFLICT (code) DO NOTHING")
+                                .params("marketing:campaign:view", "View Campaign", "Desc", "MARKETING")
+                                .update();
+                jdbcClient.sql("INSERT INTO permissions (code, name, description, module) VALUES (?, ?, ?, ?) ON CONFLICT (code) DO NOTHING")
+                                .params("marketing:campaign:launch", "Launch Campaign", "Desc", "MARKETING")
+                                .update();
+                jdbcClient.sql("INSERT INTO permissions (code, name, description, module) VALUES (?, ?, ?, ?) ON CONFLICT (code) DO NOTHING")
+                                .params("marketing:email:preview", "Email Preview", "Desc", "MARKETING")
+                                .update();
 
-    @Test
-    void testGetCampaignHistory_Success() throws Exception {
-        mockMvc.perform(get("/api/v1/marketing/campaigns")
-                .param("status", "SENT")
-                .with(user(createAdminUser())))
-                .andExpect(status().isOk());
-    }
+                jdbcClient.sql("INSERT INTO roles (name, description) VALUES (?, ?) ON CONFLICT (name) DO NOTHING")
+                                .params("MARKETING_MANAGER", "Marketing Manager")
+                                .update();
 
-    @Test
-    @WithMockUser(roles = "USER")
-    void testGetCampaignHistory_Forbidden() throws Exception {
-        mockMvc.perform(get("/api/v1/marketing/campaigns"))
-                .andExpect(status().isForbidden());
-    }
+                // Map permissions to role
+                jdbcClient.sql("INSERT INTO role_permissions (role_name, permission_code) VALUES (?, ?) ON CONFLICT DO NOTHING")
+                                .params("MARKETING_MANAGER", "marketing:campaign:view")
+                                .update();
+                jdbcClient.sql("INSERT INTO role_permissions (role_name, permission_code) VALUES (?, ?) ON CONFLICT DO NOTHING")
+                                .params("MARKETING_MANAGER", "marketing:campaign:launch")
+                                .update();
+                jdbcClient.sql("INSERT INTO role_permissions (role_name, permission_code) VALUES (?, ?) ON CONFLICT DO NOTHING")
+                                .params("MARKETING_MANAGER", "marketing:email:preview")
+                                .update();
 
-    @Test
-    void testLaunchCampaign_Success() throws Exception {
-        // Create a template first
-        MarketingTemplate template = MarketingTemplate.builder()
-                .companyId(companyId)
-                .code("TEST_CAMPAIGN")
-                .name("Test Campaign")
-                .subjectTemplate("Hello {{name}}")
-                .bodyHtml("<p>Hello</p>")
-                .active(true)
-                .createdAt(Instant.now())
-                .updatedAt(Instant.now())
-                .attachments(new ArrayList<>())
-                .build();
+                // Create Admin User in DB (ID 1L to match mock user)
+                jdbcClient.sql("INSERT INTO employees (id, username, password_hash, full_name, uuid, is_active) VALUES (?, ?, ?, ?, ?, ?)")
+                                .params(1L, "admin", "pass", "Admin", UUID.randomUUID(), true)
+                                .update();
 
-        template = templateRepository.saveTemplate(template);
+                // Grant Role to User for Company
+                jdbcClient.sql("INSERT INTO employee_access_grants (employee_id, role, scope, target_id, created_at) VALUES (?, ?, ?, ?, ?)")
+                                .params(1L, "MARKETING_MANAGER", "COMPANY", companyId,
+                                                java.sql.Timestamp.from(Instant.now()))
+                                .update();
+        }
 
-        CampaignRequest request = new CampaignRequest();
-        request.setTemplateId(template.getId());
-        CampaignRequest.AudienceFilter filter = new CampaignRequest.AudienceFilter();
-        filter.setCustomerType("active");
-        request.setAudienceFilter(filter);
+        private CustomUserDetails createAdminUser() {
+                return new CustomUserDetails(1L, UUID.randomUUID(), "admin", "Admin", "pass");
+        }
 
-        mockMvc.perform(post("/api/v1/marketing/campaigns")
-                .with(user(createAdminUser()))
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isOk());
-    }
+        @Test
+        void testGetCampaignHistory_Success() throws Exception {
+                mockMvc.perform(get("/api/v1/companies/{companyId}/marketing/campaigns", companyId)
+                                .param("status", "SENT")
+                                .with(user(createAdminUser())))
+                                .andExpect(status().isOk());
+        }
 
-    @Test
-    void testDryRun_Success() throws Exception {
-        // Create a template first
-        MarketingTemplate template = MarketingTemplate.builder()
-                .companyId(companyId)
-                .code("DRY_RUN_TEST")
-                .name("Dry Run Template")
-                .subjectTemplate("Test {{name}}")
-                .bodyHtml("<p>Test</p>")
-                .active(true)
-                .createdAt(Instant.now())
-                .updatedAt(Instant.now())
-                .attachments(new ArrayList<>())
-                .build();
+        @Test
+        @WithMockUser(roles = "USER")
+        void testGetCampaignHistory_Forbidden() throws Exception {
+                mockMvc.perform(get("/api/v1/companies/{companyId}/marketing/campaigns", companyId))
+                                .andExpect(status().isForbidden());
+        }
 
-        template = templateRepository.saveTemplate(template);
+        @Test
+        void testLaunchCampaign_Success() throws Exception {
+                // Create a template first
+                MarketingTemplate template = MarketingTemplate.builder()
+                                .companyId(companyId)
+                                .code("TEST_CAMPAIGN")
+                                .name("Test Campaign")
+                                .subjectTemplate("Hello {{name}}")
+                                .bodyHtml("<p>Hello</p>")
+                                .active(true)
+                                .createdAt(Instant.now())
+                                .updatedAt(Instant.now())
+                                .attachments(new ArrayList<>())
+                                .build();
 
-        Map<String, Object> payload = Map.of(
-                "templateId", template.getId(),
-                "testEmail", "test@example.com");
+                template = templateRepository.saveTemplate(template);
 
-        mockMvc.perform(post("/api/v1/marketing/campaigns/dry-run")
-                .with(user(createAdminUser()))
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(payload)))
-                .andExpect(status().isOk());
-    }
+                CampaignRequest request = new CampaignRequest();
+                request.setTemplateId(template.getId());
+                CampaignRequest.AudienceFilter filter = new CampaignRequest.AudienceFilter();
+                filter.setCustomerType("active");
+                request.setAudienceFilter(filter);
+
+                mockMvc.perform(post("/api/v1/companies/{companyId}/marketing/campaigns", companyId)
+                                .with(user(createAdminUser()))
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request)))
+                                .andExpect(status().isOk());
+        }
+
+        @Test
+        void testDryRun_Success() throws Exception {
+                // Create a template first
+                MarketingTemplate template = MarketingTemplate.builder()
+                                .companyId(companyId)
+                                .code("DRY_RUN_TEST")
+                                .name("Dry Run Template")
+                                .subjectTemplate("Test {{name}}")
+                                .bodyHtml("<p>Test</p>")
+                                .active(true)
+                                .createdAt(Instant.now())
+                                .updatedAt(Instant.now())
+                                .attachments(new ArrayList<>())
+                                .build();
+
+                template = templateRepository.saveTemplate(template);
+
+                Map<String, Object> payload = Map.of(
+                                "templateId", template.getId(),
+                                "testEmail", "test@example.com");
+
+                mockMvc.perform(post("/api/v1/companies/{companyId}/marketing/campaigns/dry-run", companyId)
+                                .with(user(createAdminUser()))
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(payload)))
+                                .andExpect(status().isOk());
+        }
 }

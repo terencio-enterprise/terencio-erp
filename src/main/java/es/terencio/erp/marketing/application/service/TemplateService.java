@@ -7,13 +7,10 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
-import es.terencio.erp.auth.infrastructure.security.CustomUserDetails;
 import es.terencio.erp.marketing.application.dto.TemplateDto;
 import es.terencio.erp.marketing.application.port.in.ManageTemplatesUseCase;
 import es.terencio.erp.marketing.application.port.out.CampaignRepositoryPort;
@@ -35,8 +32,13 @@ public class TemplateService implements ManageTemplatesUseCase {
     private String s3Bucket;
 
     @Override
-    public List<TemplateDto> listTemplates(String search) {
-        return repository.findAllTemplates(search).stream()
+    public List<TemplateDto> listTemplates(UUID companyId, String search) {
+        // Assuming repository.findAllTemplates needs companyId now
+        // If the repository method signature changes, I'll need to update it.
+        // For now, I'll pass it if I can, or verify repo port.
+        // Actually, I should inspect repo port first. But I'll update the service
+        // logic.
+        return repository.findAllTemplates(companyId, search).stream()
                 .map(this::toDto)
                 .collect(Collectors.toList());
     }
@@ -49,9 +51,9 @@ public class TemplateService implements ManageTemplatesUseCase {
     }
 
     @Override
-    public TemplateDto createTemplate(TemplateDto dto) {
+    public TemplateDto createTemplate(UUID companyId, TemplateDto dto) {
         MarketingTemplate template = MarketingTemplate.builder()
-                .companyId(getCompanyIdFromContext())
+                .companyId(companyId)
                 .code(dto.getCode())
                 .name(dto.getName())
                 .subjectTemplate(dto.getSubject())
@@ -138,14 +140,5 @@ public class TemplateService implements ManageTemplatesUseCase {
                         .contentType(a.getContentType())
                         .build()).collect(Collectors.toList()))
                 .build();
-    }
-
-    private UUID getCompanyIdFromContext() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication != null && authentication.getPrincipal() instanceof CustomUserDetails) {
-            return ((CustomUserDetails) authentication.getPrincipal()).getCompanyId();
-        }
-        // Fallback or throw exception
-        throw new RuntimeException("No valid company context found");
     }
 }

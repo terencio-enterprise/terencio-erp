@@ -40,16 +40,56 @@ class AdminTemplateControllerIntegrationTest extends AbstractIntegrationTest {
                 companyId = UUID.randomUUID();
                 // Insert a dummy company to satisfy FK constraints if we were to hit the DB
                 // with entities.
-                // However, if the Service implementation uses security context to get
-                // companyId, we might need to mock that or setup RBAC correctly.
-                // For now, inserting company to be safe.
                 jdbcClient.sql("INSERT INTO companies (id, name, tax_id) VALUES (?, ?, ?)")
                                 .params(companyId, "Test Company", "B12345678")
+                                .update();
+
+                // Setup permissions and roles for runtime check
+                jdbcClient.sql("INSERT INTO permissions (code, name, description, module) VALUES (?, ?, ?, ?) ON CONFLICT (code) DO NOTHING")
+                                .params("marketing:template:view", "View Template", "Desc", "MARKETING")
+                                .update();
+                jdbcClient.sql("INSERT INTO permissions (code, name, description, module) VALUES (?, ?, ?, ?) ON CONFLICT (code) DO NOTHING")
+                                .params("marketing:template:create", "Create Template", "Desc", "MARKETING")
+                                .update();
+                jdbcClient.sql("INSERT INTO permissions (code, name, description, module) VALUES (?, ?, ?, ?) ON CONFLICT (code) DO NOTHING")
+                                .params("marketing:template:edit", "Edit Template", "Desc", "MARKETING")
+                                .update();
+                jdbcClient.sql("INSERT INTO permissions (code, name, description, module) VALUES (?, ?, ?, ?) ON CONFLICT (code) DO NOTHING")
+                                .params("marketing:template:delete", "Delete Template", "Desc", "MARKETING")
+                                .update();
+
+                jdbcClient.sql("INSERT INTO roles (name, description) VALUES (?, ?) ON CONFLICT (name) DO NOTHING")
+                                .params("MARKETING_MANAGER", "Marketing Manager")
+                                .update();
+
+                // Map permissions to role
+                jdbcClient.sql("INSERT INTO role_permissions (role_name, permission_code) VALUES (?, ?) ON CONFLICT DO NOTHING")
+                                .params("MARKETING_MANAGER", "marketing:template:view")
+                                .update();
+                jdbcClient.sql("INSERT INTO role_permissions (role_name, permission_code) VALUES (?, ?) ON CONFLICT DO NOTHING")
+                                .params("MARKETING_MANAGER", "marketing:template:create")
+                                .update();
+                jdbcClient.sql("INSERT INTO role_permissions (role_name, permission_code) VALUES (?, ?) ON CONFLICT DO NOTHING")
+                                .params("MARKETING_MANAGER", "marketing:template:edit")
+                                .update();
+                jdbcClient.sql("INSERT INTO role_permissions (role_name, permission_code) VALUES (?, ?) ON CONFLICT DO NOTHING")
+                                .params("MARKETING_MANAGER", "marketing:template:delete")
+                                .update();
+
+                // Create Admin User in DB (ID 1L to match mock user)
+                jdbcClient.sql("INSERT INTO employees (id, username, password_hash, full_name, uuid, is_active) VALUES (?, ?, ?, ?, ?, ?)")
+                                .params(1L, "admin", "pass", "Admin", UUID.randomUUID(), true)
+                                .update();
+
+                // Grant Role to User for Company
+                jdbcClient.sql("INSERT INTO employee_access_grants (employee_id, role, scope, target_id, created_at) VALUES (?, ?, ?, ?, ?)")
+                                .params(1L, "MARKETING_MANAGER", "COMPANY", companyId,
+                                                java.sql.Timestamp.from(java.time.Instant.now()))
                                 .update();
         }
 
         private CustomUserDetails createAdminUser() {
-                return new CustomUserDetails(1L, UUID.randomUUID(), "admin", "Admin", "pass", "ADMIN", null, companyId);
+                return new CustomUserDetails(1L, UUID.randomUUID(), "admin", "Admin", "pass");
         }
 
         @Test
@@ -61,7 +101,7 @@ class AdminTemplateControllerIntegrationTest extends AbstractIntegrationTest {
                 dto.setBodyHtml("<p>Hi</p>");
 
                 // 1. Create
-                String response = mockMvc.perform(post("/api/v1/marketing/templates")
+                String response = mockMvc.perform(post("/api/v1/companies/{companyId}/marketing/templates", companyId)
                                 .with(user(createAdminUser()))
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(dto)))
@@ -78,7 +118,8 @@ class AdminTemplateControllerIntegrationTest extends AbstractIntegrationTest {
                 TemplateDto created = apiResponse.getData();
 
                 // 2. Get
-                mockMvc.perform(get("/api/v1/marketing/templates/{id}", created.getId())
+                mockMvc.perform(get("/api/v1/companies/{companyId}/marketing/templates/{id}", companyId,
+                                created.getId())
                                 .with(user(createAdminUser())))
                                 .andExpect(status().isOk())
                                 .andExpect(jsonPath("$.data.name").value("Welcome Email"));
@@ -93,7 +134,7 @@ class AdminTemplateControllerIntegrationTest extends AbstractIntegrationTest {
                 dto.setSubject("News");
                 dto.setBodyHtml("Content");
 
-                String response = mockMvc.perform(post("/api/v1/marketing/templates")
+                String response = mockMvc.perform(post("/api/v1/companies/{companyId}/marketing/templates", companyId)
                                 .with(user(createAdminUser()))
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(dto)))
@@ -109,7 +150,8 @@ class AdminTemplateControllerIntegrationTest extends AbstractIntegrationTest {
                 // Update
                 created.setName("Monthly Newsletter");
 
-                mockMvc.perform(put("/api/v1/marketing/templates/{id}", created.getId())
+                mockMvc.perform(put("/api/v1/companies/{companyId}/marketing/templates/{id}", companyId,
+                                created.getId())
                                 .with(user(createAdminUser()))
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(created)))
@@ -119,7 +161,7 @@ class AdminTemplateControllerIntegrationTest extends AbstractIntegrationTest {
 
         @Test
         void testListTemplates() throws Exception {
-                mockMvc.perform(get("/api/v1/marketing/templates")
+                mockMvc.perform(get("/api/v1/companies/{companyId}/marketing/templates", companyId)
                                 .with(user(createAdminUser())))
                                 .andExpect(status().isOk())
                                 .andExpect(jsonPath("$.data").isArray());
@@ -134,7 +176,7 @@ class AdminTemplateControllerIntegrationTest extends AbstractIntegrationTest {
                 dto.setSubject("Bye");
                 dto.setBodyHtml("Bye");
 
-                String response = mockMvc.perform(post("/api/v1/marketing/templates")
+                String response = mockMvc.perform(post("/api/v1/companies/{companyId}/marketing/templates", companyId)
                                 .with(user(createAdminUser()))
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(dto)))
@@ -148,12 +190,14 @@ class AdminTemplateControllerIntegrationTest extends AbstractIntegrationTest {
                 TemplateDto created = apiResponse.getData();
 
                 // Delete
-                mockMvc.perform(delete("/api/v1/marketing/templates/{id}", created.getId())
+                mockMvc.perform(delete("/api/v1/companies/{companyId}/marketing/templates/{id}", companyId,
+                                created.getId())
                                 .with(user(createAdminUser())))
                                 .andExpect(status().isOk());
 
                 // Verify gone
-                mockMvc.perform(get("/api/v1/marketing/templates/{id}", created.getId())
+                mockMvc.perform(get("/api/v1/companies/{companyId}/marketing/templates/{id}", companyId,
+                                created.getId())
                                 .with(user(createAdminUser())))
                                 .andExpect(status().is4xxClientError());
         }

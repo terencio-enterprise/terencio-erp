@@ -7,7 +7,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -78,11 +77,15 @@ public class AuthController {
         @Value("${app.jwt.refresh.expiration-ms}")
         private long refreshExpirationMs;
 
+        private final es.terencio.erp.organization.application.service.OrganizationTreeService organizationTreeService;
+
         public AuthController(AuthenticationManager authenticationManager, JwtTokenProvider tokenProvider,
-                        UserDetailsService userDetailsService) {
+                        UserDetailsService userDetailsService,
+                        es.terencio.erp.organization.application.service.OrganizationTreeService organizationTreeService) {
                 this.authenticationManager = authenticationManager;
                 this.tokenProvider = tokenProvider;
                 this.userDetailsService = userDetailsService;
+                this.organizationTreeService = organizationTreeService;
         }
 
         /**
@@ -100,34 +103,31 @@ public class AuthController {
                 String accessToken = tokenProvider.generateAccessToken(authentication);
                 String refreshToken = tokenProvider.generateRefreshToken(authentication);
 
-                String role = authentication.getAuthorities().stream()
-                                .map(GrantedAuthority::getAuthority)
-                                .findFirst()
-                                .orElse("ROLE_USER");
-
                 // Create Access Token Cookie
-                ResponseCookie accessCookie = ResponseCookie.from(accessCookieName, accessToken)
+                ResponseCookie accessCookie = ResponseCookie
+                                .from(java.util.Objects.requireNonNull(accessCookieName), accessToken)
                                 .httpOnly(accessCookieHttpOnly)
                                 .secure(accessCookieSecure)
-                                .path(accessCookiePath)
+                                .path(java.util.Objects.requireNonNull(accessCookiePath))
                                 .maxAge(accessExpirationMs / 1000)
-                                .sameSite(accessCookieSameSite)
+                                .sameSite(java.util.Objects.requireNonNull(accessCookieSameSite))
                                 .build();
 
                 // Create Refresh Token Cookie
-                ResponseCookie refreshCookie = ResponseCookie.from(refreshCookieName, refreshToken)
+                ResponseCookie refreshCookie = ResponseCookie
+                                .from(java.util.Objects.requireNonNull(refreshCookieName), refreshToken)
                                 .httpOnly(refreshCookieHttpOnly)
                                 .secure(refreshCookieSecure)
-                                .path(refreshCookiePath)
+                                .path(java.util.Objects.requireNonNull(refreshCookiePath))
                                 .maxAge(refreshExpirationMs / 1000)
-                                .sameSite(refreshCookieSameSite)
+                                .sameSite(java.util.Objects.requireNonNull(refreshCookieSameSite))
                                 .build();
 
                 return ResponseEntity.ok()
                                 .header(HttpHeaders.SET_COOKIE, accessCookie.toString())
                                 .header(HttpHeaders.SET_COOKIE, refreshCookie.toString())
                                 .body(ApiResponse.success("Login successful",
-                                                new LoginResponse(accessToken, authentication.getName(), role)));
+                                                new LoginResponse(accessToken, authentication.getName())));
         }
 
         /**
@@ -154,25 +154,20 @@ public class AuthController {
 
                         String newAccessToken = tokenProvider.generateAccessToken(authentication);
 
-                        String role = userDetails.getAuthorities().stream()
-                                        .map(GrantedAuthority::getAuthority)
-                                        .findFirst()
-                                        .orElse("ROLE_USER");
-
                         // Create new Access Token Cookie
-                        ResponseCookie newAccessCookie = ResponseCookie.from(accessCookieName, newAccessToken)
+                        ResponseCookie newAccessCookie = ResponseCookie
+                                        .from(java.util.Objects.requireNonNull(accessCookieName), newAccessToken)
                                         .httpOnly(accessCookieHttpOnly)
                                         .secure(accessCookieSecure)
-                                        .path(accessCookiePath)
+                                        .path(java.util.Objects.requireNonNull(accessCookiePath))
                                         .maxAge(accessExpirationMs / 1000)
-                                        .sameSite(accessCookieSameSite)
+                                        .sameSite(java.util.Objects.requireNonNull(accessCookieSameSite))
                                         .build();
 
                         return ResponseEntity.ok()
                                         .header(HttpHeaders.SET_COOKIE, newAccessCookie.toString())
                                         .body(ApiResponse.success("Token refreshed successfully",
-                                                        new LoginResponse(newAccessToken, userDetails.getUsername(),
-                                                                        role)));
+                                                        new LoginResponse(newAccessToken, userDetails.getUsername())));
                 }
 
                 ApiError error = new ApiError("INVALID_TOKEN", "Invalid Refresh Token", null);
@@ -187,21 +182,23 @@ public class AuthController {
         @Operation(summary = "Logout user", description = "Clears authentication cookies for current session")
         public ResponseEntity<ApiResponse<Void>> logout() {
                 // Clear Access Token Cookie
-                ResponseCookie accessCookie = ResponseCookie.from(accessCookieName, "")
+                ResponseCookie accessCookie = ResponseCookie
+                                .from(java.util.Objects.requireNonNull(accessCookieName), "")
                                 .httpOnly(accessCookieHttpOnly)
                                 .secure(accessCookieSecure)
-                                .path(accessCookiePath)
+                                .path(java.util.Objects.requireNonNull(accessCookiePath))
                                 .maxAge(0)
-                                .sameSite(accessCookieSameSite)
+                                .sameSite(java.util.Objects.requireNonNull(accessCookieSameSite))
                                 .build();
 
                 // Clear Refresh Token Cookie
-                ResponseCookie refreshCookie = ResponseCookie.from(refreshCookieName, "")
+                ResponseCookie refreshCookie = ResponseCookie
+                                .from(java.util.Objects.requireNonNull(refreshCookieName), "")
                                 .httpOnly(refreshCookieHttpOnly)
                                 .secure(refreshCookieSecure)
-                                .path(refreshCookiePath)
+                                .path(java.util.Objects.requireNonNull(refreshCookiePath))
                                 .maxAge(0)
-                                .sameSite(refreshCookieSameSite)
+                                .sameSite(java.util.Objects.requireNonNull(refreshCookieSameSite))
                                 .build();
 
                 return ResponseEntity.ok()
@@ -225,12 +222,8 @@ public class AuthController {
                                 userDetails.getId(),
                                 userDetails.getUsername(),
                                 userDetails.getFullName(),
-                                userDetails.getRole(),
-                                userDetails.getOrganizationId(),
-                                userDetails.getCompanyId(),
-                                userDetails.getStoreId(),
-                                userDetails.getAccessGrants(),
-                                userDetails.isEnabled());
+                                userDetails.isEnabled(),
+                                organizationTreeService.getDashboardContext(userDetails.getId()));
 
                 return ResponseEntity.ok(ApiResponse.success("User info fetched successfully", userInfo));
         }

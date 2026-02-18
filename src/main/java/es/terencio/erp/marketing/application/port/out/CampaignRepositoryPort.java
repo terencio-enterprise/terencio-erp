@@ -2,13 +2,14 @@ package es.terencio.erp.marketing.application.port.out;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 import es.terencio.erp.marketing.domain.model.Campaign;
 import es.terencio.erp.marketing.domain.model.MarketingTemplate;
 
 public interface CampaignRepositoryPort {
     // Template Management
-    List<MarketingTemplate> findAllTemplates(String search);
+    List<MarketingTemplate> findAllTemplates(UUID companyId, String search);
 
     Optional<MarketingTemplate> findTemplateById(Long id);
 

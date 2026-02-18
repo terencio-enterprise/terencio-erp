@@ -28,12 +28,14 @@ public class JdbcCampaignRepository implements CampaignRepositoryPort {
     private final NamedParameterJdbcTemplate jdbcTemplate;
 
     @Override
-    public List<MarketingTemplate> findAllTemplates(String search) {
-        String sql = "SELECT * FROM marketing_templates WHERE (CAST(:search AS VARCHAR) IS NULL OR LOWER(name) LIKE LOWER(:searchPattern))";
+    public List<MarketingTemplate> findAllTemplates(UUID companyId, String search) {
+        String sql = "SELECT * FROM marketing_templates WHERE company_id = :companyId AND (CAST(:search AS VARCHAR) IS NULL OR LOWER(name) LIKE LOWER(:searchPattern))";
         String searchPattern = search != null ? "%" + search + "%" : null;
 
         return jdbcTemplate.query(sql,
-                new MapSqlParameterSource("search", search).addValue("searchPattern", searchPattern),
+                new MapSqlParameterSource("search", search)
+                        .addValue("searchPattern", searchPattern)
+                        .addValue("companyId", companyId),
                 new TemplateRowMapper());
     }
 

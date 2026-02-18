@@ -72,7 +72,6 @@ public class JwtTokenProvider {
         return Jwts.builder()
                 .subject(userPrincipal.getUsername())
                 .claim("role", userPrincipal.getAuthorities().toString())
-                .claim("storeId", userPrincipal.getStoreId())
                 .issuedAt(new Date())
                 .expiration(new Date((new Date()).getTime() + expiration))
                 .signWith(key)
