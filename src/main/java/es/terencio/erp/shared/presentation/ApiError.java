@@ -17,4 +17,9 @@ public record ApiError(
             String field,
             String message) {
     }
+
+    @com.fasterxml.jackson.annotation.JsonCreator(mode = com.fasterxml.jackson.annotation.JsonCreator.Mode.DELEGATING)
+    public ApiError(String message) {
+        this("UNKNOWN_ERROR", message, null);
+    }
 }

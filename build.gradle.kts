@@ -38,6 +38,7 @@ dependencies {
     
     // 3. ACTUATOR & DOCS
     implementation("org.springframework.boot:spring-boot-starter-actuator")
+    implementation("org.springframework.boot:spring-boot-starter-aop")
     implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.3")
 
     // 4. DATABASE

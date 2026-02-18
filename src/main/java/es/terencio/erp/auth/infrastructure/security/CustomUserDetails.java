@@ -29,9 +29,11 @@ public class CustomUserDetails implements UserDetails {
     private final UUID companyId;
     private final UUID organizationId;
     private final Set<AccessGrant> accessGrants;
+    private final Set<es.terencio.erp.auth.domain.model.PermissionContext> permissions;
 
     public CustomUserDetails(Long id, UUID uuid, String username, String fullName, String password, String role,
-            UUID storeId, UUID companyId, UUID organizationId, Set<AccessGrant> accessGrants) {
+            UUID storeId, UUID companyId, UUID organizationId, Set<AccessGrant> accessGrants,
+            Set<es.terencio.erp.auth.domain.model.PermissionContext> permissions) {
         this.id = id;
         this.uuid = uuid;
         this.username = username;
@@ -42,21 +44,24 @@ public class CustomUserDetails implements UserDetails {
         this.companyId = companyId;
         this.organizationId = organizationId;
         this.accessGrants = accessGrants == null ? Set.of() : Set.copyOf(accessGrants);
+        this.permissions = permissions == null ? Set.of() : Set.copyOf(permissions);
         this.authorities = buildAuthorities(role, this.accessGrants);
     }
+
+    // ...
 
     public CustomUserDetails(Long id, UUID uuid, String username, String fullName, String password, String role,
             UUID storeId, UUID companyId) {
         this(id, uuid, username, fullName, password, role, storeId, companyId, null,
-                defaultGrants(role, storeId, companyId));
+                defaultGrants(role, storeId, companyId), Set.of());
     }
 
     private static Set<AccessGrant> defaultGrants(String role, UUID storeId, UUID companyId) {
         if (storeId != null) {
-            return Set.of(new AccessGrant(AccessScope.STORE, storeId, role));
+            return Set.of(new AccessGrant(AccessScope.STORE, storeId, role, Set.of(), Set.of()));
         }
         if (companyId != null) {
-            return Set.of(new AccessGrant(AccessScope.COMPANY, companyId, role));
+            return Set.of(new AccessGrant(AccessScope.COMPANY, companyId, role, Set.of(), Set.of()));
         }
         return Set.of();
     }
@@ -109,6 +114,16 @@ public class CustomUserDetails implements UserDetails {
 
     public Set<AccessGrant> getAccessGrants() {
         return accessGrants;
+    }
+
+    public Set<es.terencio.erp.auth.domain.model.PermissionContext> getPermissions() {
+        return permissions;
+    }
+
+    public Set<String> getPermissionCodes() {
+        return permissions.stream()
+                .map(es.terencio.erp.auth.domain.model.PermissionContext::permission)
+                .collect(Collectors.toSet());
     }
 
     public boolean canAccessCompany(UUID targetCompanyId) {

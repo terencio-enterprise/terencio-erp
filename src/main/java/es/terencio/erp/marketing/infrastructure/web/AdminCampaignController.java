@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import es.terencio.erp.auth.infrastructure.security.RequiresPermission;
 import es.terencio.erp.marketing.application.dto.CampaignRequest;
 import es.terencio.erp.marketing.application.dto.CampaignResult;
 import es.terencio.erp.marketing.application.port.in.LaunchCampaignUseCase;
@@ -36,6 +37,7 @@ public class AdminCampaignController {
 
     @GetMapping
     @Operation(summary = "List campaigns", description = "Returns campaign history, optionally filtered by status")
+    @RequiresPermission("marketing:campaign:view")
     public ResponseEntity<ApiResponse<List<Campaign>>> getCampaignHistory(
             @Parameter(description = "Campaign status filter") @RequestParam(required = false) String status) {
         List<Campaign> callbacks = campaignRepository.findLogsByStatus(status); // Simple implementation
@@ -44,6 +46,7 @@ public class AdminCampaignController {
 
     @GetMapping("/{id}/stats")
     @Operation(summary = "Get campaign stats", description = "Returns campaign analytics statistics")
+    @RequiresPermission("marketing:campaign:view")
     public ResponseEntity<ApiResponse<Map<String, Object>>> getCampaignStats(@PathVariable Long id) {
         // TODO: Implement aggregate stats. For now returning empty or mock.
         // Since we don't have a "Campaign" aggregate root, 'id' here might be
@@ -55,6 +58,7 @@ public class AdminCampaignController {
 
     @PostMapping("/dry-run")
     @Operation(summary = "Run campaign dry-run", description = "Sends test execution for campaign before launch")
+    @RequiresPermission("marketing:email:preview")
     public ResponseEntity<ApiResponse<Void>> dryRun(@RequestBody Map<String, Object> payload) {
         Long templateId = ((Number) payload.get("templateId")).longValue();
         String testEmail = (String) payload.get("testEmail");
@@ -64,6 +68,7 @@ public class AdminCampaignController {
 
     @PostMapping
     @Operation(summary = "Launch campaign", description = "Launches a campaign using template and audience filters")
+    @RequiresPermission("marketing:campaign:launch")
     public ResponseEntity<ApiResponse<CampaignResult>> launchCampaign(@RequestBody CampaignRequest request) {
         CampaignResult result = launchCampaignUseCase.launch(request.getTemplateId(), request.getAudienceFilter());
         return ResponseEntity.ok(ApiResponse.success(result));

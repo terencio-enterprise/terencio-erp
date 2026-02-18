@@ -48,18 +48,26 @@ public class JdbcEmployeePersistenceAdapter implements EmployeePort {
 
     @Override
     public List<EmployeeDto> findByStoreId(UUID storeId) {
-        return jdbcClient.sql(
-                "SELECT * FROM employees WHERE store_id = :storeId AND is_active = TRUE AND role != 'ADMIN' ORDER BY username")
+        return jdbcClient.sql("""
+                SELECT e.*
+                FROM employees e
+                JOIN employee_access_grants g ON e.id = g.employee_id
+                WHERE g.scope = 'STORE' AND g.target_id = :storeId
+                AND e.is_active = TRUE AND e.role != 'ADMIN'
+                ORDER BY e.username
+                """)
                 .param("storeId", storeId).query((rs, rowNum) -> mapRow(rs)).list();
     }
 
     @Override
     public List<EmployeeSyncDto> findSyncDataByStoreId(UUID storeId) {
         return jdbcClient.sql("""
-                SELECT id, username, full_name, role, pin_hash
-                FROM employees
-                WHERE store_id = :storeId AND is_active = TRUE AND role != 'ADMIN'
-                ORDER BY username
+                SELECT e.id, e.username, e.full_name, e.role, e.pin_hash
+                FROM employees e
+                JOIN employee_access_grants g ON e.id = g.employee_id
+                WHERE g.scope = 'STORE' AND g.target_id = :storeId
+                AND e.is_active = TRUE AND e.role != 'ADMIN'
+                ORDER BY e.username
                 """)
                 .param("storeId", storeId)
                 .query((rs, rowNum) -> new EmployeeSyncDto(
@@ -85,19 +93,25 @@ public class JdbcEmployeePersistenceAdapter implements EmployeePort {
         KeyHolder keyHolder = new GeneratedKeyHolder();
         jdbcClient
                 .sql("""
-                        INSERT INTO employees (username, full_name, role, pin_hash, password_hash, organization_id, store_id, permissions_json, is_active, created_at, updated_at)
+                        INSERT INTO employees (username, full_name, role, pin_hash, password_hash, organization_id, permissions_json, is_active, created_at, updated_at)
                         VALUES (:username, :fullName, :role, :pinHash, :passwordHash,
                             (SELECT organization_id FROM companies WHERE id = :companyId),
-                            :storeId, CAST(:permissionsJson AS JSONB), TRUE, NOW(), NOW())
+                            CAST(:permissionsJson AS JSONB), TRUE, NOW(), NOW())
                                 RETURNING id
                                 """)
                 .param("username", username).param("fullName", fullName).param("role", role)
                 .param("pinHash", pinHash).param("passwordHash", passwordHash)
-                .param("companyId", companyId).param("storeId", storeId)
+                .param("companyId", companyId)
                 .param("permissionsJson", permissionsJson).update(keyHolder);
 
         @SuppressWarnings("null")
         Long generatedId = (Long) keyHolder.getKeys().get("id");
+
+        // Manually handle store grant if provided
+        if (storeId != null) {
+            insertGrant(generatedId, "STORE", storeId, role);
+        }
+
         return generatedId;
     }
 
@@ -157,13 +171,37 @@ public class JdbcEmployeePersistenceAdapter implements EmployeePort {
     @Override
     public void update(Long id, String fullName, String role, UUID storeId, boolean isActive, String permissionsJson) {
         jdbcClient.sql("""
-                UPDATE employees SET full_name = :fullName, role = :role, store_id = :storeId,
+                UPDATE employees SET full_name = :fullName, role = :role,
                     is_active = :isActive, permissions_json = CAST(:permissionsJson AS JSONB), updated_at = NOW()
                 WHERE id = :id
                 """)
                 .param("id", id).param("fullName", fullName).param("role", role)
-                .param("storeId", storeId).param("isActive", isActive).param("permissionsJson", permissionsJson)
+                .param("isActive", isActive).param("permissionsJson", permissionsJson)
                 .update();
+
+        // Update grant if storeId is provided (simplified logic: blindly replace STORE
+        // grant)
+        if (storeId != null) {
+            // Remove existing STORE grants for this user? Or just upsert?
+            // For now, let's assume we replace the primary store access.
+            // But realistically, update() might not want to touch grants unless explicitly
+            // asked.
+            // Given the signature includes storeId, it implies we want to set that.
+
+            // However, since we moved to multiple grants, this legacy update might be
+            // dangerous.
+            // Let's defer grant updates to syncAccessGrants where possible.
+            // But to keep legacy behavior: if storeId is NOT NULL, ensure they have access.
+
+            // Check if grant exists
+            Integer count = jdbcClient.sql(
+                    "SELECT COUNT(*) FROM employee_access_grants WHERE employee_id = :id AND scope = 'STORE' AND target_id = :storeId")
+                    .param("id", id).param("storeId", storeId).query(Integer.class).single();
+
+            if (count == 0) {
+                insertGrant(id, "STORE", storeId, role);
+            }
+        }
     }
 
     @Override
