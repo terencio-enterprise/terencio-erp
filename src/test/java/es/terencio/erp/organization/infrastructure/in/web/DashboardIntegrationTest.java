@@ -2,8 +2,9 @@ package es.terencio.erp.organization.infrastructure.in.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.UUID;
+
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpMethod;
@@ -12,14 +13,10 @@ import org.springframework.http.ResponseEntity;
 
 import es.terencio.erp.AbstractIntegrationTest;
 import es.terencio.erp.auth.application.dto.AuthDtos.EmployeeInfoDto;
-import es.terencio.erp.employees.application.port.out.EmployeePort;
 import es.terencio.erp.organization.infrastructure.in.web.OrganizationController.SwitchContextRequest;
 import es.terencio.erp.shared.presentation.ApiResponse;
 
 class DashboardIntegrationTest extends AbstractIntegrationTest {
-
-    @Autowired
-    private EmployeePort employeePort;
 
     @Test
     void testDashboardContextFlow() {
@@ -43,8 +40,13 @@ class DashboardIntegrationTest extends AbstractIntegrationTest {
                 });
         assertThat(switchResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
 
-        var employee = employeePort.findById(globalAdminId).orElseThrow();
-        assertThat(employee.lastActiveStoreId()).isEqualTo(globalStoreId);
-        assertThat(employee.lastActiveCompanyId()).isEqualTo(globalCompanyId);
+        // Fetch using raw JDBC to guarantee cache bypassed assertion directly in the DB
+        UUID activeCompanyId = jdbcClient.sql("SELECT last_active_company_id FROM employees WHERE id = :id")
+                .param("id", globalAdminId).query(UUID.class).single();
+        UUID activeStoreId = jdbcClient.sql("SELECT last_active_store_id FROM employees WHERE id = :id")
+                .param("id", globalAdminId).query(UUID.class).single();
+
+        assertThat(activeCompanyId).isEqualTo(globalCompanyId);
+        assertThat(activeStoreId).isEqualTo(globalStoreId);
     }
 }

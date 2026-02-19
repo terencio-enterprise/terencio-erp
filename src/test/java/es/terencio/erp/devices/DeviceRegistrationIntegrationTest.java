@@ -26,8 +26,8 @@ class DeviceRegistrationIntegrationTest extends AbstractIntegrationTest {
         void setUp() {
                 // Ensure some standard employees exist for testing the Context DTO sync
                 Long cashier1Id = jdbcClient.sql(
-                                "INSERT INTO employees (username, full_name, pin_hash, password_hash, organization_id, is_active) VALUES ('cashier1', 'Test Cashier 1', 'pinhash1', 'passhash1', :companyId, TRUE) RETURNING id")
-                                .param("companyId", globalOrgId).query(Long.class).single();
+                                "INSERT INTO employees (username, full_name, pin_hash, password_hash, organization_id, is_active) VALUES ('cashier1', 'Test Cashier 1', 'pinhash1', 'passhash1', :orgId, TRUE) RETURNING id")
+                                .param("orgId", globalOrgId).query(Long.class).single();
                 jdbcClient.sql("INSERT INTO employee_access_grants (employee_id, scope, target_id, role, created_at) VALUES (:empId, 'STORE', :storeId, 'CASHIER', NOW())")
                                 .param("empId", cashier1Id).param("storeId", globalStoreId).update();
         }

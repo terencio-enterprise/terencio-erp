@@ -173,32 +173,36 @@ public abstract class AbstractIntegrationTest {
     }
 
     protected void cleanTransactionalTables() {
-        // Wipe data that tests actively mutate
+        // STRICT DELETION ORDER TO PREVENT FOREIGN KEY VIOLATIONS
         jdbcClient.sql("DELETE FROM audit_user_actions").update();
-        jdbcClient.sql("DELETE FROM marketing_logs").update();
-        jdbcClient.sql("DELETE FROM marketing_templates").update();
         jdbcClient.sql("DELETE FROM email_delivery_events").update();
         jdbcClient.sql("DELETE FROM accounting_entry_lines").update();
         jdbcClient.sql("DELETE FROM accounting_entries").update();
+
         jdbcClient.sql("DELETE FROM fiscal_audit_log").update();
         jdbcClient.sql("DELETE FROM payments").update();
         jdbcClient.sql("DELETE FROM sale_taxes").update();
         jdbcClient.sql("DELETE FROM sale_lines").update();
+        jdbcClient.sql("DELETE FROM sales").update();
+
         jdbcClient.sql("DELETE FROM cash_movements").update();
-        jdbcClient.sql("DELETE FROM customer_account_movements").update();
+        jdbcClient.sql("DELETE FROM shifts").update();
+        jdbcClient.sql("DELETE FROM device_sequences").update();
+        jdbcClient.sql("DELETE FROM registration_codes").update();
+        jdbcClient.sql("DELETE FROM devices").update();
+
         jdbcClient.sql("DELETE FROM stock_movements").update();
         jdbcClient.sql("DELETE FROM inventory_stock").update();
-        jdbcClient.sql("DELETE FROM customer_product_prices").update();
         jdbcClient.sql("DELETE FROM product_prices").update();
         jdbcClient.sql("DELETE FROM product_barcodes").update();
 
-        jdbcClient.sql("DELETE FROM sales").update();
-        jdbcClient.sql("DELETE FROM products").update();
+        jdbcClient.sql("DELETE FROM customer_product_prices").update();
+        jdbcClient.sql("DELETE FROM customer_account_movements").update();
+        jdbcClient.sql("DELETE FROM marketing_logs").update();
+        jdbcClient.sql("DELETE FROM marketing_templates").update();
         jdbcClient.sql("DELETE FROM customers").update();
 
-        jdbcClient.sql("DELETE FROM shifts").update();
-        jdbcClient.sql("DELETE FROM registration_codes").update();
-        jdbcClient.sql("DELETE FROM devices").update();
+        jdbcClient.sql("DELETE FROM products").update();
     }
 
     protected HttpHeaders loginAndGetHeaders(String username, String password) {
