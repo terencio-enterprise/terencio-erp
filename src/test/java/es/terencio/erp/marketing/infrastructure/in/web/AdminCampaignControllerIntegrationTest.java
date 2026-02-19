@@ -7,9 +7,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import java.time.Instant;
 import java.util.Map;
-import java.util.UUID;
 
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -35,67 +33,37 @@ class AdminCampaignControllerIntegrationTest extends AbstractIntegrationTest {
         private ObjectMapper objectMapper;
         @Autowired
         private CampaignRepositoryPort templateRepository;
-        private UUID companyId;
 
-        @BeforeEach
-        void setup() {
-                cleanDatabase();
-                companyId = createTestCompany();
-                jdbcClient.sql(
-                                "INSERT INTO permissions (code, name, description, module) VALUES (?, ?, ?, ?) ON CONFLICT (code) DO NOTHING")
-                                .params("marketing:campaign:view", "View Campaign", "Desc", "MARKETING").update();
-                jdbcClient.sql(
-                                "INSERT INTO permissions (code, name, description, module) VALUES (?, ?, ?, ?) ON CONFLICT (code) DO NOTHING")
-                                .params("marketing:campaign:launch", "Launch Campaign", "Desc", "MARKETING").update();
-                jdbcClient.sql(
-                                "INSERT INTO permissions (code, name, description, module) VALUES (?, ?, ?, ?) ON CONFLICT (code) DO NOTHING")
-                                .params("marketing:email:preview", "Email Preview", "Desc", "MARKETING").update();
-                jdbcClient.sql("INSERT INTO roles (name, description) VALUES (?, ?) ON CONFLICT (name) DO NOTHING")
-                                .params("MARKETING_MANAGER", "Marketing Manager").update();
-                jdbcClient.sql("INSERT INTO role_permissions (role_name, permission_code) VALUES (?, ?) ON CONFLICT DO NOTHING")
-                                .params("MARKETING_MANAGER", "marketing:campaign:view").update();
-                jdbcClient.sql("INSERT INTO role_permissions (role_name, permission_code) VALUES (?, ?) ON CONFLICT DO NOTHING")
-                                .params("MARKETING_MANAGER", "marketing:campaign:launch").update();
-                jdbcClient.sql("INSERT INTO role_permissions (role_name, permission_code) VALUES (?, ?) ON CONFLICT DO NOTHING")
-                                .params("MARKETING_MANAGER", "marketing:email:preview").update();
-                jdbcClient.sql(
-                                "INSERT INTO employees (id, username, password_hash, full_name, uuid, organization_id, is_active) VALUES (?, ?, ?, ?, ?, (SELECT organization_id FROM companies WHERE id = ?), ?)")
-                                .params(1L, "admin", "pass", "Admin", UUID.randomUUID(), companyId, true).update();
-                jdbcClient.sql(
-                                "INSERT INTO employee_access_grants (employee_id, role, scope, target_id, created_at) VALUES (?, ?, ?, ?, ?)")
-                                .params(1L, "MARKETING_MANAGER", "COMPANY", companyId,
-                                                java.sql.Timestamp.from(Instant.now()))
-                                .update();
-        }
-
-        private CustomUserDetails createAdminUser() {
-                return new CustomUserDetails(1L, UUID.randomUUID(), "admin", "Admin", "pass");
+        private CustomUserDetails getGlobalMockUser() {
+                return new CustomUserDetails(globalAdminId, java.util.UUID.randomUUID(), "admin", "Admin", "pass");
         }
 
         @Test
         void testGetCampaignHistory_Success() throws Exception {
-                mockMvc.perform(get("/api/v1/companies/{companyId}/marketing/campaigns", companyId)
+                mockMvc.perform(get("/api/v1/companies/{companyId}/marketing/campaigns", globalCompanyId)
                                 .param("status", "SENT")
-                                .with(user(createAdminUser()))).andExpect(status().isOk());
+                                .with(user(getGlobalMockUser()))).andExpect(status().isOk());
         }
 
         @Test
         @WithMockUser(roles = "USER")
         void testGetCampaignHistory_Forbidden() throws Exception {
-                mockMvc.perform(get("/api/v1/companies/{companyId}/marketing/campaigns", companyId))
+                // Accessing without the GranularSecurityAspect satisfying the permissions
+                mockMvc.perform(get("/api/v1/companies/{companyId}/marketing/campaigns", globalCompanyId))
                                 .andExpect(status().isForbidden());
         }
 
         @Test
         void testLaunchCampaign_Success() throws Exception {
-                MarketingTemplate template = new MarketingTemplate(null, companyId, "TEST_CAMPAIGN", "Test Campaign",
+                MarketingTemplate template = new MarketingTemplate(null, globalCompanyId, "TEST_CAMPAIGN",
+                                "Test Campaign",
                                 "Hello {{name}}", "<p>Hello</p>", true, Instant.now(), Instant.now());
                 template = templateRepository.saveTemplate(template);
                 CampaignRequest request = new CampaignRequest(null, template.getId(),
                                 new AudienceFilter(null, null, "CLIENT"));
                 mockMvc.perform(
-                                post("/api/v1/companies/{companyId}/marketing/campaigns", companyId)
-                                                .with(user(createAdminUser()))
+                                post("/api/v1/companies/{companyId}/marketing/campaigns", globalCompanyId)
+                                                .with(user(getGlobalMockUser()))
                                                 .contentType(MediaType.APPLICATION_JSON)
                                                 .content(objectMapper.writeValueAsString(request)))
                                 .andExpect(status().isOk());
@@ -103,12 +71,13 @@ class AdminCampaignControllerIntegrationTest extends AbstractIntegrationTest {
 
         @Test
         void testDryRun_Success() throws Exception {
-                MarketingTemplate template = new MarketingTemplate(null, companyId, "DRY_RUN_TEST", "Dry Run Template",
+                MarketingTemplate template = new MarketingTemplate(null, globalCompanyId, "DRY_RUN_TEST",
+                                "Dry Run Template",
                                 "Test {{name}}", "<p>Test</p>", true, Instant.now(), Instant.now());
                 template = templateRepository.saveTemplate(template);
                 Map<String, Object> payload = Map.of("templateId", template.getId(), "testEmail", "test@example.com");
-                mockMvc.perform(post("/api/v1/companies/{companyId}/marketing/campaigns/dry-run", companyId)
-                                .with(user(createAdminUser())).contentType(MediaType.APPLICATION_JSON)
+                mockMvc.perform(post("/api/v1/companies/{companyId}/marketing/campaigns/dry-run", globalCompanyId)
+                                .with(user(getGlobalMockUser())).contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(payload))).andExpect(status().isOk());
         }
 }

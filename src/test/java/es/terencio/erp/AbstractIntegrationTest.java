@@ -2,6 +2,7 @@ package es.terencio.erp;
 
 import java.util.UUID;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
@@ -51,31 +52,110 @@ public abstract class AbstractIntegrationTest {
         registry.add("spring.datasource.password", postgres::getPassword);
     }
 
-    protected void cleanDatabase() {
-        jdbcClient.sql("DELETE FROM audit_user_actions").update();
-        jdbcClient.sql("DELETE FROM marketing_logs").update();
-        jdbcClient.sql("DELETE FROM marketing_templates").update();
-        jdbcClient.sql("DELETE FROM accounting_entry_lines").update();
-        jdbcClient.sql("DELETE FROM fiscal_audit_log").update();
-        jdbcClient.sql("DELETE FROM payments").update();
-        jdbcClient.sql("DELETE FROM sale_taxes").update();
-        jdbcClient.sql("DELETE FROM sale_lines").update();
-        jdbcClient.sql("DELETE FROM cash_movements").update();
-        jdbcClient.sql("DELETE FROM customer_account_movements").update();
-        jdbcClient.sql("DELETE FROM stock_movements").update();
-        jdbcClient.sql("DELETE FROM inventory_stock").update();
-        jdbcClient.sql("DELETE FROM customer_product_prices").update();
-        jdbcClient.sql("DELETE FROM product_prices").update();
-        jdbcClient.sql("DELETE FROM product_barcodes").update();
+    // ==========================================
+    // GLOBAL SHARED TEST DATA
+    // ==========================================
+    private static boolean globalDataInitialized = false;
+    protected static UUID globalOrgId;
+    protected static UUID globalCompanyId;
+    protected static UUID globalStoreId;
+    protected static Long globalAdminId;
+    protected static HttpHeaders globalAdminHeaders;
+    protected static String globalAdminToken;
 
-        jdbcClient.sql("DELETE FROM sales").update();
-        jdbcClient.sql("DELETE FROM accounting_entries").update();
-        jdbcClient.sql("DELETE FROM products").update();
-        jdbcClient.sql("DELETE FROM customers").update();
+    @BeforeEach
+    public void setupGlobalState() {
+        if (!globalDataInitialized) {
+            // 1. Wipe EVERYTHING once at the very start of the test suite
+            cleanEntireDatabase();
 
-        jdbcClient.sql("DELETE FROM shifts").update();
-        jdbcClient.sql("DELETE FROM registration_codes").update();
-        jdbcClient.sql("DELETE FROM devices").update();
+            // 2. Setup standard global data to be reused across all tests
+            globalOrgId = UUID.randomUUID();
+            jdbcClient.sql(
+                    "INSERT INTO organizations (id, name, slug, subscription_plan) VALUES (:id, 'Global Test Org', 'global-test-org', 'STANDARD')")
+                    .param("id", globalOrgId).update();
+
+            globalCompanyId = UUID.randomUUID();
+            jdbcClient.sql(
+                    "INSERT INTO companies (id, organization_id, name, slug, tax_id, currency_code, fiscal_regime, price_includes_tax, rounding_mode, is_active, created_at, updated_at, version) VALUES (:id, :orgId, 'Global Test Company', 'global-test-co', 'B11111111', 'EUR', 'COMMON', TRUE, 'LINE', TRUE, NOW(), NOW(), 1)")
+                    .param("id", globalCompanyId).param("orgId", globalOrgId).update();
+
+            globalStoreId = UUID.randomUUID();
+            jdbcClient.sql(
+                    "INSERT INTO stores (id, company_id, code, name, slug, address, is_active) VALUES (:id, :companyId, 'GLOBAL-STORE', 'Global Test Store', 'global-test-store', 'Global Test Address', TRUE)")
+                    .param("id", globalStoreId).param("companyId", globalCompanyId).update();
+
+            jdbcClient.sql(
+                    "INSERT INTO store_settings (store_id, allow_negative_stock, print_ticket_automatically) VALUES (:storeId, FALSE, TRUE)")
+                    .param("storeId", globalStoreId).update();
+
+            // Setup Roles & Permissions FIRST to avoid FK violations
+            jdbcClient.sql(
+                    "INSERT INTO roles (name, description) VALUES ('ADMIN', 'Administrator') ON CONFLICT DO NOTHING")
+                    .update();
+            jdbcClient.sql(
+                    "INSERT INTO roles (name, description) VALUES ('MARKETING_MANAGER', 'Marketing Manager') ON CONFLICT DO NOTHING")
+                    .update();
+
+            String[] permissions = {
+                    "customer:view", "customer:create", "customer:update", "customer:delete",
+                    "marketing:campaign:view", "marketing:campaign:launch", "marketing:campaign:create",
+                    "marketing:email:preview", "marketing:template:view", "marketing:template:create",
+                    "marketing:template:edit", "marketing:template:delete",
+                    "device:view", "device:manage",
+                    "organization:company:view", "organization:company:create", "organization:company:update",
+                    "organization:company:delete",
+                    "organization:store:view", "organization:store:create", "organization:store:update",
+                    "organization:store:delete",
+                    "employee:view", "employee:create", "employee:update", "employee:delete"
+            };
+
+            for (String perm : permissions) {
+                jdbcClient.sql(
+                        "INSERT INTO permissions (code, name, description, module) VALUES (:code, :code, 'desc', 'SYSTEM') ON CONFLICT (code) DO NOTHING")
+                        .param("code", perm).update();
+                jdbcClient.sql(
+                        "INSERT INTO role_permissions (role_name, permission_code) VALUES ('ADMIN', :code) ON CONFLICT DO NOTHING")
+                        .param("code", perm).update();
+                jdbcClient.sql(
+                        "INSERT INTO role_permissions (role_name, permission_code) VALUES ('MARKETING_MANAGER', :code) ON CONFLICT DO NOTHING")
+                        .param("code", perm).update();
+            }
+
+            // Create global admin
+            String encodedPassword = passwordEncoder.encode("admin123");
+            globalAdminId = jdbcClient.sql(
+                    "INSERT INTO employees (username, full_name, pin_hash, password_hash, organization_id, is_active, created_at, updated_at) VALUES ('admin', 'Global Admin', 'pin123', :password, :orgId, TRUE, NOW(), NOW()) RETURNING id")
+                    .param("password", encodedPassword).param("orgId", globalOrgId)
+                    .query(Long.class).single();
+
+            jdbcClient.sql(
+                    "INSERT INTO employee_access_grants (employee_id, scope, target_id, role, created_at) VALUES (:employeeId, 'COMPANY', :targetId, 'ADMIN', NOW())")
+                    .param("employeeId", globalAdminId).param("targetId", globalCompanyId).update();
+            jdbcClient.sql(
+                    "INSERT INTO employee_access_grants (employee_id, scope, target_id, role, created_at) VALUES (:employeeId, 'STORE', :targetId, 'ADMIN', NOW())")
+                    .param("employeeId", globalAdminId).param("targetId", globalStoreId).update();
+            jdbcClient.sql(
+                    "INSERT INTO employee_access_grants (employee_id, scope, target_id, role, created_at) VALUES (:employeeId, 'ORGANIZATION', :targetId, 'ADMIN', NOW())")
+                    .param("employeeId", globalAdminId).param("targetId", globalOrgId).update();
+
+            globalDataInitialized = true;
+            globalAdminHeaders = loginAndGetHeaders("admin", "admin123");
+        } else {
+            // 3. For subsequent tests, ONLY wipe transactional data to prevent test
+            // pollution
+            cleanTransactionalTables();
+        }
+    }
+
+    private void cleanEntireDatabase() {
+        cleanTransactionalTables();
+
+        // Wipe structural/reference tables only once
+        jdbcClient.sql("DELETE FROM role_permissions").update();
+        jdbcClient.sql("DELETE FROM roles").update();
+        jdbcClient.sql("DELETE FROM permissions").update();
+
         jdbcClient.sql("DELETE FROM employee_access_grants").update();
         jdbcClient.sql("DELETE FROM employees").update();
         jdbcClient.sql("DELETE FROM warehouses").update();
@@ -92,85 +172,33 @@ public abstract class AbstractIntegrationTest {
         jdbcClient.sql("DELETE FROM organizations").update();
     }
 
-    protected UUID createTestCompany() {
-        UUID orgId = UUID.randomUUID();
-        jdbcClient.sql("INSERT INTO organizations (id, name, slug) VALUES (:id, 'Test Org', :slug)")
-                .param("id", orgId).param("slug", "test-org-" + orgId.toString().substring(0, 8)).update();
-        UUID companyId = UUID.randomUUID();
-        jdbcClient.sql(
-                "INSERT INTO companies (id, organization_id, name, slug, tax_id, currency_code, fiscal_regime, price_includes_tax, rounding_mode, is_active, created_at, updated_at, version) VALUES (:id, :orgId, 'Test Company', :slug, 'B11111111', 'EUR', 'COMMON', TRUE, 'LINE', TRUE, NOW(), NOW(), 1)")
-                .param("id", companyId).param("orgId", orgId)
-                .param("slug", "test-co-" + companyId.toString().substring(0, 8)).update();
-        return companyId;
-    }
+    protected void cleanTransactionalTables() {
+        // Wipe data that tests actively mutate
+        jdbcClient.sql("DELETE FROM audit_user_actions").update();
+        jdbcClient.sql("DELETE FROM marketing_logs").update();
+        jdbcClient.sql("DELETE FROM marketing_templates").update();
+        jdbcClient.sql("DELETE FROM email_delivery_events").update();
+        jdbcClient.sql("DELETE FROM accounting_entry_lines").update();
+        jdbcClient.sql("DELETE FROM accounting_entries").update();
+        jdbcClient.sql("DELETE FROM fiscal_audit_log").update();
+        jdbcClient.sql("DELETE FROM payments").update();
+        jdbcClient.sql("DELETE FROM sale_taxes").update();
+        jdbcClient.sql("DELETE FROM sale_lines").update();
+        jdbcClient.sql("DELETE FROM cash_movements").update();
+        jdbcClient.sql("DELETE FROM customer_account_movements").update();
+        jdbcClient.sql("DELETE FROM stock_movements").update();
+        jdbcClient.sql("DELETE FROM inventory_stock").update();
+        jdbcClient.sql("DELETE FROM customer_product_prices").update();
+        jdbcClient.sql("DELETE FROM product_prices").update();
+        jdbcClient.sql("DELETE FROM product_barcodes").update();
 
-    protected UUID createStore(UUID companyId) {
-        UUID storeId = UUID.randomUUID();
-        jdbcClient.sql(
-                "INSERT INTO stores (id, company_id, code, name, slug, address, is_active) VALUES (:id, :companyId, 'TEST-STORE', 'Test Store', :slug, 'Test Address', TRUE)")
-                .param("id", storeId).param("companyId", companyId)
-                .param("slug", "test-store-" + storeId.toString().substring(0, 8)).update();
-        return storeId;
-    }
+        jdbcClient.sql("DELETE FROM sales").update();
+        jdbcClient.sql("DELETE FROM products").update();
+        jdbcClient.sql("DELETE FROM customers").update();
 
-    protected void createAdminUser(UUID companyId, UUID storeId, String username, String password) {
-        String encodedPassword = passwordEncoder.encode(password);
-        Long employeeId = jdbcClient.sql(
-                "INSERT INTO employees (username, full_name, pin_hash, password_hash, organization_id, is_active, created_at, updated_at) VALUES (:username, 'Admin User', 'pin123', :password, (SELECT organization_id FROM companies WHERE id = :companyId), TRUE, NOW(), NOW()) RETURNING id")
-                .param("username", username).param("password", encodedPassword).param("companyId", companyId)
-                .query(Long.class).single();
-
-        // Grant company-level access (needed for COMPANY-scope permission checks)
-        jdbcClient.sql(
-                "INSERT INTO employee_access_grants (employee_id, scope, target_id, role, created_at) VALUES (:employeeId, 'COMPANY', :targetId, 'ADMIN', NOW())")
-                .param("employeeId", employeeId).param("targetId", companyId).update();
-
-        if (storeId != null) {
-            jdbcClient.sql(
-                    "INSERT INTO employee_access_grants (employee_id, scope, target_id, role, created_at) VALUES (:employeeId, 'STORE', :targetId, 'ADMIN', NOW())")
-                    .param("employeeId", employeeId).param("targetId", storeId).update();
-        }
-
-        // Ensure CRM permissions exist and are assigned to ADMIN role
-        jdbcClient.sql(
-                "INSERT INTO permissions (code, name, description, module) VALUES ('customer:view', 'View Customers', 'View customers', 'CRM') ON CONFLICT (code) DO NOTHING")
-                .update();
-        jdbcClient.sql(
-                "INSERT INTO permissions (code, name, description, module) VALUES ('customer:create', 'Create Customer', 'Create customers', 'CRM') ON CONFLICT (code) DO NOTHING")
-                .update();
-        jdbcClient.sql(
-                "INSERT INTO permissions (code, name, description, module) VALUES ('customer:update', 'Edit Customer', 'Edit customers', 'CRM') ON CONFLICT (code) DO NOTHING")
-                .update();
-        jdbcClient.sql(
-                "INSERT INTO role_permissions (role_name, permission_code) VALUES ('ADMIN', 'customer:view') ON CONFLICT DO NOTHING")
-                .update();
-        jdbcClient.sql(
-                "INSERT INTO role_permissions (role_name, permission_code) VALUES ('ADMIN', 'customer:create') ON CONFLICT DO NOTHING")
-                .update();
-        jdbcClient.sql(
-                "INSERT INTO role_permissions (role_name, permission_code) VALUES ('ADMIN', 'customer:update') ON CONFLICT DO NOTHING")
-                .update();
-    }
-
-    protected HttpHeaders createAuthenticatedUser(String username, String role, String scope, UUID targetId,
-            String... permissionCodes) {
-        String encodedPassword = passwordEncoder.encode("test123");
-        Long employeeId = jdbcClient.sql(
-                "INSERT INTO employees (username, full_name, pin_hash, password_hash, organization_id, is_active, created_at, updated_at) VALUES (:username, :username, 'pin000', :password, (SELECT organization_id FROM companies WHERE id = :targetId), TRUE, NOW(), NOW()) RETURNING id")
-                .param("username", username).param("password", encodedPassword)
-                .param("targetId", targetId).query(Long.class).single();
-
-        jdbcClient.sql(
-                "INSERT INTO employee_access_grants (employee_id, scope, target_id, role, created_at) VALUES (:employeeId, :scope, :targetId, :role, NOW())")
-                .param("employeeId", employeeId).param("scope", scope).param("targetId", targetId).param("role", role)
-                .update();
-
-        for (String code : permissionCodes) {
-            jdbcClient.sql(
-                    "INSERT INTO role_permissions (role_name, permission_code) VALUES (:role, :code) ON CONFLICT DO NOTHING")
-                    .param("role", role).param("code", code).update();
-        }
-        return loginAndGetHeaders(username, "test123");
+        jdbcClient.sql("DELETE FROM shifts").update();
+        jdbcClient.sql("DELETE FROM registration_codes").update();
+        jdbcClient.sql("DELETE FROM devices").update();
     }
 
     protected HttpHeaders loginAndGetHeaders(String username, String password) {
@@ -180,15 +208,29 @@ public abstract class AbstractIntegrationTest {
                 new ParameterizedTypeReference<ApiResponse<LoginResponse>>() {
                 });
 
-        if (response.getStatusCode() != HttpStatus.OK)
+        if (response.getStatusCode() != HttpStatus.OK || response.getBody() == null)
             throw new RuntimeException("Login failed for user: " + username);
 
-        String accessTokenCookie = response.getHeaders().get(HttpHeaders.SET_COOKIE).stream()
+        String fullCookieValue = response.getHeaders().get(HttpHeaders.SET_COOKIE).stream()
                 .filter(c -> c.startsWith("ACCESS_TOKEN=")).findFirst()
                 .orElseThrow(() -> new RuntimeException("ACCESS_TOKEN cookie not found"));
 
         HttpHeaders headers = new HttpHeaders();
-        headers.add(HttpHeaders.COOKIE, accessTokenCookie);
+        headers.add(HttpHeaders.COOKIE, fullCookieValue.split(";")[0]);
+
+        if (response.getBody().getData() != null && response.getBody().getData().token() != null) {
+            globalAdminToken = response.getBody().getData().token();
+            headers.setBearerAuth(globalAdminToken);
+        }
+
         return headers;
+    }
+
+    protected UUID createTestCustomer(String legalName, String taxId) {
+        UUID uuid = UUID.randomUUID();
+        jdbcClient.sql(
+                "INSERT INTO customers (uuid, company_id, tax_id, legal_name, commercial_name, country, allow_credit, credit_limit, surcharge_apply, active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 'ES', FALSE, 0, FALSE, TRUE, NOW(), NOW())")
+                .param(uuid).param(globalCompanyId).param(taxId).param(legalName).param(legalName).update();
+        return uuid;
     }
 }

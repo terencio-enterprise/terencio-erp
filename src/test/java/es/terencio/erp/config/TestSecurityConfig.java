@@ -10,20 +10,28 @@ import org.springframework.security.config.annotation.method.configuration.Enabl
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
-/**
- * Security configuration for tests.
- * Completely disables authentication and authorization to simplify testing.
- * All endpoints are permitted without any security checks.
- */
+import es.terencio.erp.auth.infrastructure.config.security.device.DeviceApiKeyFilter;
+import es.terencio.erp.auth.infrastructure.config.security.jwt.JwtAuthenticationFilter;
+
 @TestConfiguration
 @EnableWebSecurity
 @EnableMethodSecurity
 @Profile("test")
 public class TestSecurityConfig {
+
+    private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final DeviceApiKeyFilter deviceApiKeyFilter;
+
+    public TestSecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter, DeviceApiKeyFilter deviceApiKeyFilter) {
+        this.jwtAuthenticationFilter = jwtAuthenticationFilter;
+        this.deviceApiKeyFilter = deviceApiKeyFilter;
+    }
 
     @Bean
     @Primary
@@ -31,8 +39,11 @@ public class TestSecurityConfig {
         http
                 .csrf(AbstractHttpConfigurer::disable)
                 .cors(AbstractHttpConfigurer::disable)
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .anyRequest().permitAll());
+                        .anyRequest().permitAll())
+                .addFilterBefore(deviceApiKeyFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }

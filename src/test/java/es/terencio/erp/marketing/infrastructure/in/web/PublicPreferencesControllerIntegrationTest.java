@@ -5,8 +5,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import java.util.UUID;
-
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,15 +24,12 @@ class PublicPreferencesControllerIntegrationTest extends AbstractIntegrationTest
     private MockMvc mockMvc;
     @Autowired
     private ObjectMapper objectMapper;
-    private UUID companyId;
 
     @BeforeEach
     void setup() {
-        cleanDatabase();
-        companyId = createTestCompany();
         jdbcClient.sql(
                 "INSERT INTO customers (company_id, email, unsubscribe_token, marketing_status) VALUES (?, ?, ?, ?)")
-                .params(companyId, "test@example.com", "valid-token-123", "SUBSCRIBED").update();
+                .params(globalCompanyId, "test@example.com", "valid-token-123", "SUBSCRIBED").update();
     }
 
     @Test
