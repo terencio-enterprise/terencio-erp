@@ -1,13 +1,13 @@
-package es.terencio.erp;
+﻿package es.terencio.erp;
 
 import java.util.UUID;
-
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -21,7 +21,6 @@ import es.terencio.erp.auth.application.dto.AuthDtos.LoginRequest;
 import es.terencio.erp.auth.application.dto.AuthDtos.LoginResponse;
 import es.terencio.erp.config.TestSecurityConfig;
 import es.terencio.erp.shared.presentation.ApiResponse;
-import io.netty.handler.codec.http.HttpMethod;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
@@ -51,17 +50,9 @@ public abstract class AbstractIntegrationTest {
         registry.add("spring.datasource.password", postgres::getPassword);
     }
 
-    /**
-     * Deletes all data from all tables in the correct order to respect foreign key
-     * constraints.
-     * Call this method in @BeforeEach to ensure a clean state for each test.
-     */
     protected void cleanDatabase() {
-        // Level 1: Most dependent tables (leaf nodes)
         jdbcClient.sql("DELETE FROM audit_user_actions").update();
-        jdbcClient.sql("DELETE FROM marketing_bounce_events").update();
         jdbcClient.sql("DELETE FROM marketing_logs").update();
-        jdbcClient.sql("DELETE FROM marketing_attachments").update();
         jdbcClient.sql("DELETE FROM marketing_templates").update();
         jdbcClient.sql("DELETE FROM accounting_entry_lines").update();
         jdbcClient.sql("DELETE FROM fiscal_audit_log").update();
@@ -76,13 +67,11 @@ public abstract class AbstractIntegrationTest {
         jdbcClient.sql("DELETE FROM product_prices").update();
         jdbcClient.sql("DELETE FROM product_barcodes").update();
 
-        // Level 2: Middle layer tables
         jdbcClient.sql("DELETE FROM sales").update();
         jdbcClient.sql("DELETE FROM accounting_entries").update();
         jdbcClient.sql("DELETE FROM products").update();
         jdbcClient.sql("DELETE FROM customers").update();
 
-        // Level 3: Infrastructure tables
         jdbcClient.sql("DELETE FROM shifts").update();
         jdbcClient.sql("DELETE FROM registration_codes").update();
         jdbcClient.sql("DELETE FROM devices").update();
@@ -92,149 +81,60 @@ public abstract class AbstractIntegrationTest {
         jdbcClient.sql("DELETE FROM store_settings").update();
         jdbcClient.sql("DELETE FROM stores").update();
 
-        // Level 4: Company-level configuration
         jdbcClient.sql("DELETE FROM pricing_rules").update();
         jdbcClient.sql("DELETE FROM categories").update();
         jdbcClient.sql("DELETE FROM taxes").update();
         jdbcClient.sql("DELETE FROM tariffs").update();
         jdbcClient.sql("DELETE FROM payment_methods").update();
 
-        // Level 5: Root tables
         jdbcClient.sql("DELETE FROM companies").update();
         jdbcClient.sql("DELETE FROM organizations").update();
     }
 
-    // ==================== AUTH HELPER METHODS ====================
-
     protected UUID createStore(UUID companyId) {
         UUID storeId = UUID.randomUUID();
-        jdbcClient.sql("""
-                INSERT INTO stores (id, company_id, code, name, address, is_active)
-                VALUES (:id, :companyId, 'TEST-STORE', 'Test Store', 'Test Address', TRUE)
-                """)
-                .param("id", storeId)
-                .param("companyId", companyId)
-                .update();
+        jdbcClient.sql("INSERT INTO stores (id, company_id, code, name, address, is_active) VALUES (:id, :companyId, 'TEST-STORE', 'Test Store', 'Test Address', TRUE)")
+                .param("id", storeId).param("companyId", companyId).update();
         return storeId;
     }
 
-    /**
-     * Creates an employee without a direct store_id (they get access via
-     * employee_access_grants).
-     * The employee gets a STORE-scoped grant if storeId is provided, otherwise
-     * COMPANY-scoped.
-     */
     protected void createAdminUser(UUID companyId, UUID storeId, String username, String password) {
         String encodedPassword = passwordEncoder.encode(password);
-        Long employeeId = jdbcClient.sql("""
-                INSERT INTO employees (username, full_name, role, pin_hash, password_hash,
-                    organization_id, permissions_json, is_active, created_at, updated_at)
-                VALUES (:username, 'Admin User', 'ADMIN', 'pin123', :password,
-                    (SELECT organization_id FROM companies WHERE id = :companyId), '[]', TRUE, NOW(), NOW())
-                RETURNING id
-                """)
-                .param("username", username)
-                .param("password", encodedPassword)
-                .param("companyId", companyId)
-                .query(Long.class)
-                .single();
+        Long employeeId = jdbcClient.sql("INSERT INTO employees (username, full_name, role, pin_hash, password_hash, organization_id, permissions_json, is_active, created_at, updated_at) VALUES (:username, 'Admin User', 'ADMIN', 'pin123', :password, (SELECT organization_id FROM companies WHERE id = :companyId), '[]', TRUE, NOW(), NOW()) RETURNING id")
+                .param("username", username).param("password", encodedPassword).param("companyId", companyId).query(Long.class).single();
 
-        // Grant access at the store level (or company level if no store provided)
         if (storeId != null) {
-            jdbcClient.sql("""
-                    INSERT INTO employee_access_grants (employee_id, scope, target_id, role, created_at)
-                    VALUES (:employeeId, 'STORE', :targetId, 'ADMIN', NOW())
-                    """)
-                    .param("employeeId", employeeId)
-                    .param("targetId", storeId)
-                    .update();
+            jdbcClient.sql("INSERT INTO employee_access_grants (employee_id, scope, target_id, role, created_at) VALUES (:employeeId, 'STORE', :targetId, 'ADMIN', NOW())")
+                    .param("employeeId", employeeId).param("targetId", storeId).update();
         } else {
-            jdbcClient.sql("""
-                    INSERT INTO employee_access_grants (employee_id, scope, target_id, role, created_at)
-                    VALUES (:employeeId, 'COMPANY', :targetId, 'ADMIN', NOW())
-                    """)
-                    .param("employeeId", employeeId)
-                    .param("targetId", companyId)
-                    .update();
+            jdbcClient.sql("INSERT INTO employee_access_grants (employee_id, scope, target_id, role, created_at) VALUES (:employeeId, 'COMPANY', :targetId, 'ADMIN', NOW())")
+                    .param("employeeId", employeeId).param("targetId", companyId).update();
         }
     }
 
-    /**
-     * Full-lifecycle helper: creates an employee with a specific role, grants a
-     * permission at the given scope/target, and returns login headers.
-     *
-     * <pre>
-     * HttpHeaders headers = createAuthenticatedUser("user1", "MANAGER", "COMPANY", companyId, "product:create");
-     * </pre>
-     */
-    protected HttpHeaders createAuthenticatedUser(
-            String username,
-            String role,
-            String scope,
-            UUID targetId,
-            String... permissionCodes) {
-
+    protected HttpHeaders createAuthenticatedUser(String username, String role, String scope, UUID targetId, String... permissionCodes) {
         String encodedPassword = passwordEncoder.encode("test123");
+        Long employeeId = jdbcClient.sql("INSERT INTO employees (username, full_name, role, pin_hash, password_hash, organization_id, permissions_json, is_active, created_at, updated_at) VALUES (:username, :username, :role, 'pin000', :password, (SELECT organization_id FROM companies WHERE id = :targetId), '[]', TRUE, NOW(), NOW()) RETURNING id")
+                .param("username", username).param("role", role).param("password", encodedPassword).param("targetId", targetId).query(Long.class).single();
 
-        Long employeeId = jdbcClient.sql("""
-                INSERT INTO employees (username, full_name, role, pin_hash, password_hash,
-                    organization_id, permissions_json, is_active, created_at, updated_at)
-                VALUES (:username, :username, :role, 'pin000', :password,
-                    (SELECT organization_id FROM companies WHERE id = :targetId), '[]', TRUE, NOW(), NOW())
-                RETURNING id
-                """)
-                .param("username", username)
-                .param("role", role)
-                .param("password", encodedPassword)
-                .param("targetId", targetId)
-                .query(Long.class)
-                .single();
-
-        jdbcClient.sql("""
-                INSERT INTO employee_access_grants (employee_id, scope, target_id, role, created_at)
-                VALUES (:employeeId, :scope, :targetId, :role, NOW())
-                """)
-                .param("employeeId", employeeId)
-                .param("scope", scope)
-                .param("targetId", targetId)
-                .param("role", role)
-                .update();
+        jdbcClient.sql("INSERT INTO employee_access_grants (employee_id, scope, target_id, role, created_at) VALUES (:employeeId, :scope, :targetId, :role, NOW())")
+                .param("employeeId", employeeId).param("scope", scope).param("targetId", targetId).param("role", role).update();
 
         for (String code : permissionCodes) {
-            jdbcClient.sql("""
-                    INSERT INTO role_permissions (role_name, permission_code)
-                    VALUES (:role, :code)
-                    ON CONFLICT DO NOTHING
-                    """)
-                    .param("role", role)
-                    .param("code", code)
-                    .update();
+            jdbcClient.sql("INSERT INTO role_permissions (role_name, permission_code) VALUES (:role, :code) ON CONFLICT DO NOTHING")
+                    .param("role", role).param("code", code).update();
         }
-
         return loginAndGetHeaders(username, "test123");
     }
 
     protected HttpHeaders loginAndGetHeaders(String username, String password) {
-        LoginRequest loginRequest = new LoginRequest(
-                username, password);
+        LoginRequest loginRequest = new LoginRequest(username, password);
+        ResponseEntity<ApiResponse<LoginResponse>> response = restTemplate.exchange("/api/v1/auth/login", HttpMethod.POST, new HttpEntity<>(loginRequest), new ParameterizedTypeReference<ApiResponse<LoginResponse>>() {});
 
-        ResponseEntity<ApiResponse<LoginResponse>> response = restTemplate
-                .exchange(
-                        "/api/v1/auth/login",
-                        HttpMethod.POST,
-                        new HttpEntity<>(loginRequest),
-                        new ParameterizedTypeReference<ApiResponse<LoginResponse>>() {
-                        });
+        if (response.getStatusCode() != HttpStatus.OK) throw new RuntimeException("Login failed for user: " + username);
 
-        if (response.getStatusCode() != HttpStatus.OK) {
-            throw new RuntimeException("Login failed for user: " + username);
-        }
-
-        // Extract Access Token from cookie
         String accessTokenCookie = response.getHeaders().get(HttpHeaders.SET_COOKIE).stream()
-                .filter(c -> c.startsWith("ACCESS_TOKEN="))
-                .findFirst()
-                .orElseThrow(() -> new RuntimeException("ACCESS_TOKEN cookie not found"));
+                .filter(c -> c.startsWith("ACCESS_TOKEN=")).findFirst().orElseThrow(() -> new RuntimeException("ACCESS_TOKEN cookie not found"));
 
         HttpHeaders headers = new HttpHeaders();
         headers.add(HttpHeaders.COOKIE, accessTokenCookie);

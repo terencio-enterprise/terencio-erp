@@ -1,7 +1,6 @@
 ﻿package es.terencio.erp.organization.infrastructure.in.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -33,10 +32,10 @@ class OrganizationIntegrationTest extends AbstractIntegrationTest {
         createAdminUser(bootstrapCompanyId, bootstrapStoreId, "bootstrap_admin", "admin123");
         org.springframework.http.HttpHeaders bootstrapHeaders = loginAndGetHeaders("bootstrap_admin", "admin123");
 
-        ResponseEntity<ApiResponse<Map>> response = restTemplate.exchange("/api/v1/companies", HttpMethod.POST, new HttpEntity<>(createRequest, bootstrapHeaders), new ParameterizedTypeReference<ApiResponse<Map>>() {});
+        ResponseEntity<ApiResponse<Map<String, Object>>> response = restTemplate.exchange("/api/v1/companies", HttpMethod.POST, new HttpEntity<>(createRequest, bootstrapHeaders), new ParameterizedTypeReference<ApiResponse<Map<String, Object>>>() {});
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        Map company = response.getBody().getData();
+        Map<String, Object> company = java.util.Objects.requireNonNull(response.getBody()).getData();
         assertThat(company.get("name")).isEqualTo("Test Company SA");
         UUID companyId = UUID.fromString((String) company.get("companyId"));
         Integer count = jdbcClient.sql("SELECT COUNT(*) FROM companies WHERE id = ?").param(companyId).query(Integer.class).single();
@@ -51,11 +50,9 @@ class OrganizationIntegrationTest extends AbstractIntegrationTest {
         authHeaders = loginAndGetHeaders("admin", "admin123");
 
         Map<String, Object> updateRequest = Map.of("fiscalRegime", "SII", "priceIncludesTax", false, "roundingMode", "TOTAL");
-
-        ResponseEntity<ApiResponse<Map>> response = restTemplate.exchange("/api/v1/companies/" + companyId + "/fiscal-settings", HttpMethod.PUT, new HttpEntity<>(updateRequest, authHeaders), new ParameterizedTypeReference<ApiResponse<Map>>() {});
-
+        ResponseEntity<ApiResponse<Map<String, Object>>> response = restTemplate.exchange("/api/v1/companies/" + companyId + "/fiscal-settings", HttpMethod.PUT, new HttpEntity<>(updateRequest, authHeaders), new ParameterizedTypeReference<ApiResponse<Map<String, Object>>>() {});
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(response.getBody().getData().get("fiscalRegime")).isEqualTo("SII");
+        assertThat(java.util.Objects.requireNonNull(response.getBody()).getData().get("fiscalRegime")).isEqualTo("SII");
     }
 
     @Test
@@ -66,12 +63,10 @@ class OrganizationIntegrationTest extends AbstractIntegrationTest {
         authHeaders = loginAndGetHeaders("admin", "admin123");
 
         Map<String, Object> createRequest = Map.of("companyId", companyId.toString(), "code", "STORE001", "name", "Main Store", "street", "Test Street 123", "zipCode", "28001", "city", "Madrid");
-
-        ResponseEntity<ApiResponse<Map>> response = restTemplate.exchange("/api/v1/stores", HttpMethod.POST, new HttpEntity<>(createRequest, authHeaders), new ParameterizedTypeReference<ApiResponse<Map>>() {});
+        ResponseEntity<ApiResponse<Map<String, Object>>> response = restTemplate.exchange("/api/v1/stores", HttpMethod.POST, new HttpEntity<>(createRequest, authHeaders), new ParameterizedTypeReference<ApiResponse<Map<String, Object>>>() {});
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        Map store = response.getBody().getData();
-        UUID storeId = UUID.fromString((String) store.get("storeId"));
+        Map<String, Object> store = java.util.Objects.requireNonNull(response.getBody()).getData();
         UUID warehouseId = UUID.fromString((String) store.get("warehouseId"));
 
         Integer warehouseCount = jdbcClient.sql("SELECT COUNT(*) FROM warehouses WHERE id = ?").param(warehouseId).query(Integer.class).single();
@@ -82,11 +77,5 @@ class OrganizationIntegrationTest extends AbstractIntegrationTest {
         testCompanyId = UUID.randomUUID();
         jdbcClient.sql("INSERT INTO companies (id, name, tax_id, currency_code, fiscal_regime, price_includes_tax, rounding_mode, is_active, created_at, updated_at, version) VALUES (?, 'Test Company', 'B11111111', 'EUR', 'COMMON', TRUE, 'LINE', TRUE, NOW(), NOW(), 1)").param(testCompanyId).update();
         return testCompanyId;
-    }
-
-    private UUID createStore(UUID companyId) {
-        UUID storeId = UUID.randomUUID();
-        jdbcClient.sql("INSERT INTO stores (id, company_id, code, name, is_active, timezone, created_at, updated_at, version) VALUES (?, ?, 'DEF', 'Def', TRUE, 'Europe/Madrid', NOW(), NOW(), 1)").param(storeId).param(companyId).update();
-        return storeId;
     }
 }

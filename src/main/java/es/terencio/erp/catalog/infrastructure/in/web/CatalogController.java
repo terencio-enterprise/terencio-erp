@@ -90,8 +90,6 @@ public class CatalogController {
         return ResponseEntity.ok(ApiResponse.success("Product created", new ProductResponse(saved.id().value(), saved.reference(), saved.name(), saved.shortName(), saved.categoryId(), saved.taxId(), saved.type().name(), saved.isActive())));
     }
 
-    // Include the remaining Catalog methods similarly wrapped with @RequiresPermission
-    // ...
     public record TaxResponse(Long id, String name, BigDecimal rate, BigDecimal surcharge) {}
     public record CategoryResponse(Long id, Long parentId, String name, String color, boolean active) {}
     public record CreateCategoryRequest(UUID companyId, String name) {}
