@@ -187,6 +187,12 @@ public class JdbcProductPersistenceAdapter implements ProductRepository {
                 .list();
     }
 
+    @Override
+    public List<Product> search(CompanyId companyId, String name, String reference, Long categoryId, int page,
+            int size) {
+        return searchProducts(companyId, name, reference, categoryId, page, size);
+    }
+
     public List<Product> searchProducts(CompanyId companyId, String name, String reference, Long categoryId, int page,
             int size) {
         StringBuilder sql = new StringBuilder("SELECT * FROM products WHERE company_id = :companyId");

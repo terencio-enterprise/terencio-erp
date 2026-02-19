@@ -4,6 +4,8 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,17 +20,24 @@ import es.terencio.erp.marketing.domain.model.DeliveryStatus;
 import es.terencio.erp.marketing.domain.model.EmailMessage;
 import es.terencio.erp.marketing.domain.model.MarketingTemplate;
 import es.terencio.erp.shared.exception.ResourceNotFoundException;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 
 @Service
-@RequiredArgsConstructor
-@Slf4j
 public class CampaignService implements LaunchCampaignUseCase {
+
+    private static final Logger log = LoggerFactory.getLogger(CampaignService.class);
 
     private final CampaignRepositoryPort campaignRepository;
     private final CustomerIntegrationPort customerPort;
     private final MailingSystemPort mailingSystem;
+
+    public CampaignService(
+            CampaignRepositoryPort campaignRepository,
+            CustomerIntegrationPort customerPort,
+            MailingSystemPort mailingSystem) {
+        this.campaignRepository = campaignRepository;
+        this.customerPort = customerPort;
+        this.mailingSystem = mailingSystem;
+    }
 
     @Override
     @Transactional
@@ -64,13 +73,12 @@ public class CampaignService implements LaunchCampaignUseCase {
 
         String personalSubject = tpl.compileSubject(Map.of("name", customer.getName()));
 
-        EmailMessage msg = EmailMessage.builder()
-                .to(customer.getEmail())
-                .subject(personalSubject)
-                .bodyHtml(personalBody)
-                .attachments(tpl.getAttachments())
-                .userToken(customer.getUnsubscribeToken())
-                .build();
+        EmailMessage msg = EmailMessage.of(
+                customer.getEmail(),
+                personalSubject,
+                personalBody,
+                tpl.getAttachments(),
+                customer.getUnsubscribeToken());
 
         mailingSystem.send(msg);
         saveLog(tpl, customer, DeliveryStatus.SENT, null);
@@ -78,14 +86,15 @@ public class CampaignService implements LaunchCampaignUseCase {
 
     private void saveLog(MarketingTemplate tpl, CustomerIntegrationPort.MarketingCustomer customer,
             DeliveryStatus status, String error) {
-        Campaign logEntry = Campaign.builder()
-                .companyId(customer.getCompanyId())
-                .customerId(customer.getId())
-                .templateId(tpl.getId())
-                .sentAt(Instant.now())
-                .status(status)
-                .errorMessage(error)
-                .build();
+        Campaign logEntry = new Campaign(
+                null,
+                customer.getCompanyId(),
+                customer.getId(),
+                tpl.getId(),
+                Instant.now(),
+                status,
+                null,
+                error);
         campaignRepository.saveLog(logEntry);
     }
 
@@ -102,13 +111,12 @@ public class CampaignService implements LaunchCampaignUseCase {
                 "name", "Test User",
                 "unsubscribe_link", "#"));
 
-        EmailMessage msg = EmailMessage.builder()
-                .to(testEmail)
-                .subject("[DRY RUN] " + tpl.getSubjectTemplate())
-                .bodyHtml(personalBody)
-                .attachments(tpl.getAttachments())
-                .userToken("dry-run-token")
-                .build();
+        EmailMessage msg = EmailMessage.of(
+                testEmail,
+                "[DRY RUN] " + tpl.getSubjectTemplate(),
+                personalBody,
+                tpl.getAttachments(),
+                "dry-run-token");
 
         mailingSystem.send(msg);
     }

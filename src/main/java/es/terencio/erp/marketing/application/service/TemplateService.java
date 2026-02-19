@@ -18,11 +18,8 @@ import es.terencio.erp.marketing.application.port.out.StorageSystemPort;
 import es.terencio.erp.marketing.domain.model.MarketingAttachment;
 import es.terencio.erp.marketing.domain.model.MarketingTemplate;
 import es.terencio.erp.shared.exception.ResourceNotFoundException;
-import lombok.RequiredArgsConstructor;
 
 @Service
-@RequiredArgsConstructor
-@Transactional
 public class TemplateService implements ManageTemplatesUseCase {
 
     private final CampaignRepositoryPort repository;
@@ -31,19 +28,21 @@ public class TemplateService implements ManageTemplatesUseCase {
     @Value("${terencio.marketing.s3.bucket}")
     private String s3Bucket;
 
+    public TemplateService(CampaignRepositoryPort repository, StorageSystemPort storage) {
+        this.repository = repository;
+        this.storage = storage;
+    }
+
     @Override
+    @Transactional(readOnly = true)
     public List<TemplateDto> listTemplates(UUID companyId, String search) {
-        // Assuming repository.findAllTemplates needs companyId now
-        // If the repository method signature changes, I'll need to update it.
-        // For now, I'll pass it if I can, or verify repo port.
-        // Actually, I should inspect repo port first. But I'll update the service
-        // logic.
         return repository.findAllTemplates(companyId, search).stream()
                 .map(this::toDto)
                 .collect(Collectors.toList());
     }
 
     @Override
+    @Transactional(readOnly = true)
     public TemplateDto getTemplate(Long id) {
         return repository.findTemplateById(id)
                 .map(this::toDto)
@@ -51,41 +50,48 @@ public class TemplateService implements ManageTemplatesUseCase {
     }
 
     @Override
+    @Transactional
     public TemplateDto createTemplate(UUID companyId, TemplateDto dto) {
-        MarketingTemplate template = MarketingTemplate.builder()
-                .companyId(companyId)
-                .code(dto.getCode())
-                .name(dto.getName())
-                .subjectTemplate(dto.getSubject())
-                .bodyHtml(dto.getBodyHtml())
-                .active(true)
-                .createdAt(Instant.now())
-                .updatedAt(Instant.now())
-                .attachments(new ArrayList<>())
-                .build();
+        Instant now = Instant.now();
+        MarketingTemplate template = new MarketingTemplate(
+                null,
+                companyId,
+                dto.getCode(),
+                dto.getName(),
+                dto.getSubject(),
+                dto.getBodyHtml(),
+                true,
+                now,
+                now,
+                new ArrayList<>());
 
         return toDto(repository.saveTemplate(template));
     }
 
     @Override
+    @Transactional
     public TemplateDto updateTemplate(Long id, TemplateDto dto) {
         MarketingTemplate template = repository.findTemplateById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Template not found: " + id));
 
-        template.setName(dto.getName());
-        template.setCode(dto.getCode());
-        template.setSubjectTemplate(dto.getSubject());
-        template.setBodyHtml(dto.getBodyHtml());
-        template.setUpdatedAt(Instant.now());
+        // Use proper domain method instead of individual setters
+        template.update(dto.getName(), dto.getCode(), dto.getSubject(), dto.getBodyHtml());
 
         return toDto(repository.saveTemplate(template));
     }
 
     @Override
+    @Transactional
     public void deleteTemplate(Long id) {
         repository.deleteTemplate(id);
     }
 
+    /**
+     * Uploads the file to S3 first, then saves attachment metadata to DB.
+     * S3 upload happens OUTSIDE the @Transactional boundary on this method
+     * to prevent holding a DB connection while waiting for a slow network call.
+     * The method itself is not @Transactional — only the DB save inside is.
+     */
     @Override
     public void addAttachment(Long templateId, MultipartFile file) {
         MarketingTemplate template = repository.findTemplateById(templateId)
@@ -93,16 +99,23 @@ public class TemplateService implements ManageTemplatesUseCase {
 
         String key = "templates/" + templateId + "/" + file.getOriginalFilename();
 
+        // S3 upload happens BEFORE the transaction begins
         storage.upload(file, key);
 
-        MarketingAttachment attachment = MarketingAttachment.builder()
-                .templateId(templateId)
-                .filename(file.getOriginalFilename())
-                .contentType(file.getContentType())
-                .fileSizeBytes(file.getSize())
-                .s3Bucket(s3Bucket)
-                .s3Key(key)
-                .build();
+        saveAttachmentToDb(template, file, key);
+    }
+
+    @Transactional
+    protected void saveAttachmentToDb(MarketingTemplate template, MultipartFile file, String key) {
+        MarketingAttachment attachment = new MarketingAttachment(
+                null,
+                template.getId(),
+                file.getOriginalFilename(),
+                file.getContentType(),
+                file.getSize(),
+                s3Bucket,
+                key,
+                null);
 
         template.getAttachments().add(attachment);
         repository.saveTemplate(template);
@@ -113,32 +126,37 @@ public class TemplateService implements ManageTemplatesUseCase {
         MarketingTemplate template = repository.findTemplateById(templateId)
                 .orElseThrow(() -> new ResourceNotFoundException("Template not found: " + templateId));
 
-        template.getAttachments().removeIf(a -> {
-            if (a.getId().equals(attachmentId)) {
-                storage.delete(a.getS3Bucket(), a.getS3Key());
-                return true;
-            }
-            return false;
-        });
+        // Perform S3 deletion before starting DB transaction
+        MarketingAttachment toRemove = template.getAttachments().stream()
+                .filter(a -> a.getId().equals(attachmentId))
+                .findFirst()
+                .orElseThrow(() -> new ResourceNotFoundException("Attachment not found: " + attachmentId));
 
+        storage.delete(toRemove.getS3Bucket(), toRemove.getS3Key());
+
+        removeAttachmentFromDb(template, attachmentId);
+    }
+
+    @Transactional
+    protected void removeAttachmentFromDb(MarketingTemplate template, Long attachmentId) {
+        template.getAttachments().removeIf(a -> a.getId().equals(attachmentId));
         repository.saveTemplate(template);
     }
 
     private TemplateDto toDto(MarketingTemplate t) {
-        return TemplateDto.builder()
-                .id(t.getId())
-                .code(t.getCode())
-                .name(t.getName())
-                .subject(t.getSubjectTemplate())
-                .bodyHtml(t.getBodyHtml())
-                .active(t.isActive())
-                .lastModified(t.getUpdatedAt())
-                .attachments(t.getAttachments().stream().map(a -> TemplateDto.AttachmentDto.builder()
-                        .id(a.getId())
-                        .filename(a.getFilename())
-                        .size(a.getFileSizeBytes())
-                        .contentType(a.getContentType())
-                        .build()).collect(Collectors.toList()))
-                .build();
+        List<TemplateDto.AttachmentDto> attachmentDtos = t.getAttachments().stream()
+                .map(a -> new TemplateDto.AttachmentDto(a.getId(), a.getFilename(), a.getFileSizeBytes(),
+                        a.getContentType()))
+                .collect(Collectors.toList());
+
+        return new TemplateDto(
+                t.getId(),
+                t.getCode(),
+                t.getName(),
+                t.getSubjectTemplate(),
+                t.getBodyHtml(),
+                t.isActive(),
+                t.getUpdatedAt(),
+                attachmentDtos);
     }
 }

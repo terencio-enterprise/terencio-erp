@@ -19,13 +19,15 @@ import es.terencio.erp.marketing.domain.model.Campaign;
 import es.terencio.erp.marketing.domain.model.DeliveryStatus;
 import es.terencio.erp.marketing.domain.model.MarketingAttachment;
 import es.terencio.erp.marketing.domain.model.MarketingTemplate;
-import lombok.RequiredArgsConstructor;
 
 @Repository
-@RequiredArgsConstructor
 public class JdbcCampaignRepository implements CampaignRepositoryPort {
 
     private final NamedParameterJdbcTemplate jdbcTemplate;
+
+    public JdbcCampaignRepository(NamedParameterJdbcTemplate jdbcTemplate) {
+        this.jdbcTemplate = jdbcTemplate;
+    }
 
     @Override
     public List<MarketingTemplate> findAllTemplates(UUID companyId, String search) {
@@ -57,16 +59,15 @@ public class JdbcCampaignRepository implements CampaignRepositoryPort {
     private List<MarketingAttachment> findAttachmentsByTemplateId(Long templateId) {
         String sql = "SELECT * FROM marketing_attachments WHERE template_id = :templateId";
         return jdbcTemplate.query(sql, new MapSqlParameterSource("templateId", templateId),
-                (rs, rowNum) -> MarketingAttachment.builder()
-                        .id(rs.getLong("id"))
-                        .templateId(rs.getLong("template_id"))
-                        .filename(rs.getString("filename"))
-                        .contentType(rs.getString("content_type"))
-                        .fileSizeBytes(rs.getLong("file_size_bytes"))
-                        .s3Bucket(rs.getString("s3_bucket"))
-                        .s3Key(rs.getString("s3_key"))
-                        .s3Region(rs.getString("s3_region"))
-                        .build());
+                (rs, rowNum) -> new MarketingAttachment(
+                        rs.getLong("id"),
+                        rs.getLong("template_id"),
+                        rs.getString("filename"),
+                        rs.getString("content_type"),
+                        rs.getLong("file_size_bytes"),
+                        rs.getString("s3_bucket"),
+                        rs.getString("s3_key"),
+                        rs.getString("s3_region")));
     }
 
     @Override
@@ -146,32 +147,32 @@ public class JdbcCampaignRepository implements CampaignRepositoryPort {
     @Override
     public List<Campaign> findLogsByStatus(String status) {
         String sql = "SELECT * FROM marketing_logs WHERE status = :status";
-        return jdbcTemplate.query(sql, new MapSqlParameterSource("status", status), (rs, i) -> Campaign.builder()
-                .id(rs.getLong("id"))
-                .companyId(rs.getObject("company_id", UUID.class))
-                .customerId(rs.getLong("customer_id"))
-                .templateId(rs.getLong("template_id"))
-                .sentAt(rs.getTimestamp("sent_at").toInstant())
-                .status(DeliveryStatus.valueOf(rs.getString("status")))
-                .messageId(rs.getString("message_id"))
-                .errorMessage(rs.getString("error_message"))
-                .build());
+        return jdbcTemplate.query(sql, new MapSqlParameterSource("status", status),
+                (rs, i) -> new Campaign(
+                        rs.getLong("id"),
+                        rs.getObject("company_id", UUID.class),
+                        rs.getLong("customer_id"),
+                        rs.getLong("template_id"),
+                        rs.getTimestamp("sent_at").toInstant(),
+                        DeliveryStatus.valueOf(rs.getString("status")),
+                        rs.getString("message_id"),
+                        rs.getString("error_message")));
     }
 
     private static class TemplateRowMapper implements RowMapper<MarketingTemplate> {
         @Override
         public MarketingTemplate mapRow(ResultSet rs, int rowNum) throws SQLException {
-            return MarketingTemplate.builder()
-                    .id(rs.getLong("id"))
-                    .companyId(rs.getObject("company_id", UUID.class))
-                    .code(rs.getString("code"))
-                    .name(rs.getString("name"))
-                    .subjectTemplate(rs.getString("subject_template"))
-                    .bodyHtml(rs.getString("body_html"))
-                    .active(rs.getBoolean("is_active"))
-                    .createdAt(rs.getTimestamp("created_at").toInstant())
-                    .updatedAt(rs.getTimestamp("updated_at").toInstant())
-                    .build();
+            return new MarketingTemplate(
+                    rs.getLong("id"),
+                    rs.getObject("company_id", UUID.class),
+                    rs.getString("code"),
+                    rs.getString("name"),
+                    rs.getString("subject_template"),
+                    rs.getString("body_html"),
+                    rs.getBoolean("is_active"),
+                    rs.getTimestamp("created_at").toInstant(),
+                    rs.getTimestamp("updated_at").toInstant(),
+                    null); // attachments loaded separately
         }
     }
 }

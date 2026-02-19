@@ -3,26 +3,89 @@ package es.terencio.erp.marketing.domain.model;
 import java.time.Instant;
 import java.util.UUID;
 
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-
 /**
  * Represents a single execution log of a campaign email sent to a customer.
  * Maps to 'marketing_logs' table.
  */
-@Data
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
 public class Campaign {
+
     private Long id;
-    private UUID companyId;
-    private Long customerId;
-    private Long templateId;
-    private Instant sentAt;
+    private final UUID companyId;
+    private final Long customerId;
+    private final Long templateId;
+    private final Instant sentAt;
     private DeliveryStatus status;
-    private String messageId;
-    private String errorMessage;
+    private final String messageId;
+    private final String errorMessage;
+
+    public Campaign(
+            Long id,
+            UUID companyId,
+            Long customerId,
+            Long templateId,
+            Instant sentAt,
+            DeliveryStatus status,
+            String messageId,
+            String errorMessage) {
+        if (companyId == null)
+            throw new IllegalArgumentException("Campaign companyId is required");
+        if (customerId == null)
+            throw new IllegalArgumentException("Campaign customerId is required");
+        if (templateId == null)
+            throw new IllegalArgumentException("Campaign templateId is required");
+        if (sentAt == null)
+            throw new IllegalArgumentException("Campaign sentAt is required");
+        if (status == null)
+            throw new IllegalArgumentException("Campaign status is required");
+        this.id = id;
+        this.companyId = companyId;
+        this.customerId = customerId;
+        this.templateId = templateId;
+        this.sentAt = sentAt;
+        this.status = status;
+        this.messageId = messageId;
+        this.errorMessage = errorMessage;
+    }
+
+    // Getters
+    public Long getId() {
+        return id;
+    }
+
+    public UUID getCompanyId() {
+        return companyId;
+    }
+
+    public Long getCustomerId() {
+        return customerId;
+    }
+
+    public Long getTemplateId() {
+        return templateId;
+    }
+
+    public Instant getSentAt() {
+        return sentAt;
+    }
+
+    public DeliveryStatus getStatus() {
+        return status;
+    }
+
+    public String getMessageId() {
+        return messageId;
+    }
+
+    public String getErrorMessage() {
+        return errorMessage;
+    }
+
+    // Infrastructure-only setters
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public void setStatus(DeliveryStatus status) {
+        this.status = status;
+    }
 }

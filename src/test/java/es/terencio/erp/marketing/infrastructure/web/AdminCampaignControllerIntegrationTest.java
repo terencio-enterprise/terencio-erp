@@ -108,17 +108,17 @@ class AdminCampaignControllerIntegrationTest extends AbstractIntegrationTest {
         @Test
         void testLaunchCampaign_Success() throws Exception {
                 // Create a template first
-                MarketingTemplate template = MarketingTemplate.builder()
-                                .companyId(companyId)
-                                .code("TEST_CAMPAIGN")
-                                .name("Test Campaign")
-                                .subjectTemplate("Hello {{name}}")
-                                .bodyHtml("<p>Hello</p>")
-                                .active(true)
-                                .createdAt(Instant.now())
-                                .updatedAt(Instant.now())
-                                .attachments(new ArrayList<>())
-                                .build();
+                MarketingTemplate template = new MarketingTemplate(
+                                null,
+                                companyId,
+                                "TEST_CAMPAIGN",
+                                "Test Campaign",
+                                "Hello {{name}}",
+                                "<p>Hello</p>",
+                                true,
+                                Instant.now(),
+                                Instant.now(),
+                                new ArrayList<>());
 
                 template = templateRepository.saveTemplate(template);
 
@@ -138,17 +138,17 @@ class AdminCampaignControllerIntegrationTest extends AbstractIntegrationTest {
         @Test
         void testDryRun_Success() throws Exception {
                 // Create a template first
-                MarketingTemplate template = MarketingTemplate.builder()
-                                .companyId(companyId)
-                                .code("DRY_RUN_TEST")
-                                .name("Dry Run Template")
-                                .subjectTemplate("Test {{name}}")
-                                .bodyHtml("<p>Test</p>")
-                                .active(true)
-                                .createdAt(Instant.now())
-                                .updatedAt(Instant.now())
-                                .attachments(new ArrayList<>())
-                                .build();
+                MarketingTemplate template = new MarketingTemplate(
+                                null,
+                                companyId,
+                                "DRY_RUN_TEST",
+                                "Dry Run Template",
+                                "Test {{name}}",
+                                "<p>Test</p>",
+                                true,
+                                Instant.now(),
+                                Instant.now(),
+                                new ArrayList<>());
 
                 template = templateRepository.saveTemplate(template);
 

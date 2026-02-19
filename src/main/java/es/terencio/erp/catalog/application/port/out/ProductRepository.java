@@ -1,5 +1,6 @@
 package es.terencio.erp.catalog.application.port.out;
 
+import java.util.List;
 import java.util.Optional;
 
 import es.terencio.erp.catalog.domain.model.Product;
@@ -18,4 +19,6 @@ public interface ProductRepository {
     Optional<Product> findByCompanyAndReference(CompanyId companyId, String reference);
 
     boolean existsByCompanyAndReference(CompanyId companyId, String reference);
+
+    List<Product> search(CompanyId companyId, String name, String reference, Long categoryId, int page, int size);
 }
