@@ -11,11 +11,13 @@ import es.terencio.erp.devices.application.port.in.GetDeviceContextUseCase;
 import es.terencio.erp.devices.application.port.out.DevicePort;
 import es.terencio.erp.employees.application.dto.EmployeeSyncDto;
 import es.terencio.erp.employees.application.port.out.EmployeePort;
+import es.terencio.erp.organization.application.port.out.StoreRepository;
+import es.terencio.erp.organization.application.port.out.StoreSettingsRepository;
+import es.terencio.erp.organization.domain.model.Store;
+import es.terencio.erp.organization.domain.model.StoreSettings;
+import es.terencio.erp.shared.domain.identifier.StoreId;
+import es.terencio.erp.shared.domain.valueobject.Money;
 import es.terencio.erp.shared.exception.RegistrationException;
-import es.terencio.erp.stores.application.dto.StoreDto;
-import es.terencio.erp.stores.application.dto.StoreSettingsDto;
-import es.terencio.erp.stores.application.port.out.StorePort;
-import es.terencio.erp.stores.application.port.out.StoreSettingsPort;
 
 /**
  * Service for retrieving device context information.
@@ -25,19 +27,19 @@ import es.terencio.erp.stores.application.port.out.StoreSettingsPort;
 public class GetDeviceContextService implements GetDeviceContextUseCase {
 
     private final DevicePort devicePort;
-    private final StorePort storePort;
-    private final StoreSettingsPort storeSettingsPort;
-    private final EmployeePort EmployeePort;
+    private final StoreRepository storeRepository;
+    private final StoreSettingsRepository storeSettingsRepository;
+    private final EmployeePort employeePort;
 
     public GetDeviceContextService(
             DevicePort devicePort,
-            StorePort storePort,
-            StoreSettingsPort storeSettingsPort,
-            EmployeePort EmployeePort) {
+            StoreRepository storeRepository,
+            StoreSettingsRepository storeSettingsRepository,
+            EmployeePort employeePort) {
         this.devicePort = devicePort;
-        this.storePort = storePort;
-        this.storeSettingsPort = storeSettingsPort;
-        this.EmployeePort = EmployeePort;
+        this.storeRepository = storeRepository;
+        this.storeSettingsRepository = storeSettingsRepository;
+        this.employeePort = employeePort;
     }
 
     @Override
@@ -50,28 +52,30 @@ public class GetDeviceContextService implements GetDeviceContextUseCase {
             throw new RegistrationException("Device is not active");
         }
 
+        StoreId storeId = new StoreId(device.storeId());
+
         // 2. Fetch Store information
-        StoreDto store = storePort.findById(device.storeId())
+        Store store = storeRepository.findById(storeId)
                 .orElseThrow(() -> new RegistrationException("Store not found"));
 
         // 3. Fetch Store Settings (may not exist for new stores)
-        StoreSettingsDto settings = storeSettingsPort.findByStoreId(device.storeId())
-                .orElse(createDefaultSettings(device.storeId()));
+        StoreSettings settings = storeSettingsRepository.findByStoreId(storeId)
+                .orElse(createDefaultSettings(storeId));
 
         // 4. Fetch all active users for this store (with pinHash for offline
         // verification)
-        List<EmployeeSyncDto> users = EmployeePort.findSyncDataByStoreId(device.storeId());
+        List<EmployeeSyncDto> users = employeePort.findSyncDataByStoreId(device.storeId());
 
         return new DeviceContextDto(store, settings, users);
     }
 
-    private StoreSettingsDto createDefaultSettings(UUID storeId) {
-        return new StoreSettingsDto(
+    private StoreSettings createDefaultSettings(StoreId storeId) {
+        return new StoreSettings(
                 storeId,
                 false, // allowNegativeStock
                 null, // defaultTariffId
                 true, // printTicketAutomatically
-                null // requireCustomerForLargeAmount
-        );
+                Money.ofEuros(1000.0), // requireCustomerForLargeAmount
+                java.time.Instant.now());
     }
 }

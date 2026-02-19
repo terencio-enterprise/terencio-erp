@@ -16,6 +16,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
+import es.terencio.erp.auth.domain.model.AccessScope;
+import es.terencio.erp.auth.domain.model.Permission;
 import es.terencio.erp.auth.infrastructure.security.RequiresPermission;
 import es.terencio.erp.marketing.application.dto.TemplateDto;
 import es.terencio.erp.marketing.application.port.in.ManageTemplatesUseCase;
@@ -35,7 +37,7 @@ public class AdminTemplateController {
 
     @GetMapping
     @Operation(summary = "List templates", description = "Returns templates, optionally filtered by search")
-    @RequiresPermission(permission = "marketing:template:view", scope = es.terencio.erp.auth.domain.model.AccessScope.COMPANY, targetIdParam = "companyId")
+    @RequiresPermission(permission = Permission.MARKETING_TEMPLATE_VIEW, scope = AccessScope.COMPANY, targetIdParam = "companyId")
     public ResponseEntity<ApiResponse<List<TemplateDto>>> listTemplates(
             @PathVariable UUID companyId,
             @RequestParam(required = false) String search) {
@@ -44,7 +46,7 @@ public class AdminTemplateController {
 
     @PostMapping
     @Operation(summary = "Create template", description = "Creates a new marketing template")
-    @RequiresPermission(permission = "marketing:template:create", scope = es.terencio.erp.auth.domain.model.AccessScope.COMPANY, targetIdParam = "companyId")
+    @RequiresPermission(permission = Permission.MARKETING_TEMPLATE_CREATE, scope = AccessScope.COMPANY, targetIdParam = "companyId")
     public ResponseEntity<ApiResponse<TemplateDto>> createTemplate(
             @PathVariable UUID companyId,
             @RequestBody TemplateDto template) {
@@ -53,7 +55,7 @@ public class AdminTemplateController {
 
     @GetMapping("/{id}")
     @Operation(summary = "Get template", description = "Returns one template by identifier")
-    @RequiresPermission(permission = "marketing:template:view", scope = es.terencio.erp.auth.domain.model.AccessScope.COMPANY, targetIdParam = "companyId")
+    @RequiresPermission(permission = Permission.MARKETING_TEMPLATE_VIEW, scope = AccessScope.COMPANY, targetIdParam = "companyId")
     public ResponseEntity<ApiResponse<TemplateDto>> getTemplate(
             @PathVariable UUID companyId,
             @PathVariable Long id) {
@@ -62,7 +64,7 @@ public class AdminTemplateController {
 
     @PutMapping("/{id}")
     @Operation(summary = "Update template", description = "Updates an existing template")
-    @RequiresPermission(permission = "marketing:template:edit", scope = es.terencio.erp.auth.domain.model.AccessScope.COMPANY, targetIdParam = "companyId")
+    @RequiresPermission(permission = Permission.MARKETING_TEMPLATE_EDIT, scope = AccessScope.COMPANY, targetIdParam = "companyId")
     public ResponseEntity<ApiResponse<TemplateDto>> updateTemplate(
             @PathVariable UUID companyId,
             @PathVariable Long id,
@@ -72,7 +74,7 @@ public class AdminTemplateController {
 
     @DeleteMapping("/{id}")
     @Operation(summary = "Delete template", description = "Deletes a template by identifier")
-    @RequiresPermission(permission = "marketing:template:delete", scope = es.terencio.erp.auth.domain.model.AccessScope.COMPANY, targetIdParam = "companyId")
+    @RequiresPermission(permission = Permission.MARKETING_TEMPLATE_DELETE, scope = AccessScope.COMPANY, targetIdParam = "companyId")
     public ResponseEntity<ApiResponse<Void>> deleteTemplate(
             @PathVariable UUID companyId,
             @PathVariable Long id) {
@@ -82,7 +84,7 @@ public class AdminTemplateController {
 
     @PostMapping(value = "/{id}/attachments", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(summary = "Upload attachment", description = "Uploads a template attachment file")
-    @RequiresPermission(permission = "marketing:template:edit", scope = es.terencio.erp.auth.domain.model.AccessScope.COMPANY, targetIdParam = "companyId")
+    @RequiresPermission(permission = Permission.MARKETING_TEMPLATE_EDIT, scope = AccessScope.COMPANY, targetIdParam = "companyId")
     public ResponseEntity<ApiResponse<Void>> uploadAttachment(
             @PathVariable UUID companyId,
             @PathVariable Long id,
@@ -93,7 +95,7 @@ public class AdminTemplateController {
 
     @DeleteMapping("/{id}/attachments/{attId}")
     @Operation(summary = "Delete attachment", description = "Deletes a template attachment")
-    @RequiresPermission(permission = "marketing:template:edit", scope = es.terencio.erp.auth.domain.model.AccessScope.COMPANY, targetIdParam = "companyId")
+    @RequiresPermission(permission = Permission.MARKETING_TEMPLATE_EDIT, scope = AccessScope.COMPANY, targetIdParam = "companyId")
     public ResponseEntity<ApiResponse<Void>> deleteAttachment(
             @PathVariable UUID companyId,
             @PathVariable Long id,

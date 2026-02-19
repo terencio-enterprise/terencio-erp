@@ -1,5 +1,7 @@
 package es.terencio.erp;
 
+import java.util.UUID;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
@@ -95,8 +97,8 @@ public abstract class AbstractIntegrationTest {
 
     // ==================== AUTH HELPER METHODS ====================
 
-    protected java.util.UUID createStore(java.util.UUID companyId) {
-        java.util.UUID storeId = java.util.UUID.randomUUID();
+    protected UUID createStore(UUID companyId) {
+        UUID storeId = UUID.randomUUID();
         jdbcClient.sql("""
                 INSERT INTO stores (id, company_id, code, name, address, is_active)
                 VALUES (:id, :companyId, 'TEST-STORE', 'Test Store', 'Test Address', TRUE)
@@ -107,19 +109,100 @@ public abstract class AbstractIntegrationTest {
         return storeId;
     }
 
-    protected void createAdminUser(java.util.UUID companyId, java.util.UUID storeId, String username, String password) {
+    /**
+     * Creates an employee without a direct store_id (they get access via
+     * employee_access_grants).
+     * The employee gets a STORE-scoped grant if storeId is provided, otherwise
+     * COMPANY-scoped.
+     */
+    protected void createAdminUser(UUID companyId, UUID storeId, String username, String password) {
         String encodedPassword = passwordEncoder.encode(password);
-        jdbcClient.sql("""
+        Long employeeId = jdbcClient.sql("""
                 INSERT INTO employees (username, full_name, role, pin_hash, password_hash,
-                    organization_id, store_id, permissions_json, is_active)
+                    organization_id, permissions_json, is_active, created_at, updated_at)
                 VALUES (:username, 'Admin User', 'ADMIN', 'pin123', :password,
-                    (SELECT organization_id FROM companies WHERE id = :companyId), :storeId, '[]', TRUE)
+                    (SELECT organization_id FROM companies WHERE id = :companyId), '[]', TRUE, NOW(), NOW())
+                RETURNING id
                 """)
                 .param("username", username)
                 .param("password", encodedPassword)
                 .param("companyId", companyId)
-                .param("storeId", storeId)
+                .query(Long.class)
+                .single();
+
+        // Grant access at the store level (or company level if no store provided)
+        if (storeId != null) {
+            jdbcClient.sql("""
+                    INSERT INTO employee_access_grants (employee_id, scope, target_id, role, created_at)
+                    VALUES (:employeeId, 'STORE', :targetId, 'ADMIN', NOW())
+                    """)
+                    .param("employeeId", employeeId)
+                    .param("targetId", storeId)
+                    .update();
+        } else {
+            jdbcClient.sql("""
+                    INSERT INTO employee_access_grants (employee_id, scope, target_id, role, created_at)
+                    VALUES (:employeeId, 'COMPANY', :targetId, 'ADMIN', NOW())
+                    """)
+                    .param("employeeId", employeeId)
+                    .param("targetId", companyId)
+                    .update();
+        }
+    }
+
+    /**
+     * Full-lifecycle helper: creates an employee with a specific role, grants a
+     * permission at the given scope/target, and returns login headers.
+     *
+     * <pre>
+     * HttpHeaders headers = createAuthenticatedUser("user1", "MANAGER", "COMPANY", companyId, "product:create");
+     * </pre>
+     */
+    protected org.springframework.http.HttpHeaders createAuthenticatedUser(
+            String username,
+            String role,
+            String scope,
+            UUID targetId,
+            String... permissionCodes) {
+
+        String encodedPassword = passwordEncoder.encode("test123");
+
+        Long employeeId = jdbcClient.sql("""
+                INSERT INTO employees (username, full_name, role, pin_hash, password_hash,
+                    organization_id, permissions_json, is_active, created_at, updated_at)
+                VALUES (:username, :username, :role, 'pin000', :password,
+                    (SELECT organization_id FROM companies WHERE id = :targetId), '[]', TRUE, NOW(), NOW())
+                RETURNING id
+                """)
+                .param("username", username)
+                .param("role", role)
+                .param("password", encodedPassword)
+                .param("targetId", targetId)
+                .query(Long.class)
+                .single();
+
+        jdbcClient.sql("""
+                INSERT INTO employee_access_grants (employee_id, scope, target_id, role, created_at)
+                VALUES (:employeeId, :scope, :targetId, :role, NOW())
+                """)
+                .param("employeeId", employeeId)
+                .param("scope", scope)
+                .param("targetId", targetId)
+                .param("role", role)
                 .update();
+
+        for (String code : permissionCodes) {
+            jdbcClient.sql("""
+                    INSERT INTO role_permissions (role_name, permission_code)
+                    VALUES (:role, :code)
+                    ON CONFLICT DO NOTHING
+                    """)
+                    .param("role", role)
+                    .param("code", code)
+                    .update();
+        }
+
+        return loginAndGetHeaders(username, "test123");
     }
 
     protected org.springframework.http.HttpHeaders loginAndGetHeaders(String username, String password) {

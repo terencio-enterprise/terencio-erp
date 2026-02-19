@@ -1,5 +1,9 @@
 package es.terencio.erp.auth.presentation;
 
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
@@ -21,6 +25,7 @@ import org.springframework.web.bind.annotation.RestController;
 import es.terencio.erp.auth.application.dto.EmployeeInfoDto;
 import es.terencio.erp.auth.application.dto.LoginRequest;
 import es.terencio.erp.auth.application.dto.LoginResponse;
+import es.terencio.erp.auth.domain.service.RuntimePermissionService;
 import es.terencio.erp.auth.infrastructure.security.CustomUserDetails;
 import es.terencio.erp.auth.infrastructure.security.JwtTokenProvider;
 import es.terencio.erp.employees.application.port.out.EmployeePort;
@@ -80,16 +85,19 @@ public class AuthController {
 
         private final es.terencio.erp.organization.application.service.OrganizationTreeService organizationTreeService;
         private final EmployeePort employeePort;
+        private final RuntimePermissionService permissionService;
 
         public AuthController(AuthenticationManager authenticationManager, JwtTokenProvider tokenProvider,
                         UserDetailsService userDetailsService,
                         es.terencio.erp.organization.application.service.OrganizationTreeService organizationTreeService,
-                        EmployeePort employeePort) {
+                        EmployeePort employeePort,
+                        RuntimePermissionService permissionService) {
                 this.authenticationManager = authenticationManager;
                 this.tokenProvider = tokenProvider;
                 this.userDetailsService = userDetailsService;
                 this.organizationTreeService = organizationTreeService;
                 this.employeePort = employeePort;
+                this.permissionService = permissionService;
         }
 
         /**
@@ -236,5 +244,31 @@ public class AuthController {
                                 organizationTreeService.getCompanyTreeForEmployee(userDetails.getId()));
 
                 return ResponseEntity.ok(ApiResponse.success("User info fetched successfully", userInfo));
+        }
+
+        /**
+         * Permission matrix endpoint — returns every permission the authenticated user
+         * has,
+         * grouped by scope then target UUID. Intended for the frontend to
+         * disable/enable UI elements.
+         */
+        @GetMapping("/permissions")
+        @Operation(summary = "Get permission matrix", description = "Returns a scope-keyed map of permissions the current user holds")
+        public ResponseEntity<ApiResponse<PermissionMatrixResponse>> getPermissions(
+                        @AuthenticationPrincipal CustomUserDetails userDetails) {
+                if (userDetails == null) {
+                        return ResponseEntity.status(401).build();
+                }
+
+                Map<String, Map<UUID, List<String>>> matrix = permissionService
+                                .getPermissionMatrix(userDetails.getId());
+
+                return ResponseEntity.ok(ApiResponse.success(
+                                "Permission matrix fetched successfully",
+                                new PermissionMatrixResponse(matrix)));
+        }
+
+        /** Response wrapper for the permission matrix endpoint. */
+        public record PermissionMatrixResponse(Map<String, Map<UUID, List<String>>> matrix) {
         }
 }

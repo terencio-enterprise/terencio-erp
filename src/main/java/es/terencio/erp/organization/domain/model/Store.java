@@ -1,12 +1,12 @@
 package es.terencio.erp.organization.domain.model;
 
+import java.time.Instant;
+import java.time.ZoneId;
+
 import es.terencio.erp.shared.domain.exception.InvariantViolationException;
 import es.terencio.erp.shared.domain.identifier.CompanyId;
 import es.terencio.erp.shared.domain.identifier.StoreId;
 import es.terencio.erp.shared.domain.valueobject.TaxId;
-
-import java.time.Instant;
-import java.time.ZoneId;
 
 /**
  * Store aggregate root.

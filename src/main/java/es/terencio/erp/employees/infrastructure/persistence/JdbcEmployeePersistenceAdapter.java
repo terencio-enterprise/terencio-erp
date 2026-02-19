@@ -88,7 +88,7 @@ public class JdbcEmployeePersistenceAdapter implements EmployeePort {
                 rs.getString("username"),
                 rs.getString("full_name"),
                 rs.getString("role"),
-                rs.getBoolean("is_active") ? 1 : 0,
+                rs.getBoolean("is_active"),
                 rs.getString("permissions_json"),
                 rs.getObject("last_active_company_id", UUID.class),
                 rs.getObject("last_active_store_id", UUID.class),

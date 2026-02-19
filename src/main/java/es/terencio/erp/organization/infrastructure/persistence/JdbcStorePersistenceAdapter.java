@@ -109,6 +109,54 @@ public class JdbcStorePersistenceAdapter implements StoreRepository {
         return count != null && count > 0;
     }
 
+    @Override
+    public Optional<Store> findByCode(String code) {
+        return jdbcClient.sql("""
+                SELECT * FROM stores WHERE code = :code
+                """)
+                .param("code", code)
+                .query(this::mapRow)
+                .optional();
+    }
+
+    @Override
+    public List<Store> findAll() {
+        return jdbcClient.sql("""
+                SELECT * FROM stores ORDER BY name
+                """)
+                .query(this::mapRow)
+                .list();
+    }
+
+    @Override
+    public boolean hasDependencies(StoreId id) {
+        Integer grantCount = jdbcClient.sql("""
+                SELECT COUNT(*) FROM employee_access_grants
+                WHERE scope = 'STORE' AND target_id = :storeId
+                """)
+                .param("storeId", id.value())
+                .query(Integer.class)
+                .single();
+
+        Integer deviceCount = jdbcClient.sql("""
+                SELECT COUNT(*) FROM devices WHERE store_id = :storeId AND status != 'INACTIVE'
+                """)
+                .param("storeId", id.value())
+                .query(Integer.class)
+                .single();
+
+        return (grantCount != null && grantCount > 0) || (deviceCount != null && deviceCount > 0);
+    }
+
+    @Override
+    public void delete(StoreId id) {
+        jdbcClient.sql("""
+                UPDATE stores SET is_active = false, updated_at = NOW() WHERE id = :id
+                """)
+                .param("id", id.value())
+                .update();
+    }
+
     private Store mapRow(ResultSet rs, int rowNum) throws SQLException {
         String street = rs.getString("address");
         String zipCode = rs.getString("zip_code");

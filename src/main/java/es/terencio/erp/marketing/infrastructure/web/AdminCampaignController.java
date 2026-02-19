@@ -13,6 +13,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import es.terencio.erp.auth.domain.model.AccessScope;
+import es.terencio.erp.auth.domain.model.Permission;
 import es.terencio.erp.auth.infrastructure.security.RequiresPermission;
 import es.terencio.erp.marketing.application.dto.CampaignRequest;
 import es.terencio.erp.marketing.application.dto.CampaignResult;
@@ -37,7 +39,7 @@ public class AdminCampaignController {
 
     @GetMapping
     @Operation(summary = "List campaigns", description = "Returns campaign history, optionally filtered by status")
-    @RequiresPermission(permission = "marketing:campaign:view", scope = es.terencio.erp.auth.domain.model.AccessScope.COMPANY, targetIdParam = "companyId")
+    @RequiresPermission(permission = Permission.MARKETING_CAMPAIGN_VIEW, scope = AccessScope.COMPANY, targetIdParam = "companyId")
     public ResponseEntity<ApiResponse<List<Campaign>>> getCampaignHistory(
             @PathVariable UUID companyId,
             @Parameter(description = "Campaign status filter") @RequestParam(required = false) String status) {
@@ -47,7 +49,7 @@ public class AdminCampaignController {
 
     @GetMapping("/{id}/stats")
     @Operation(summary = "Get campaign stats", description = "Returns campaign analytics statistics")
-    @RequiresPermission(permission = "marketing:campaign:view", scope = es.terencio.erp.auth.domain.model.AccessScope.COMPANY, targetIdParam = "companyId")
+    @RequiresPermission(permission = Permission.MARKETING_CAMPAIGN_VIEW, scope = AccessScope.COMPANY, targetIdParam = "companyId")
     public ResponseEntity<ApiResponse<Map<String, Object>>> getCampaignStats(
             @PathVariable UUID companyId,
             @PathVariable Long id) {
@@ -57,7 +59,7 @@ public class AdminCampaignController {
 
     @PostMapping("/dry-run")
     @Operation(summary = "Run campaign dry-run", description = "Sends test execution for campaign before launch")
-    @RequiresPermission(permission = "marketing:email:preview", scope = es.terencio.erp.auth.domain.model.AccessScope.COMPANY, targetIdParam = "companyId")
+    @RequiresPermission(permission = Permission.MARKETING_EMAIL_PREVIEW, scope = AccessScope.COMPANY, targetIdParam = "companyId")
     public ResponseEntity<ApiResponse<Void>> dryRun(
             @PathVariable UUID companyId,
             @RequestBody Map<String, Object> payload) {
@@ -69,7 +71,7 @@ public class AdminCampaignController {
 
     @PostMapping
     @Operation(summary = "Launch campaign", description = "Launches a campaign using template and audience filters")
-    @RequiresPermission(permission = "marketing:campaign:launch", scope = es.terencio.erp.auth.domain.model.AccessScope.COMPANY, targetIdParam = "companyId")
+    @RequiresPermission(permission = Permission.MARKETING_CAMPAIGN_LAUNCH, scope = AccessScope.COMPANY, targetIdParam = "companyId")
     public ResponseEntity<ApiResponse<CampaignResult>> launchCampaign(
             @PathVariable UUID companyId,
             @RequestBody CampaignRequest request) {
@@ -79,7 +81,7 @@ public class AdminCampaignController {
 
     @PostMapping("/launch")
     @Operation(summary = "Launch campaign (explicit)", description = "Launches a campaign (explicit endpoint)")
-    @RequiresPermission(permission = "marketing:campaign:launch", scope = es.terencio.erp.auth.domain.model.AccessScope.COMPANY, targetIdParam = "companyId")
+    @RequiresPermission(permission = Permission.MARKETING_CAMPAIGN_LAUNCH, scope = AccessScope.COMPANY, targetIdParam = "companyId")
     public ResponseEntity<ApiResponse<CampaignResult>> launchCampaignExplicit(
             @PathVariable UUID companyId,
             @RequestBody CampaignRequest request) {
