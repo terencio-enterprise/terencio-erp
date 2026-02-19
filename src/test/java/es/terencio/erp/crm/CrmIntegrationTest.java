@@ -37,14 +37,8 @@ class CrmIntegrationTest extends AbstractIntegrationTest {
         void setUp() {
                 cleanDatabase();
 
-                // Create test company
-                testCompanyId = UUID.randomUUID();
-                jdbcClient.sql("""
-                                INSERT INTO companies (id, name, tax_id, is_active, created_at, updated_at, version)
-                                VALUES (?, 'Test Company', 'B11111111', TRUE, NOW(), NOW(), 1)
-                                """)
-                                .param(testCompanyId)
-                                .update();
+                // Create test company (with required organization)
+                testCompanyId = createTestCompany();
 
                 // Create test store and admin user for auth
                 UUID storeId = createStore(testCompanyId);
@@ -188,7 +182,7 @@ class CrmIntegrationTest extends AbstractIntegrationTest {
                 // When
                 @SuppressWarnings("rawtypes")
                 ResponseEntity<ApiResponse<Map>> response = restTemplate.exchange(
-                                "/api/v1/customers/" + customerId,
+                                "/api/v1/customers/" + customerId + "?companyId=" + testCompanyId,
                                 HttpMethod.PUT,
                                 new HttpEntity<>(updateRequest, authHeaders),
                                 new ParameterizedTypeReference<ApiResponse<Map>>() {
@@ -222,7 +216,7 @@ class CrmIntegrationTest extends AbstractIntegrationTest {
 
                 // When
                 ResponseEntity<Void> response = restTemplate.exchange(
-                                "/api/v1/customers/" + customerId + "/commercial-terms",
+                                "/api/v1/customers/" + customerId + "/commercial-terms?companyId=" + testCompanyId,
                                 HttpMethod.PUT,
                                 new HttpEntity<>(updateRequest, authHeaders),
                                 Void.class);
@@ -268,7 +262,7 @@ class CrmIntegrationTest extends AbstractIntegrationTest {
 
                 // When
                 ResponseEntity<Void> response = restTemplate.exchange(
-                                "/api/v1/customers/" + customerId + "/special-prices",
+                                "/api/v1/customers/" + customerId + "/special-prices?companyId=" + testCompanyId,
                                 HttpMethod.PUT,
                                 new HttpEntity<>(updateRequest, authHeaders),
                                 Void.class);
@@ -310,7 +304,7 @@ class CrmIntegrationTest extends AbstractIntegrationTest {
                 // When
                 @SuppressWarnings("rawtypes")
                 ResponseEntity<ApiResponse<List<Map>>> response = restTemplate.exchange(
-                                "/api/v1/customers/" + customerId + "/special-prices",
+                                "/api/v1/customers/" + customerId + "/special-prices?companyId=" + testCompanyId,
                                 HttpMethod.GET,
                                 new HttpEntity<>(authHeaders),
                                 new ParameterizedTypeReference<ApiResponse<List<Map>>>() {
@@ -327,14 +321,8 @@ class CrmIntegrationTest extends AbstractIntegrationTest {
 
         @Test
         void shouldEnforceTenantIsolation() {
-                // Given - Create customer in another company
-                UUID anotherCompanyId = UUID.randomUUID();
-                jdbcClient.sql("""
-                                INSERT INTO companies (id, name, tax_id, is_active, created_at, updated_at, version)
-                                VALUES (?, 'Another Company', 'B99999999', TRUE, NOW(), NOW(), 1)
-                                """)
-                                .param(anotherCompanyId)
-                                .update();
+                // Given - Create customer in another company (with required organization)
+                UUID anotherCompanyId = createTestCompany();
 
                 // Create customer for the other company
                 UUID otherCustomerUuid = UUID.randomUUID();

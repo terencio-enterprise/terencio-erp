@@ -27,14 +27,14 @@ import es.terencio.erp.shared.exception.ResourceNotFoundException;
 public class DeviceService implements ManageDevicesUseCase, SetupDeviceUseCase {
 
     private final DevicePort devicePort;
-    private final EmployeePort EmployeePort;
+    private final EmployeePort employeePort;
     private final DeviceApiKeyGenerator apiKeyGenerator;
     private final SecureRandom random = new SecureRandom();
 
-    public DeviceService(DevicePort devicePort, EmployeePort EmployeePort,
+    public DeviceService(DevicePort devicePort, EmployeePort employeePort,
             DeviceApiKeyGenerator apiKeyGenerator) {
         this.devicePort = devicePort;
-        this.EmployeePort = EmployeePort;
+        this.employeePort = employeePort;
         this.apiKeyGenerator = apiKeyGenerator;
     }
 
@@ -85,7 +85,7 @@ public class DeviceService implements ManageDevicesUseCase, SetupDeviceUseCase {
         validateCode(info);
 
         // Load users associated with this store
-        var storeUsers = EmployeePort.findByStoreId(info.storeId());
+        var storeUsers = employeePort.findAll();
 
         return new SetupPreviewDto(
                 "POS-" + info.storeCode() + "-" + info.code(),

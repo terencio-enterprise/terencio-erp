@@ -4,24 +4,15 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-
 import es.terencio.erp.devices.application.dto.DeviceDto;
 
 public interface DevicePort {
     List<DeviceDto> findAll();
-
-    Optional<DeviceDto> findById(UUID id);
-
     void updateStatus(UUID id, String status);
-
-    // Registration Methods
     void saveCode(String code, UUID storeId, String posName, Instant expiresAt);
-
     Optional<CodeInfo> findByCode(String code);
-
     UUID registerDevice(String code, String hardwareId, UUID storeId, String serialCode, String deviceSecret);
+    Optional<DeviceDto> findById(UUID deviceId);
 
-    record CodeInfo(String code, UUID storeId, String storeName, String storeCode, String preassignedName,
-            Instant expiresAt, boolean isUsed) {
-    }
+    record CodeInfo(String code, UUID storeId, String storeName, String storeCode, String preassignedName, Instant expiresAt, boolean isUsed) {}
 }
