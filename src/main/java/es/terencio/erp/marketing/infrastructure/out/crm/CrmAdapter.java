@@ -1,4 +1,4 @@
-﻿package es.terencio.erp.marketing.infrastructure.out.crm;
+package es.terencio.erp.marketing.infrastructure.out.crm;
 
 import java.time.Instant;
 import java.util.List;

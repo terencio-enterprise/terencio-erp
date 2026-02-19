@@ -1,4 +1,4 @@
-﻿package es.terencio.erp.marketing.infrastructure.in.web;
+package es.terencio.erp.marketing.infrastructure.in.web;
 
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;

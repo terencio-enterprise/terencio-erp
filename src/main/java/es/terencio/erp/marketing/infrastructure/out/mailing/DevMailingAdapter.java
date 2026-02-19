@@ -1,4 +1,4 @@
-﻿package es.terencio.erp.marketing.infrastructure.out.mailing;
+package es.terencio.erp.marketing.infrastructure.out.mailing;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

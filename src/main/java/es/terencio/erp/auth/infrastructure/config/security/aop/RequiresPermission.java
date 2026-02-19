@@ -1,4 +1,4 @@
-﻿package es.terencio.erp.auth.infrastructure.config.security.aop;
+package es.terencio.erp.auth.infrastructure.config.security.aop;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;

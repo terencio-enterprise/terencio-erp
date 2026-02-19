@@ -1,4 +1,4 @@
-﻿package es.terencio.erp.organization.infrastructure.in.web;
+package es.terencio.erp.organization.infrastructure.in.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import java.util.UUID;

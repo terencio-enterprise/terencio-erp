@@ -1,4 +1,4 @@
-﻿package es.terencio.erp.crm.infrastructure.in.web;
+package es.terencio.erp.crm.infrastructure.in.web;
 
 import java.util.UUID;
 import org.springframework.http.ResponseEntity;

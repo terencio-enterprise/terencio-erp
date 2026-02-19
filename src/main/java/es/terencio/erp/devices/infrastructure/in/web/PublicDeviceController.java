@@ -1,4 +1,4 @@
-﻿package es.terencio.erp.devices.infrastructure.in.web;
+package es.terencio.erp.devices.infrastructure.in.web;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;

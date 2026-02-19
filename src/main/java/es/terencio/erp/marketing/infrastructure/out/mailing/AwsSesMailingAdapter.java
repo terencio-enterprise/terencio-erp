@@ -1,4 +1,4 @@
-﻿package es.terencio.erp.marketing.infrastructure.out.mailing;
+package es.terencio.erp.marketing.infrastructure.out.mailing;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;

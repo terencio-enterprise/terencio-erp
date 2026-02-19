@@ -1,8 +1,7 @@
-﻿package es.terencio.erp.devices.infrastructure.in.web;
+package es.terencio.erp.devices.infrastructure.in.web;
 
 import java.util.UUID;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import es.terencio.erp.devices.application.dto.DeviceContextDto;
@@ -24,7 +23,7 @@ public class PosSyncController {
 
     // Retained @PreAuthorize("hasRole('DEVICE')") as devices are explicitly assigned this hardcoded machine role by the ApiKeyFilter.
     @GetMapping("/context")
-    @PreAuthorize("hasRole('DEVICE')")
+
     @Operation(summary = "Get device context")
     public ResponseEntity<ApiResponse<DeviceContextDto>> getContext(@AuthenticationPrincipal UUID deviceId) {
         DeviceContextDto context = getDeviceContextUseCase.getContext(deviceId);

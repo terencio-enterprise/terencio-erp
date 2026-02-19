@@ -1,4 +1,4 @@
-﻿package es.terencio.erp.auth.infrastructure.config.security;
+package es.terencio.erp.auth.infrastructure.config.security;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

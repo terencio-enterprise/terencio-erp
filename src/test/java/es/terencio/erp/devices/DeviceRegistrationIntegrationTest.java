@@ -1,4 +1,4 @@
-﻿package es.terencio.erp.devices;
+package es.terencio.erp.devices;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

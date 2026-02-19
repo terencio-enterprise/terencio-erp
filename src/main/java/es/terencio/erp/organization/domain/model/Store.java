@@ -1,4 +1,4 @@
-﻿package es.terencio.erp.organization.domain.model;
+package es.terencio.erp.organization.domain.model;
 
 import java.time.Instant;
 import java.time.ZoneId;

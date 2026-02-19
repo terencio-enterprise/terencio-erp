@@ -1,4 +1,4 @@
-﻿package es.terencio.erp.marketing.application.port.out;
+package es.terencio.erp.marketing.application.port.out;
 
 import java.util.List;
 import java.util.Optional;

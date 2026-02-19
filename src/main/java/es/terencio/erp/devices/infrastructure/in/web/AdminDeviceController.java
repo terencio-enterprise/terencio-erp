@@ -1,4 +1,4 @@
-﻿package es.terencio.erp.devices.infrastructure.in.web;
+package es.terencio.erp.devices.infrastructure.in.web;
 
 import java.util.List;
 import java.util.UUID;

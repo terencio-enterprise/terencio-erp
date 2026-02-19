@@ -1,4 +1,4 @@
-﻿package es.terencio.erp.auth.infrastructure.out.persistence;
+package es.terencio.erp.auth.infrastructure.out.persistence;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import java.time.Instant;

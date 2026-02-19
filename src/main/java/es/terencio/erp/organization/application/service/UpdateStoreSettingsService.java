@@ -1,4 +1,4 @@
-﻿package es.terencio.erp.organization.application.service;
+package es.terencio.erp.organization.application.service;
 
 import es.terencio.erp.organization.application.dto.OrganizationCommands.UpdateStoreSettingsCommand;
 import es.terencio.erp.organization.application.port.in.UpdateStoreSettingsUseCase;

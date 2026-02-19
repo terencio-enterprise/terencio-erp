@@ -1,4 +1,4 @@
-﻿package es.terencio.erp.organization.infrastructure.in.web;
+package es.terencio.erp.organization.infrastructure.in.web;
 
 import java.util.List;
 import java.util.UUID;

@@ -1,4 +1,4 @@
-﻿package es.terencio.erp.organization.application.service;
+package es.terencio.erp.organization.application.service;
 
 import java.util.Collections;
 import java.util.HashSet;

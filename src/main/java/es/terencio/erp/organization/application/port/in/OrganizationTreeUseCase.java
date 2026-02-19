@@ -1,4 +1,4 @@
-﻿package es.terencio.erp.organization.application.port.in;
+package es.terencio.erp.organization.application.port.in;
 
 import java.util.List;
 import java.util.UUID;

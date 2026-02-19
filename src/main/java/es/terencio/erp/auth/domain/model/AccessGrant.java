@@ -1,4 +1,4 @@
-﻿package es.terencio.erp.auth.domain.model;
+package es.terencio.erp.auth.domain.model;
 
 import java.util.Set;
 import java.util.UUID;

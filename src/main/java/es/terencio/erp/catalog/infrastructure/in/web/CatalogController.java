@@ -1,4 +1,4 @@
-﻿package es.terencio.erp.catalog.infrastructure.in.web;
+package es.terencio.erp.catalog.infrastructure.in.web;
 
 import java.math.BigDecimal;
 import java.util.List;

@@ -1,4 +1,4 @@
-﻿package es.terencio.erp.organization.application.dto;
+package es.terencio.erp.organization.application.dto;
 
 import java.math.BigDecimal;
 import java.util.UUID;

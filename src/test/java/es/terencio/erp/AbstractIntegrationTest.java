@@ -1,4 +1,4 @@
-﻿package es.terencio.erp;
+package es.terencio.erp;
 
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Autowired;

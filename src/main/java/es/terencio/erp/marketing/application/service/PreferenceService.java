@@ -1,4 +1,4 @@
-﻿package es.terencio.erp.marketing.application.service;
+package es.terencio.erp.marketing.application.service;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;

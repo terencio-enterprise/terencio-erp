@@ -1,4 +1,4 @@
-﻿package es.terencio.erp.organization.infrastructure.out.persistence;
+package es.terencio.erp.organization.infrastructure.out.persistence;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;

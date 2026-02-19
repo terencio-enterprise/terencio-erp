@@ -1,4 +1,4 @@
-﻿package es.terencio.erp.auth.infrastructure.in.web;
+package es.terencio.erp.auth.infrastructure.in.web;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;

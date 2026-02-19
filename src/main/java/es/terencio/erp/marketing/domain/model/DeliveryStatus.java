@@ -1,4 +1,4 @@
-﻿package es.terencio.erp.marketing.domain.model;
+package es.terencio.erp.marketing.domain.model;
 
 public enum DeliveryStatus {
     SENT,

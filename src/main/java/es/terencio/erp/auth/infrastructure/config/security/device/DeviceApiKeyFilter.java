@@ -1,4 +1,4 @@
-﻿package es.terencio.erp.auth.infrastructure.config.security.device;
+package es.terencio.erp.auth.infrastructure.config.security.device;
 
 import java.io.IOException;
 import java.sql.Connection;

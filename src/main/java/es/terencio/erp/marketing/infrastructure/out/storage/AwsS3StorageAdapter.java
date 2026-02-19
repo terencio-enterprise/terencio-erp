@@ -1,4 +1,4 @@
-﻿package es.terencio.erp.marketing.infrastructure.out.storage;
+package es.terencio.erp.marketing.infrastructure.out.storage;
 
 import java.io.IOException;
 import java.io.InputStream;

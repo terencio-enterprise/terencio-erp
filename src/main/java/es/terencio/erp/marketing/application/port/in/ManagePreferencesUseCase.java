@@ -1,4 +1,4 @@
-﻿package es.terencio.erp.marketing.application.port.in;
+package es.terencio.erp.marketing.application.port.in;
 
 import java.util.Map;
 import es.terencio.erp.marketing.application.dto.MarketingDtos.UnsubscribeRequest;

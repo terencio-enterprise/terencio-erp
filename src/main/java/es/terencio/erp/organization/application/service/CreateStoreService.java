@@ -1,4 +1,4 @@
-﻿package es.terencio.erp.organization.application.service;
+package es.terencio.erp.organization.application.service;
 
 import es.terencio.erp.organization.application.dto.OrganizationCommands.CreateStoreCommand;
 import es.terencio.erp.organization.application.dto.OrganizationCommands.CreateStoreResult;

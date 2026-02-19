@@ -1,4 +1,4 @@
-﻿package es.terencio.erp.marketing.application.port.out;
+package es.terencio.erp.marketing.application.port.out;
 
 import java.io.InputStream;
 import org.springframework.web.multipart.MultipartFile;

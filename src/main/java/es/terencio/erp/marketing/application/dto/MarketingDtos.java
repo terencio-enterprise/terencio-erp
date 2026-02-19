@@ -1,4 +1,4 @@
-﻿package es.terencio.erp.marketing.application.dto;
+package es.terencio.erp.marketing.application.dto;
 
 import java.math.BigDecimal;
 import java.time.Instant;

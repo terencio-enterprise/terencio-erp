@@ -1,4 +1,4 @@
-﻿package es.terencio.erp.inventory.infrastructure.in.web;
+package es.terencio.erp.inventory.infrastructure.in.web;
 
 import java.math.BigDecimal;
 import java.time.Instant;

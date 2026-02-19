@@ -1,4 +1,4 @@
-﻿package es.terencio.erp.organization.domain.model;
+package es.terencio.erp.organization.domain.model;
 
 public enum FiscalRegime {
     COMMON, // Régimen general

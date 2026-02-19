@@ -1,4 +1,4 @@
-﻿package es.terencio.erp.marketing.infrastructure.in.web;
+package es.terencio.erp.marketing.infrastructure.in.web;
 
 import java.util.List;
 import java.util.Map;

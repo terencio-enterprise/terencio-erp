@@ -1,4 +1,4 @@
-﻿package es.terencio.erp.auth.infrastructure.config.security.jwt;
+package es.terencio.erp.auth.infrastructure.config.security.jwt;
 
 import java.util.Date;
 import javax.crypto.SecretKey;

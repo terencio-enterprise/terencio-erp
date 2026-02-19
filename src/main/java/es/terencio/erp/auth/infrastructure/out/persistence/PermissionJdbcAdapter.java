@@ -1,4 +1,4 @@
-﻿package es.terencio.erp.auth.infrastructure.out.persistence;
+package es.terencio.erp.auth.infrastructure.out.persistence;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;

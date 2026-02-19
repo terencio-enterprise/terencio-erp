@@ -1,4 +1,4 @@
-﻿package es.terencio.erp.marketing.domain.model;
+package es.terencio.erp.marketing.domain.model;
 
 import java.time.Instant;
 import java.util.UUID;

@@ -1,4 +1,4 @@
-﻿package es.terencio.erp.organization.domain.model;
+package es.terencio.erp.organization.domain.model;
 
 import es.terencio.erp.shared.domain.exception.InvariantViolationException;
 import es.terencio.erp.shared.domain.identifier.StoreId;

@@ -1,4 +1,4 @@
-﻿package es.terencio.erp.marketing.application.port.in;
+package es.terencio.erp.marketing.application.port.in;
 
 import es.terencio.erp.marketing.application.dto.MarketingDtos.AudienceFilter;
 import es.terencio.erp.marketing.application.dto.MarketingDtos.CampaignResult;

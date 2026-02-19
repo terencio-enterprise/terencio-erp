@@ -1,4 +1,4 @@
-﻿package es.terencio.erp.organization.domain.model;
+package es.terencio.erp.organization.domain.model;
 
 import es.terencio.erp.shared.domain.identifier.StoreId;
 import es.terencio.erp.shared.domain.valueobject.Money;

@@ -1,4 +1,4 @@
-﻿package es.terencio.erp.auth.infrastructure.config.security;
+package es.terencio.erp.auth.infrastructure.config.security;
 
 import java.util.UUID;
 import org.springframework.jdbc.core.simple.JdbcClient;

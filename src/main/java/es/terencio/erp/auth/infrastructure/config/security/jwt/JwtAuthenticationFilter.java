@@ -1,4 +1,4 @@
-﻿package es.terencio.erp.auth.infrastructure.config.security.jwt;
+package es.terencio.erp.auth.infrastructure.config.security.jwt;
 
 import java.io.IOException;
 import org.springframework.beans.factory.annotation.Value;

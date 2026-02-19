@@ -1,4 +1,4 @@
-﻿package es.terencio.erp.auth.infrastructure.config.security.aop;
+package es.terencio.erp.auth.infrastructure.config.security.aop;
 
 import java.lang.reflect.Method;
 import java.util.UUID;

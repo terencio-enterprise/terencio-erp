@@ -1,4 +1,4 @@
-﻿package es.terencio.erp.marketing.infrastructure.config;
+package es.terencio.erp.marketing.infrastructure.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

@@ -1,4 +1,4 @@
-﻿package es.terencio.erp.devices.infrastructure.security;
+package es.terencio.erp.devices.infrastructure.security;
 
 import java.nio.charset.StandardCharsets;
 import java.security.InvalidKeyException;
