@@ -1,9 +1,5 @@
 package es.terencio.erp.auth.presentation;
 
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
-
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
@@ -28,7 +24,9 @@ import es.terencio.erp.auth.application.dto.LoginResponse;
 import es.terencio.erp.auth.domain.service.RuntimePermissionService;
 import es.terencio.erp.auth.infrastructure.security.CustomUserDetails;
 import es.terencio.erp.auth.infrastructure.security.JwtTokenProvider;
+import es.terencio.erp.employees.application.dto.EmployeeDto;
 import es.terencio.erp.employees.application.port.out.EmployeePort;
+import es.terencio.erp.organization.application.service.OrganizationTreeService;
 import es.terencio.erp.shared.presentation.ApiError;
 import es.terencio.erp.shared.presentation.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -83,13 +81,13 @@ public class AuthController {
         @Value("${app.jwt.refresh.expiration-ms}")
         private long refreshExpirationMs;
 
-        private final es.terencio.erp.organization.application.service.OrganizationTreeService organizationTreeService;
+        private final OrganizationTreeService organizationTreeService;
         private final EmployeePort employeePort;
         private final RuntimePermissionService permissionService;
 
         public AuthController(AuthenticationManager authenticationManager, JwtTokenProvider tokenProvider,
                         UserDetailsService userDetailsService,
-                        es.terencio.erp.organization.application.service.OrganizationTreeService organizationTreeService,
+                        OrganizationTreeService organizationTreeService,
                         EmployeePort employeePort,
                         RuntimePermissionService permissionService) {
                 this.authenticationManager = authenticationManager;
@@ -100,10 +98,6 @@ public class AuthController {
                 this.permissionService = permissionService;
         }
 
-        /**
-         * Login endpoint - authenticates user, sets Access and Refresh tokens in
-         * cookies.
-         */
         @PostMapping("/login")
         @Operation(summary = "Authenticate user", description = "Authenticates with username/password and sets access and refresh token cookies")
         public ResponseEntity<ApiResponse<LoginResponse>> login(@Valid @RequestBody LoginRequest request) {
@@ -115,7 +109,6 @@ public class AuthController {
                 String accessToken = tokenProvider.generateAccessToken(authentication);
                 String refreshToken = tokenProvider.generateRefreshToken(authentication);
 
-                // Create Access Token Cookie
                 ResponseCookie accessCookie = ResponseCookie
                                 .from(java.util.Objects.requireNonNull(accessCookieName), accessToken)
                                 .httpOnly(accessCookieHttpOnly)
@@ -125,7 +118,6 @@ public class AuthController {
                                 .sameSite(java.util.Objects.requireNonNull(accessCookieSameSite))
                                 .build();
 
-                // Create Refresh Token Cookie
                 ResponseCookie refreshCookie = ResponseCookie
                                 .from(java.util.Objects.requireNonNull(refreshCookieName), refreshToken)
                                 .httpOnly(refreshCookieHttpOnly)
@@ -142,10 +134,6 @@ public class AuthController {
                                                 new LoginResponse(accessToken, authentication.getName())));
         }
 
-        /**
-         * Refresh Token endpoint - generates new Access Token using valid Refresh Token
-         * from cookie.
-         */
         @PostMapping("/refresh")
         @Operation(summary = "Refresh access token", description = "Generates a new access token using the refresh token cookie")
         public ResponseEntity<?> refresh(
@@ -187,13 +175,9 @@ public class AuthController {
                                 .body(ApiResponse.error("Invalid Refresh Token", error));
         }
 
-        /**
-         * Logout endpoint - clears Access and Refresh Token cookies.
-         */
         @PostMapping("/logout")
         @Operation(summary = "Logout user", description = "Clears authentication cookies for current session")
         public ResponseEntity<ApiResponse<Void>> logout() {
-                // Clear Access Token Cookie
                 ResponseCookie accessCookie = ResponseCookie
                                 .from(java.util.Objects.requireNonNull(accessCookieName), "")
                                 .httpOnly(accessCookieHttpOnly)
@@ -203,7 +187,6 @@ public class AuthController {
                                 .sameSite(java.util.Objects.requireNonNull(accessCookieSameSite))
                                 .build();
 
-                // Clear Refresh Token Cookie
                 ResponseCookie refreshCookie = ResponseCookie
                                 .from(java.util.Objects.requireNonNull(refreshCookieName), "")
                                 .httpOnly(refreshCookieHttpOnly)
@@ -219,9 +202,6 @@ public class AuthController {
                                 .body(ApiResponse.success("Logout successful"));
         }
 
-        /**
-         * Get current authenticated user information.
-         */
         @GetMapping("/me")
         @Operation(summary = "Get current user", description = "Returns information for the currently authenticated user")
         public ResponseEntity<ApiResponse<EmployeeInfoDto>> getCurrentUser(
@@ -230,7 +210,7 @@ public class AuthController {
                         return ResponseEntity.status(401).build();
                 }
 
-                es.terencio.erp.employees.application.dto.EmployeeDto employee = employeePort
+                EmployeeDto employee = employeePort
                                 .findById(userDetails.getId())
                                 .orElseThrow(() -> new RuntimeException("Employee not found"));
 
@@ -241,34 +221,9 @@ public class AuthController {
                                 userDetails.isEnabled(),
                                 employee.lastActiveCompanyId(),
                                 employee.lastActiveStoreId(),
-                                organizationTreeService.getCompanyTreeForEmployee(userDetails.getId()));
+                                organizationTreeService.getCompanyTreeForEmployee(userDetails.getId()),
+                                permissionService.getPermissionMatrix(userDetails.getId()));
 
                 return ResponseEntity.ok(ApiResponse.success("User info fetched successfully", userInfo));
-        }
-
-        /**
-         * Permission matrix endpoint — returns every permission the authenticated user
-         * has,
-         * grouped by scope then target UUID. Intended for the frontend to
-         * disable/enable UI elements.
-         */
-        @GetMapping("/permissions")
-        @Operation(summary = "Get permission matrix", description = "Returns a scope-keyed map of permissions the current user holds")
-        public ResponseEntity<ApiResponse<PermissionMatrixResponse>> getPermissions(
-                        @AuthenticationPrincipal CustomUserDetails userDetails) {
-                if (userDetails == null) {
-                        return ResponseEntity.status(401).build();
-                }
-
-                Map<String, Map<UUID, List<String>>> matrix = permissionService
-                                .getPermissionMatrix(userDetails.getId());
-
-                return ResponseEntity.ok(ApiResponse.success(
-                                "Permission matrix fetched successfully",
-                                new PermissionMatrixResponse(matrix)));
-        }
-
-        /** Response wrapper for the permission matrix endpoint. */
-        public record PermissionMatrixResponse(Map<String, Map<UUID, List<String>>> matrix) {
         }
 }

@@ -1,15 +1,18 @@
 package es.terencio.erp.auth.application.dto;
 
-/**
- * DTO for current Employee information.
- * Returned by the /me endpoint.
- */
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+
+import es.terencio.erp.organization.application.dto.CompanyTreeDto;
+
 public record EmployeeInfoDto(
-                Long id,
-                String username,
-                String fullName,
-                boolean isActive,
-                java.util.UUID lastCompanyId,
-                java.util.UUID lastStoreId,
-                java.util.List<es.terencio.erp.organization.application.dto.CompanyTreeDto> companies) {
+        Long id,
+        String username,
+        String fullName,
+        boolean isActive,
+        UUID lastCompanyId,
+        UUID lastStoreId,
+        List<CompanyTreeDto> companies,
+        Map<String, Map<UUID, List<String>>> permissions) {
 }
