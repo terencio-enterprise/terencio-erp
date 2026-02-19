@@ -3,8 +3,6 @@ package es.terencio.erp.marketing.application.port.in;
 import java.util.List;
 import java.util.UUID;
 
-import org.springframework.web.multipart.MultipartFile;
-
 import es.terencio.erp.marketing.application.dto.TemplateDto;
 
 public interface ManageTemplatesUseCase {
@@ -17,8 +15,4 @@ public interface ManageTemplatesUseCase {
     TemplateDto updateTemplate(Long id, TemplateDto template);
 
     void deleteTemplate(Long id);
-
-    void addAttachment(Long templateId, MultipartFile file);
-
-    void removeAttachment(Long templateId, Long attachmentId);
 }

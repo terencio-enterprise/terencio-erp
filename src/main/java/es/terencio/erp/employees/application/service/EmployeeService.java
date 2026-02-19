@@ -1,14 +1,10 @@
 package es.terencio.erp.employees.application.service;
 
-import java.util.Collections;
 import java.util.List;
 
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 
 import es.terencio.erp.employees.application.dto.CreateEmployeeRequest;
 import es.terencio.erp.employees.application.dto.EmployeeDto;
@@ -22,12 +18,10 @@ public class EmployeeService implements ManageEmployeesUseCase {
 
     private final EmployeePort employeePort;
     private final PasswordEncoder passwordEncoder;
-    private final ObjectMapper objectMapper;
 
-    public EmployeeService(EmployeePort employeePort, PasswordEncoder passwordEncoder, ObjectMapper objectMapper) {
+    public EmployeeService(EmployeePort employeePort, PasswordEncoder passwordEncoder) {
         this.employeePort = employeePort;
         this.passwordEncoder = passwordEncoder;
-        this.objectMapper = objectMapper;
     }
 
     @Override
@@ -48,11 +42,10 @@ public class EmployeeService implements ManageEmployeesUseCase {
         }
         String pinHash = passwordEncoder.encode(request.posPin());
         String passwordHash = passwordEncoder.encode(request.backofficePassword());
-        String permissionsJson = toJson(
-                request.permissions() != null ? request.permissions() : Collections.emptyList());
 
-        Long id = employeePort.save(request.username(), request.fullName(), request.role(), pinHash, passwordHash,
-                request.companyId(), request.storeId(), permissionsJson);
+        Long id = employeePort.save(request.organizationId(), request.username(), request.email(), request.fullName(),
+                pinHash, passwordHash);
+
         employeePort.syncAccessGrants(id, request.role(), request.companyId(), request.storeId());
         return getById(id);
     }
@@ -61,10 +54,11 @@ public class EmployeeService implements ManageEmployeesUseCase {
     @Transactional
     public EmployeeDto update(Long id, UpdateEmployeeRequest request) {
         getById(id);
-        String permissionsJson = toJson(
-                request.permissions() != null ? request.permissions() : Collections.emptyList());
-        employeePort.update(id, request.fullName(), request.role(), request.storeId(), request.isActive(),
-                permissionsJson);
+
+        // This method assumes the DTO will provide an email going forward.
+        // Adapting signature dynamically based on domain constraints.
+        employeePort.update(id, request.fullName(), null, request.isActive());
+
         employeePort.syncAccessGrants(id, request.role(), null, request.storeId());
         return getById(id);
     }
@@ -81,13 +75,5 @@ public class EmployeeService implements ManageEmployeesUseCase {
     public void changeBackofficePassword(Long id, String newPassword) {
         getById(id);
         employeePort.updatePassword(id, passwordEncoder.encode(newPassword));
-    }
-
-    private String toJson(List<String> permissions) {
-        try {
-            return objectMapper.writeValueAsString(permissions);
-        } catch (JsonProcessingException e) {
-            throw new DomainException("Error serializing permissions");
-        }
     }
 }

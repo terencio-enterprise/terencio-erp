@@ -41,7 +41,6 @@ public class CrmAdapter implements CustomerIntegrationPort {
     @Override
     public void updateMarketingStatus(String token, String status, Instant snoozedUntil) {
         customerRepository.findByUnsubscribeToken(token).ifPresent(customer -> {
-            customer.setMarketingStatus(status);
             customer.setSnoozedUntil(snoozedUntil);
             customerRepository.save(customer);
         });

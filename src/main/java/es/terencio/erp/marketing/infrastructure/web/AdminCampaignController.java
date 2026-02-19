@@ -20,7 +20,7 @@ import es.terencio.erp.marketing.application.dto.CampaignRequest;
 import es.terencio.erp.marketing.application.dto.CampaignResult;
 import es.terencio.erp.marketing.application.port.in.LaunchCampaignUseCase;
 import es.terencio.erp.marketing.application.port.out.CampaignRepositoryPort;
-import es.terencio.erp.marketing.domain.model.Campaign;
+import es.terencio.erp.marketing.domain.model.CampaignLog;
 import es.terencio.erp.shared.presentation.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -30,7 +30,6 @@ import lombok.RequiredArgsConstructor;
 @RestController
 @RequestMapping("/api/v1/companies/{companyId}/marketing/campaigns")
 @RequiredArgsConstructor
-
 @Tag(name = "Marketing Campaigns", description = "Campaign launch, history and analytics endpoints")
 public class AdminCampaignController {
 
@@ -40,28 +39,24 @@ public class AdminCampaignController {
     @GetMapping
     @Operation(summary = "List campaigns", description = "Returns campaign history, optionally filtered by status")
     @RequiresPermission(permission = Permission.MARKETING_CAMPAIGN_VIEW, scope = AccessScope.COMPANY, targetIdParam = "companyId")
-    public ResponseEntity<ApiResponse<List<Campaign>>> getCampaignHistory(
-            @PathVariable UUID companyId,
+    public ResponseEntity<ApiResponse<List<CampaignLog>>> getCampaignHistory(@PathVariable UUID companyId,
             @Parameter(description = "Campaign status filter") @RequestParam(required = false) String status) {
-        List<Campaign> callbacks = campaignRepository.findLogsByStatus(status); // Simple implementation
-        return ResponseEntity.ok(ApiResponse.success(callbacks));
+        List<CampaignLog> logs = campaignRepository.findLogsByStatus(status);
+        return ResponseEntity.ok(ApiResponse.success(logs));
     }
 
     @GetMapping("/{id}/stats")
     @Operation(summary = "Get campaign stats", description = "Returns campaign analytics statistics")
     @RequiresPermission(permission = Permission.MARKETING_CAMPAIGN_VIEW, scope = AccessScope.COMPANY, targetIdParam = "companyId")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> getCampaignStats(
-            @PathVariable UUID companyId,
+    public ResponseEntity<ApiResponse<Map<String, Object>>> getCampaignStats(@PathVariable UUID companyId,
             @PathVariable Long id) {
-        // TODO: Implement aggregate stats. For now returning empty or mock.
         return ResponseEntity.ok(ApiResponse.success(Map.of("sent", 1000, "bounced", 5, "openRate", "20%")));
     }
 
     @PostMapping("/dry-run")
     @Operation(summary = "Run campaign dry-run", description = "Sends test execution for campaign before launch")
     @RequiresPermission(permission = Permission.MARKETING_EMAIL_PREVIEW, scope = AccessScope.COMPANY, targetIdParam = "companyId")
-    public ResponseEntity<ApiResponse<Void>> dryRun(
-            @PathVariable UUID companyId,
+    public ResponseEntity<ApiResponse<Void>> dryRun(@PathVariable UUID companyId,
             @RequestBody Map<String, Object> payload) {
         Long templateId = ((Number) payload.get("templateId")).longValue();
         String testEmail = (String) payload.get("testEmail");
@@ -72,19 +67,9 @@ public class AdminCampaignController {
     @PostMapping
     @Operation(summary = "Launch campaign", description = "Launches a campaign using template and audience filters")
     @RequiresPermission(permission = Permission.MARKETING_CAMPAIGN_LAUNCH, scope = AccessScope.COMPANY, targetIdParam = "companyId")
-    public ResponseEntity<ApiResponse<CampaignResult>> launchCampaign(
-            @PathVariable UUID companyId,
+    public ResponseEntity<ApiResponse<CampaignResult>> launchCampaign(@PathVariable UUID companyId,
             @RequestBody CampaignRequest request) {
         CampaignResult result = launchCampaignUseCase.launch(request.getTemplateId(), request.getAudienceFilter());
         return ResponseEntity.ok(ApiResponse.success(result));
-    }
-
-    @PostMapping("/launch")
-    @Operation(summary = "Launch campaign (explicit)", description = "Launches a campaign (explicit endpoint)")
-    @RequiresPermission(permission = Permission.MARKETING_CAMPAIGN_LAUNCH, scope = AccessScope.COMPANY, targetIdParam = "companyId")
-    public ResponseEntity<ApiResponse<CampaignResult>> launchCampaignExplicit(
-            @PathVariable UUID companyId,
-            @RequestBody CampaignRequest request) {
-        return launchCampaign(companyId, request);
     }
 }

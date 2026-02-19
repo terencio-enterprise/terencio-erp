@@ -19,18 +19,17 @@ public interface EmployeePort {
 
     List<EmployeeSyncDto> findSyncDataByStoreId(UUID storeId);
 
-    List<AccessGrant> findAccessGrants(Long employeeId);
+    Long save(UUID organizationId, String username, String email, String fullName, String pinHash, String passwordHash);
 
-    Long save(String username, String fullName, String role, String pinHash, String passwordHash, UUID companyId,
-            UUID storeId, String permissionsJson);
-
-    void update(Long id, String fullName, String role, UUID storeId, boolean isActive, String permissionsJson);
-
-    void syncAccessGrants(Long EmployeeId, String role, UUID companyId, UUID storeId);
+    void update(Long id, String fullName, String email, boolean isActive);
 
     void updatePin(Long id, String newPinHash);
 
     void updatePassword(Long id, String newPasswordHash);
+
+    void syncAccessGrants(Long employeeId, String role, UUID companyId, UUID storeId);
+
+    List<AccessGrant> findAccessGrants(Long employeeId);
 
     void updateLastActiveContext(Long id, UUID companyId, UUID storeId);
 }

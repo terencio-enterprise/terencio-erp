@@ -4,7 +4,6 @@ import java.util.List;
 import java.util.Map;
 
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -14,19 +13,17 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import es.terencio.erp.shared.presentation.ApiResponse;
 import es.terencio.erp.employees.application.dto.CreateEmployeeRequest;
-import es.terencio.erp.employees.application.dto.UpdateEmployeeRequest;
 import es.terencio.erp.employees.application.dto.EmployeeDto;
+import es.terencio.erp.employees.application.dto.UpdateEmployeeRequest;
 import es.terencio.erp.employees.application.port.in.ManageEmployeesUseCase;
-import es.terencio.erp.employees.domain.model.Role;
+import es.terencio.erp.shared.presentation.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 
 @RestController
 @RequestMapping("/api/v1/admin/employees")
-@PreAuthorize("hasRole('ADMIN')")
 @Tag(name = "Admin Employees", description = "Administrative employee management endpoints")
 public class AdminEmployeeController {
 
@@ -39,13 +36,15 @@ public class AdminEmployeeController {
     @GetMapping
     @Operation(summary = "List employees", description = "Returns all employees")
     public ResponseEntity<ApiResponse<List<EmployeeDto>>> list() {
-        return ResponseEntity.ok(ApiResponse.success("Employees fetched successfully", manageEmployeesUseCase.listAll()));
+        return ResponseEntity
+                .ok(ApiResponse.success("Employees fetched successfully", manageEmployeesUseCase.listAll()));
     }
 
     @GetMapping("/{id}")
     @Operation(summary = "Get employee", description = "Returns one employee by identifier")
     public ResponseEntity<ApiResponse<EmployeeDto>> get(@PathVariable Long id) {
-        return ResponseEntity.ok(ApiResponse.success("Employee fetched successfully", manageEmployeesUseCase.getById(id)));
+        return ResponseEntity
+                .ok(ApiResponse.success("Employee fetched successfully", manageEmployeesUseCase.getById(id)));
     }
 
     @PostMapping
@@ -77,11 +76,5 @@ public class AdminEmployeeController {
             @RequestBody Map<String, String> body) {
         manageEmployeesUseCase.changeBackofficePassword(id, body.get("password"));
         return ResponseEntity.ok(ApiResponse.success("Password changed successfully"));
-    }
-
-    @GetMapping("/roles")
-    @Operation(summary = "List roles", description = "Returns all available Employee roles")
-    public ResponseEntity<ApiResponse<Role[]>> listRoles() {
-        return ResponseEntity.ok(ApiResponse.success("Roles fetched successfully", Role.values()));
     }
 }

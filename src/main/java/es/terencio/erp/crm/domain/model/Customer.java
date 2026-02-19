@@ -1,6 +1,8 @@
 package es.terencio.erp.crm.domain.model;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 import es.terencio.erp.shared.domain.exception.InvariantViolationException;
@@ -10,9 +12,6 @@ import es.terencio.erp.shared.domain.valueobject.Email;
 import es.terencio.erp.shared.domain.valueobject.Money;
 import es.terencio.erp.shared.domain.valueobject.TaxId;
 
-/**
- * Customer aggregate root.
- */
 public class Customer {
 
     private final CustomerId id;
@@ -35,38 +34,23 @@ public class Customer {
     private boolean active;
     private final Instant createdAt;
     private Instant updatedAt;
+    private Instant deletedAt;
 
     // Marketing Fields
-    private String type; // LEAD, CLIENT, PROSPECT
+    private CustomerType type;
     private String origin;
-    private String[] tags;
+    private List<String> tags;
     private boolean marketingConsent;
-    private String marketingStatus;
+    private MarketingStatus marketingStatus;
     private String unsubscribeToken;
     private Instant lastInteractionAt;
     private Instant snoozedUntil;
 
     public Customer(
-            CustomerId id,
-            UUID uuid,
-            CompanyId companyId,
-            TaxId taxId,
-            String legalName,
-            String commercialName,
-            Email email,
-            String phone,
-            String address,
-            String zipCode,
-            String city,
-            String country,
-            Long tariffId,
-            boolean allowCredit,
-            Money creditLimit,
-            boolean surchargeApply,
-            String notes,
-            boolean active,
-            Instant createdAt,
-            Instant updatedAt) {
+            CustomerId id, UUID uuid, CompanyId companyId, TaxId taxId, String legalName, String commercialName,
+            Email email, String phone, String address, String zipCode, String city, String country,
+            Long tariffId, boolean allowCredit, Money creditLimit, boolean surchargeApply, String notes,
+            boolean active, Instant createdAt, Instant updatedAt, Instant deletedAt) {
 
         if (uuid == null)
             throw new InvariantViolationException("Customer UUID cannot be null");
@@ -93,30 +77,17 @@ public class Customer {
         this.active = active;
         this.createdAt = createdAt != null ? createdAt : Instant.now();
         this.updatedAt = updatedAt != null ? updatedAt : Instant.now();
+        this.deletedAt = deletedAt;
+
+        // Defaults
+        this.type = CustomerType.CLIENT;
+        this.tags = new ArrayList<>();
+        this.marketingStatus = MarketingStatus.SUBSCRIBED;
     }
 
     public static Customer create(CompanyId companyId, String legalName, TaxId taxId) {
-        return new Customer(
-                null,
-                UUID.randomUUID(),
-                companyId,
-                taxId,
-                legalName,
-                legalName,
-                null,
-                null,
-                null,
-                null,
-                null,
-                "ES",
-                null,
-                false,
-                Money.zeroEuros(),
-                false,
-                null,
-                true,
-                Instant.now(),
-                Instant.now());
+        return new Customer(null, UUID.randomUUID(), companyId, taxId, legalName, legalName, null, null, null, null,
+                null, "ES", null, false, Money.zeroEuros(), false, null, true, Instant.now(), Instant.now(), null);
     }
 
     public void updateContactInfo(Email email, String phone, String address, String zipCode, String city) {
@@ -139,7 +110,24 @@ public class Customer {
         this.updatedAt = Instant.now();
     }
 
-    // Getters
+    // CRM / Marketing Behaviours
+    public boolean canReceiveMarketing() {
+        if (!marketingConsent)
+            return false;
+        if (marketingStatus == MarketingStatus.UNSUBSCRIBED || marketingStatus == MarketingStatus.BOUNCED
+                || marketingStatus == MarketingStatus.COMPLAINED)
+            return false;
+        if (snoozedUntil != null && snoozedUntil.isAfter(Instant.now()))
+            return false;
+        return true;
+    }
+
+    public void applyUnsubscribe() {
+        this.marketingStatus = MarketingStatus.UNSUBSCRIBED;
+        this.updatedAt = Instant.now();
+    }
+
+    // Getters / Setters
     public CustomerId id() {
         return id;
     }
@@ -220,13 +208,15 @@ public class Customer {
         return updatedAt;
     }
 
-    // Marketing Accessors
+    public Instant deletedAt() {
+        return deletedAt;
+    }
 
-    public String getType() {
+    public CustomerType getType() {
         return type;
     }
 
-    public void setType(String type) {
+    public void setType(CustomerType type) {
         this.type = type;
     }
 
@@ -238,66 +228,51 @@ public class Customer {
         this.origin = origin;
     }
 
-    public String[] getTags() {
+    public List<String> getTags() {
         return tags;
     }
 
-    public void setTags(String[] tags) {
-        this.tags = tags;
+    public void setTags(List<String> tags) {
+        this.tags = tags != null ? new ArrayList<>(tags) : new ArrayList<>();
     }
 
     public boolean isMarketingConsent() {
         return marketingConsent;
     }
 
-    public void setMarketingConsent(boolean consent) {
-        this.marketingConsent = consent;
-        this.updatedAt = Instant.now();
+    public void setMarketingConsent(boolean marketingConsent) {
+        this.marketingConsent = marketingConsent;
     }
 
-    public String getMarketingStatus() {
+    public MarketingStatus getMarketingStatus() {
         return marketingStatus;
     }
 
-    public void setMarketingStatus(String status) {
-        this.marketingStatus = status;
-        this.updatedAt = Instant.now();
+    public void setMarketingStatus(MarketingStatus marketingStatus) {
+        this.marketingStatus = marketingStatus;
     }
 
     public String getUnsubscribeToken() {
         return unsubscribeToken;
     }
 
-    public void setUnsubscribeToken(String token) {
-        this.unsubscribeToken = token;
+    public void setUnsubscribeToken(String unsubscribeToken) {
+        this.unsubscribeToken = unsubscribeToken;
     }
 
     public Instant getLastInteractionAt() {
         return lastInteractionAt;
     }
 
-    public void setLastInteractionAt(Instant at) {
-        this.lastInteractionAt = at;
+    public void setLastInteractionAt(Instant lastInteractionAt) {
+        this.lastInteractionAt = lastInteractionAt;
     }
 
     public Instant getSnoozedUntil() {
         return snoozedUntil;
     }
 
-    public void setSnoozedUntil(Instant until) {
-        this.snoozedUntil = until;
-        this.updatedAt = Instant.now();
-    }
-
-    public boolean canReceiveMarketing() {
-        if (!marketingConsent)
-            return false;
-        if ("UNSUBSCRIBED".equals(marketingStatus))
-            return false;
-        if ("BOUNCED".equals(marketingStatus))
-            return false;
-        if (snoozedUntil != null && snoozedUntil.isAfter(Instant.now()))
-            return false;
-        return true;
+    public void setSnoozedUntil(Instant snoozedUntil) {
+        this.snoozedUntil = snoozedUntil;
     }
 }

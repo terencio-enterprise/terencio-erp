@@ -18,9 +18,6 @@ public class DevMailingAdapter implements MailingSystemPort {
         log.info("To: {}", msg.getTo());
         log.info("Subject: {}", msg.getSubject());
         log.info("Body Length: {}", msg.getBodyHtml() != null ? msg.getBodyHtml().length() : 0);
-        if (msg.getAttachments() != null && !msg.getAttachments().isEmpty()) {
-            log.info("Attachments: {}", msg.getAttachments().size());
-        }
         log.info("==============================================");
     }
 }
