@@ -1,11 +1,10 @@
-package es.terencio.erp.marketing.domain.model;
+﻿package es.terencio.erp.marketing.domain.model;
 
 import java.time.Instant;
 import java.util.Map;
 import java.util.UUID;
 
 public class MarketingTemplate {
-
     private Long id;
     private final UUID companyId;
     private String code;
@@ -18,10 +17,8 @@ public class MarketingTemplate {
 
     public MarketingTemplate(Long id, UUID companyId, String code, String name, String subjectTemplate, String bodyHtml,
             boolean active, Instant createdAt, Instant updatedAt) {
-        if (companyId == null)
-            throw new IllegalArgumentException("MarketingTemplate companyId is required");
-        if (name == null || name.isBlank())
-            throw new IllegalArgumentException("MarketingTemplate name is required");
+        if (companyId == null) throw new IllegalArgumentException("MarketingTemplate companyId is required");
+        if (name == null || name.isBlank()) throw new IllegalArgumentException("MarketingTemplate name is required");
         this.id = id;
         this.companyId = companyId;
         this.code = code;
@@ -50,8 +47,7 @@ public class MarketingTemplate {
     }
 
     public void update(String name, String code, String subjectTemplate, String bodyHtml) {
-        if (name == null || name.isBlank())
-            throw new IllegalArgumentException("Template name cannot be blank");
+        if (name == null || name.isBlank()) throw new IllegalArgumentException("Template name cannot be blank");
         this.name = name;
         this.code = code;
         this.subjectTemplate = subjectTemplate;
@@ -59,43 +55,14 @@ public class MarketingTemplate {
         this.updatedAt = Instant.now();
     }
 
-    public Long getId() {
-        return id;
-    }
-
-    public void setId(Long id) {
-        this.id = id;
-    }
-
-    public UUID getCompanyId() {
-        return companyId;
-    }
-
-    public String getCode() {
-        return code;
-    }
-
-    public String getName() {
-        return name;
-    }
-
-    public String getSubjectTemplate() {
-        return subjectTemplate;
-    }
-
-    public String getBodyHtml() {
-        return bodyHtml;
-    }
-
-    public boolean isActive() {
-        return active;
-    }
-
-    public Instant getCreatedAt() {
-        return createdAt;
-    }
-
-    public Instant getUpdatedAt() {
-        return updatedAt;
-    }
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
+    public UUID getCompanyId() { return companyId; }
+    public String getCode() { return code; }
+    public String getName() { return name; }
+    public String getSubjectTemplate() { return subjectTemplate; }
+    public String getBodyHtml() { return bodyHtml; }
+    public boolean isActive() { return active; }
+    public Instant getCreatedAt() { return createdAt; }
+    public Instant getUpdatedAt() { return updatedAt; }
 }

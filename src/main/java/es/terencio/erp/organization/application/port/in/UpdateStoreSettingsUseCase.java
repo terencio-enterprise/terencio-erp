@@ -1,10 +1,7 @@
-package es.terencio.erp.organization.application.port.in;
+﻿package es.terencio.erp.organization.application.port.in;
 
-import es.terencio.erp.organization.application.usecase.UpdateStoreSettingsCommand;
+import es.terencio.erp.organization.application.dto.OrganizationCommands.UpdateStoreSettingsCommand;
 
-/**
- * Input port for updating store settings.
- */
 public interface UpdateStoreSettingsUseCase {
     void execute(UpdateStoreSettingsCommand command);
 }

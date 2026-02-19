@@ -5,6 +5,11 @@ import java.util.UUID;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -12,7 +17,11 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
+import es.terencio.erp.auth.application.dto.AuthDtos.LoginRequest;
+import es.terencio.erp.auth.application.dto.AuthDtos.LoginResponse;
 import es.terencio.erp.config.TestSecurityConfig;
+import es.terencio.erp.shared.presentation.ApiResponse;
+import io.netty.handler.codec.http.HttpMethod;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
@@ -158,7 +167,7 @@ public abstract class AbstractIntegrationTest {
      * HttpHeaders headers = createAuthenticatedUser("user1", "MANAGER", "COMPANY", companyId, "product:create");
      * </pre>
      */
-    protected org.springframework.http.HttpHeaders createAuthenticatedUser(
+    protected HttpHeaders createAuthenticatedUser(
             String username,
             String role,
             String scope,
@@ -205,30 +214,30 @@ public abstract class AbstractIntegrationTest {
         return loginAndGetHeaders(username, "test123");
     }
 
-    protected org.springframework.http.HttpHeaders loginAndGetHeaders(String username, String password) {
-        es.terencio.erp.auth.application.dto.LoginRequest loginRequest = new es.terencio.erp.auth.application.dto.LoginRequest(
+    protected HttpHeaders loginAndGetHeaders(String username, String password) {
+        LoginRequest loginRequest = new LoginRequest(
                 username, password);
 
-        org.springframework.http.ResponseEntity<es.terencio.erp.shared.presentation.ApiResponse<es.terencio.erp.auth.application.dto.LoginResponse>> response = restTemplate
+        ResponseEntity<ApiResponse<LoginResponse>> response = restTemplate
                 .exchange(
                         "/api/v1/auth/login",
-                        org.springframework.http.HttpMethod.POST,
-                        new org.springframework.http.HttpEntity<>(loginRequest),
-                        new org.springframework.core.ParameterizedTypeReference<>() {
+                        HttpMethod.POST,
+                        new HttpEntity<>(loginRequest),
+                        new ParameterizedTypeReference<ApiResponse<LoginResponse>>() {
                         });
 
-        if (response.getStatusCode() != org.springframework.http.HttpStatus.OK) {
+        if (response.getStatusCode() != HttpStatus.OK) {
             throw new RuntimeException("Login failed for user: " + username);
         }
 
         // Extract Access Token from cookie
-        String accessTokenCookie = response.getHeaders().get(org.springframework.http.HttpHeaders.SET_COOKIE).stream()
+        String accessTokenCookie = response.getHeaders().get(HttpHeaders.SET_COOKIE).stream()
                 .filter(c -> c.startsWith("ACCESS_TOKEN="))
                 .findFirst()
                 .orElseThrow(() -> new RuntimeException("ACCESS_TOKEN cookie not found"));
 
-        org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
-        headers.add(org.springframework.http.HttpHeaders.COOKIE, accessTokenCookie);
+        HttpHeaders headers = new HttpHeaders();
+        headers.add(HttpHeaders.COOKIE, accessTokenCookie);
         return headers;
     }
 }

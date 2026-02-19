@@ -1,12 +1,8 @@
-package es.terencio.erp.organization.domain.model;
+﻿package es.terencio.erp.organization.domain.model;
 
 import java.util.Objects;
 
-/**
- * Value Object representing a physical address.
- */
 public final class Address {
-
     private final String street;
     private final String zipCode;
     private final String city;
@@ -23,34 +19,20 @@ public final class Address {
         return new Address(street, zipCode, city, "ES");
     }
 
-    public String street() {
-        return street;
-    }
-
-    public String zipCode() {
-        return zipCode;
-    }
-
-    public String city() {
-        return city;
-    }
-
-    public String country() {
-        return country;
-    }
+    public String street() { return street; }
+    public String zipCode() { return zipCode; }
+    public String city() { return city; }
+    public String country() { return country; }
 
     public String formattedAddress() {
         StringBuilder sb = new StringBuilder();
-        if (street != null)
-            sb.append(street);
+        if (street != null) sb.append(street);
         if (zipCode != null) {
-            if (sb.length() > 0)
-                sb.append(", ");
+            if (sb.length() > 0) sb.append(", ");
             sb.append(zipCode);
         }
         if (city != null) {
-            if (sb.length() > 0)
-                sb.append(" ");
+            if (sb.length() > 0) sb.append(" ");
             sb.append(city);
         }
         return sb.toString();
@@ -58,10 +40,8 @@ public final class Address {
 
     @Override
     public boolean equals(Object o) {
-        if (this == o)
-            return true;
-        if (o == null || getClass() != o.getClass())
-            return false;
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
         Address address = (Address) o;
         return Objects.equals(street, address.street) &&
                 Objects.equals(zipCode, address.zipCode) &&

@@ -1,17 +1,6 @@
-package es.terencio.erp.auth.domain.model;
+﻿package es.terencio.erp.auth.domain.model;
 
-/**
- * Enumeration of all fine-grained permission codes used across the system.
- * The {@code code} string is what gets stored in the {@code role_permissions}
- * table
- * and is also the value used in
- * {@link es.terencio.erp.auth.infrastructure.security.RequiresPermission}.
- *
- * <p>
- * Convention: {@code domain:entity:action}
- */
 public enum Permission {
-
     // ── Organization / Store management ────────────────────────────────────────
     ORGANIZATION_STORE_VIEW("organization:store:view"),
     ORGANIZATION_STORE_CREATE("organization:store:create"),
@@ -78,10 +67,6 @@ public enum Permission {
         this.code = code;
     }
 
-    /**
-     * The string code that matches the {@code role_permissions.permission_code} DB
-     * column.
-     */
     public String getCode() {
         return code;
     }

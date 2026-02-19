@@ -1,11 +1,12 @@
-package es.terencio.erp.auth.domain.model;
+﻿package es.terencio.erp.auth.domain.model;
 
+import java.util.Set;
 import java.util.UUID;
 
 public record AccessGrant(
-                AccessScope scope,
-                UUID targetId,
-                String role,
-                java.util.Set<String> extraPermissions,
-                java.util.Set<String> excludedPermissions) {
+        AccessScope scope,
+        UUID targetId,
+        String role,
+        Set<String> extraPermissions,
+        Set<String> excludedPermissions) {
 }

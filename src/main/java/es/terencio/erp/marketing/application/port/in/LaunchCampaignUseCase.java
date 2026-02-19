@@ -1,10 +1,9 @@
-package es.terencio.erp.marketing.application.port.in;
+﻿package es.terencio.erp.marketing.application.port.in;
 
-import es.terencio.erp.marketing.application.dto.CampaignRequest;
-import es.terencio.erp.marketing.application.dto.CampaignResult;
+import es.terencio.erp.marketing.application.dto.MarketingDtos.AudienceFilter;
+import es.terencio.erp.marketing.application.dto.MarketingDtos.CampaignResult;
 
 public interface LaunchCampaignUseCase {
-    CampaignResult launch(Long templateId, CampaignRequest.AudienceFilter filter);
-
+    CampaignResult launch(Long templateId, AudienceFilter filter);
     void dryRun(Long templateId, String testEmail);
 }

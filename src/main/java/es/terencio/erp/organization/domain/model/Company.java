@@ -1,18 +1,12 @@
-package es.terencio.erp.organization.domain.model;
+﻿package es.terencio.erp.organization.domain.model;
 
 import es.terencio.erp.shared.domain.exception.InvariantViolationException;
 import es.terencio.erp.shared.domain.identifier.CompanyId;
 import es.terencio.erp.shared.domain.valueobject.TaxId;
-
 import java.time.Instant;
 import java.util.Currency;
 
-/**
- * Company aggregate root.
- * Represents a legal entity that can own multiple stores.
- */
 public class Company {
-
     private final CompanyId id;
     private String name;
     private TaxId taxId;
@@ -25,26 +19,11 @@ public class Company {
     private Instant updatedAt;
     private long version;
 
-    // Constructor for reconstitution from persistence
-    public Company(
-            CompanyId id,
-            String name,
-            TaxId taxId,
-            Currency currency,
-            FiscalRegime fiscalRegime,
-            boolean priceIncludesTax,
-            RoundingMode roundingMode,
-            boolean active,
-            Instant createdAt,
-            Instant updatedAt,
-            long version) {
-
-        if (id == null)
-            throw new InvariantViolationException("Company ID cannot be null");
-        if (name == null || name.isBlank())
-            throw new InvariantViolationException("Company name cannot be empty");
-        if (taxId == null)
-            throw new InvariantViolationException("Company tax ID cannot be null");
+    public Company(CompanyId id, String name, TaxId taxId, Currency currency, FiscalRegime fiscalRegime,
+            boolean priceIncludesTax, RoundingMode roundingMode, boolean active, Instant createdAt, Instant updatedAt, long version) {
+        if (id == null) throw new InvariantViolationException("Company ID cannot be null");
+        if (name == null || name.isBlank()) throw new InvariantViolationException("Company name cannot be empty");
+        if (taxId == null) throw new InvariantViolationException("Company tax ID cannot be null");
 
         this.id = id;
         this.name = name;
@@ -59,34 +38,19 @@ public class Company {
         this.version = version;
     }
 
-    // Factory method for new company creation
     public static Company create(String name, String taxIdValue, String currencyCode) {
-        return new Company(
-                CompanyId.create(),
-                name,
-                TaxId.of(taxIdValue),
-                Currency.getInstance(currencyCode),
-                FiscalRegime.COMMON,
-                true,
-                RoundingMode.LINE,
-                true,
-                Instant.now(),
-                Instant.now(),
-                1);
+        return new Company(CompanyId.create(), name, TaxId.of(taxIdValue), Currency.getInstance(currencyCode),
+                FiscalRegime.COMMON, true, RoundingMode.LINE, true, Instant.now(), Instant.now(), 1);
     }
 
     public void updateName(String newName) {
-        if (newName == null || newName.isBlank()) {
-            throw new InvariantViolationException("Company name cannot be empty");
-        }
+        if (newName == null || newName.isBlank()) throw new InvariantViolationException("Company name cannot be empty");
         this.name = newName;
         this.updatedAt = Instant.now();
     }
 
     public void updateTaxId(TaxId newTaxId) {
-        if (newTaxId == null) {
-            throw new InvariantViolationException("Company tax ID cannot be null");
-        }
+        if (newTaxId == null) throw new InvariantViolationException("Company tax ID cannot be null");
         this.taxId = newTaxId;
         this.updatedAt = Instant.now();
     }
@@ -98,62 +62,19 @@ public class Company {
         this.updatedAt = Instant.now();
     }
 
-    public void activate() {
-        this.active = true;
-        this.updatedAt = Instant.now();
-    }
+    public void activate() { this.active = true; this.updatedAt = Instant.now(); }
+    public void deactivate() { this.active = false; this.updatedAt = Instant.now(); }
 
-    public void deactivate() {
-        this.active = false;
-        this.updatedAt = Instant.now();
-    }
-
-    // Getters
-    public CompanyId id() {
-        return id;
-    }
-
-    public String name() {
-        return name;
-    }
-
-    public TaxId taxId() {
-        return taxId;
-    }
-
-    public Currency currency() {
-        return currency;
-    }
-
-    public String currencyCode() {
-        return currency.getCurrencyCode();
-    }
-
-    public FiscalRegime fiscalRegime() {
-        return fiscalRegime;
-    }
-
-    public boolean priceIncludesTax() {
-        return priceIncludesTax;
-    }
-
-    public RoundingMode roundingMode() {
-        return roundingMode;
-    }
-
-    public boolean isActive() {
-        return active;
-    }
-
-    public Instant createdAt() {
-        return createdAt;
-    }
-
-    public Instant updatedAt() {
-        return updatedAt;
-    }
-
-    public long version() {
-        return version;
-    }
+    public CompanyId id() { return id; }
+    public String name() { return name; }
+    public TaxId taxId() { return taxId; }
+    public Currency currency() { return currency; }
+    public String currencyCode() { return currency.getCurrencyCode(); }
+    public FiscalRegime fiscalRegime() { return fiscalRegime; }
+    public boolean priceIncludesTax() { return priceIncludesTax; }
+    public RoundingMode roundingMode() { return roundingMode; }
+    public boolean isActive() { return active; }
+    public Instant createdAt() { return createdAt; }
+    public Instant updatedAt() { return updatedAt; }
+    public long version() { return version; }
 }

@@ -1,9 +1,8 @@
-package es.terencio.erp.marketing.domain.model;
+﻿package es.terencio.erp.marketing.domain.model;
 
 import java.time.Instant;
 
 public class EmailDeliveryEvent {
-
     private Long id;
     private final String providerMessageId;
     private final String emailAddress;
@@ -25,35 +24,12 @@ public class EmailDeliveryEvent {
         this.createdAt = createdAt != null ? createdAt : Instant.now();
     }
 
-    public Long getId() {
-        return id;
-    }
-
-    public String getProviderMessageId() {
-        return providerMessageId;
-    }
-
-    public String getEmailAddress() {
-        return emailAddress;
-    }
-
-    public String getEventType() {
-        return eventType;
-    }
-
-    public String getBounceType() {
-        return bounceType;
-    }
-
-    public String getBounceSubtype() {
-        return bounceSubtype;
-    }
-
-    public String getRawPayload() {
-        return rawPayload;
-    }
-
-    public Instant getCreatedAt() {
-        return createdAt;
-    }
+    public Long getId() { return id; }
+    public String getProviderMessageId() { return providerMessageId; }
+    public String getEmailAddress() { return emailAddress; }
+    public String getEventType() { return eventType; }
+    public String getBounceType() { return bounceType; }
+    public String getBounceSubtype() { return bounceSubtype; }
+    public String getRawPayload() { return rawPayload; }
+    public Instant getCreatedAt() { return createdAt; }
 }
