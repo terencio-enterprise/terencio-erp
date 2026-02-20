@@ -1,16 +1,10 @@
 package es.terencio.erp.crm.domain.model;
 
 import java.time.Instant;
-
 import es.terencio.erp.shared.domain.identifier.CustomerId;
 import es.terencio.erp.shared.domain.identifier.ProductId;
 import es.terencio.erp.shared.domain.valueobject.Money;
 
-/**
- * CustomerProductPrice entity.
- * Represents a special negotiated price for a specific customer-product
- * combination.
- */
 public class CustomerProductPrice {
 
     private final CustomerId customerId;
@@ -21,19 +15,12 @@ public class CustomerProductPrice {
     private final Instant createdAt;
 
     public CustomerProductPrice(
-            CustomerId customerId,
-            ProductId productId,
-            Money customPrice,
-            Instant validFrom,
-            Instant validUntil,
-            Instant createdAt) {
+            CustomerId customerId, ProductId productId, Money customPrice,
+            Instant validFrom, Instant validUntil, Instant createdAt) {
 
-        if (customerId == null)
-            throw new IllegalArgumentException("CustomerId cannot be null");
-        if (productId == null)
-            throw new IllegalArgumentException("ProductId cannot be null");
-        if (customPrice == null)
-            throw new IllegalArgumentException("Custom price cannot be null");
+        if (customerId == null) throw new IllegalArgumentException("CustomerId cannot be null");
+        if (productId == null) throw new IllegalArgumentException("ProductId cannot be null");
+        if (customPrice == null) throw new IllegalArgumentException("Custom price cannot be null");
 
         this.customerId = customerId;
         this.productId = productId;
@@ -53,28 +40,10 @@ public class CustomerProductPrice {
         return afterStart && beforeEnd;
     }
 
-    // Getters
-    public CustomerId customerId() {
-        return customerId;
-    }
-
-    public ProductId productId() {
-        return productId;
-    }
-
-    public Money customPrice() {
-        return customPrice;
-    }
-
-    public Instant validFrom() {
-        return validFrom;
-    }
-
-    public Instant validUntil() {
-        return validUntil;
-    }
-
-    public Instant createdAt() {
-        return createdAt;
-    }
+    public CustomerId customerId() { return customerId; }
+    public ProductId productId() { return productId; }
+    public Money customPrice() { return customPrice; }
+    public Instant validFrom() { return validFrom; }
+    public Instant validUntil() { return validUntil; }
+    public Instant createdAt() { return createdAt; }
 }

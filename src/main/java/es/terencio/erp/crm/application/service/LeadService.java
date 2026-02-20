@@ -1,12 +1,10 @@
 package es.terencio.erp.crm.application.service;
 
 import java.util.UUID;
-
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
 import es.terencio.erp.crm.application.port.in.IngestLeadUseCase;
-import es.terencio.erp.crm.application.port.out.CustomerRepository;
+import es.terencio.erp.crm.application.port.out.CustomerRepositoryPort;
 import es.terencio.erp.crm.domain.model.Customer;
 import es.terencio.erp.crm.domain.model.CustomerType;
 import es.terencio.erp.crm.domain.model.MarketingStatus;
@@ -20,7 +18,7 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class LeadService implements IngestLeadUseCase {
 
-    private final CustomerRepository customerRepository;
+    private final CustomerRepositoryPort customerRepository;
 
     @Override
     @Transactional

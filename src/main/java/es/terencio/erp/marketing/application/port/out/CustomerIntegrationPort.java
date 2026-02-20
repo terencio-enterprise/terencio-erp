@@ -7,10 +7,9 @@ import java.util.UUID;
 import es.terencio.erp.marketing.application.dto.MarketingDtos.AudienceFilter;
 
 public interface CustomerIntegrationPort {
-    
-    record MarketingCustomer(Long id, UUID companyId, String email, String name, String token, String unsubscribeToken, boolean canReceiveMarketing) {}
-
     List<MarketingCustomer> findAudience(AudienceFilter filter);
     Optional<MarketingCustomer> findByToken(String token);
     void updateMarketingStatus(String token, String status, Instant snoozedUntil);
+
+    record MarketingCustomer(Long id, UUID companyId, String name, String email, String unsubscribeToken, boolean canReceiveMarketing) {}
 }

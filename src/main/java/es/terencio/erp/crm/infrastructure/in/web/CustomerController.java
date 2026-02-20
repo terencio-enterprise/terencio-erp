@@ -2,22 +2,13 @@ package es.terencio.erp.crm.infrastructure.in.web;
 
 import java.util.List;
 import java.util.UUID;
-
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
-
+import org.springframework.web.bind.annotation.*;
 import es.terencio.erp.auth.domain.model.AccessScope;
 import es.terencio.erp.auth.domain.model.Permission;
 import es.terencio.erp.auth.infrastructure.config.security.aop.RequiresPermission;
-import es.terencio.erp.crm.application.port.out.CustomerProductPriceRepository;
-import es.terencio.erp.crm.application.port.out.CustomerRepository;
+import es.terencio.erp.crm.application.port.out.CustomerProductPriceRepositoryPort;
+import es.terencio.erp.crm.application.port.out.CustomerRepositoryPort;
 import es.terencio.erp.crm.domain.model.Customer;
 import es.terencio.erp.crm.domain.model.CustomerProductPrice;
 import es.terencio.erp.shared.domain.identifier.CompanyId;
@@ -35,10 +26,10 @@ import jakarta.validation.Valid;
 @Tag(name = "Customers", description = "CRM customer management")
 public class CustomerController {
 
-    private final CustomerRepository customerRepository;
-    private final CustomerProductPriceRepository priceRepository;
+    private final CustomerRepositoryPort customerRepository;
+    private final CustomerProductPriceRepositoryPort priceRepository;
 
-    public CustomerController(CustomerRepository customerRepository, CustomerProductPriceRepository priceRepository) {
+    public CustomerController(CustomerRepositoryPort customerRepository, CustomerProductPriceRepositoryPort priceRepository) {
         this.customerRepository = customerRepository;
         this.priceRepository = priceRepository;
     }

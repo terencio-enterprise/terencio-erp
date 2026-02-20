@@ -48,7 +48,6 @@ class AdminCampaignControllerIntegrationTest extends AbstractIntegrationTest {
         @Test
         @WithMockUser(roles = "USER")
         void testGetCampaignHistory_Forbidden() throws Exception {
-                // Accessing without the GranularSecurityAspect satisfying the permissions
                 mockMvc.perform(get("/api/v1/companies/{companyId}/marketing/campaigns", globalCompanyId))
                                 .andExpect(status().isForbidden());
         }

@@ -24,7 +24,6 @@ class CrmIntegrationTest extends AbstractIntegrationTest {
 
         @BeforeEach
         void setUp() {
-                // Relies on the transactional wipe from AbstractIntegrationTest
                 testTariffId = jdbcClient.sql(
                                 "INSERT INTO tariffs (company_id, name, priority, price_type, is_default, active, version) VALUES (?, 'VIP Tariff', 10, 'RETAIL', FALSE, TRUE, 1) RETURNING id")
                                 .param(globalCompanyId).query(Long.class).single();

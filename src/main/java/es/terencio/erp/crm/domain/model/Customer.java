@@ -36,7 +36,6 @@ public class Customer {
     private Instant updatedAt;
     private Instant deletedAt;
 
-    // Marketing Fields
     private CustomerType type;
     private String origin;
     private List<String> tags;
@@ -52,10 +51,8 @@ public class Customer {
             Long tariffId, boolean allowCredit, Money creditLimit, boolean surchargeApply, String notes,
             boolean active, Instant createdAt, Instant updatedAt, Instant deletedAt) {
 
-        if (uuid == null)
-            throw new InvariantViolationException("Customer UUID cannot be null");
-        if (companyId == null)
-            throw new InvariantViolationException("Customer must belong to a company");
+        if (uuid == null) throw new InvariantViolationException("Customer UUID cannot be null");
+        if (companyId == null) throw new InvariantViolationException("Customer must belong to a company");
 
         this.id = id;
         this.uuid = uuid;
@@ -79,7 +76,6 @@ public class Customer {
         this.updatedAt = updatedAt != null ? updatedAt : Instant.now();
         this.deletedAt = deletedAt;
 
-        // Defaults
         this.type = CustomerType.CLIENT;
         this.tags = new ArrayList<>();
         this.marketingStatus = MarketingStatus.SUBSCRIBED;
@@ -110,15 +106,11 @@ public class Customer {
         this.updatedAt = Instant.now();
     }
 
-    // CRM / Marketing Behaviours
     public boolean canReceiveMarketing() {
-        if (!marketingConsent)
-            return false;
+        if (!marketingConsent) return false;
         if (marketingStatus == MarketingStatus.UNSUBSCRIBED || marketingStatus == MarketingStatus.BOUNCED
-                || marketingStatus == MarketingStatus.COMPLAINED)
-            return false;
-        if (snoozedUntil != null && snoozedUntil.isAfter(Instant.now()))
-            return false;
+                || marketingStatus == MarketingStatus.COMPLAINED) return false;
+        if (snoozedUntil != null && snoozedUntil.isAfter(Instant.now())) return false;
         return true;
     }
 
@@ -127,152 +119,41 @@ public class Customer {
         this.updatedAt = Instant.now();
     }
 
-    // Getters / Setters
-    public CustomerId id() {
-        return id;
-    }
-
-    public UUID uuid() {
-        return uuid;
-    }
-
-    public CompanyId companyId() {
-        return companyId;
-    }
-
-    public TaxId taxId() {
-        return taxId;
-    }
-
-    public String legalName() {
-        return legalName;
-    }
-
-    public String commercialName() {
-        return commercialName;
-    }
-
-    public Email email() {
-        return email;
-    }
-
-    public String phone() {
-        return phone;
-    }
-
-    public String address() {
-        return address;
-    }
-
-    public String zipCode() {
-        return zipCode;
-    }
-
-    public String city() {
-        return city;
-    }
-
-    public String country() {
-        return country;
-    }
-
-    public Long tariffId() {
-        return tariffId;
-    }
-
-    public boolean allowCredit() {
-        return allowCredit;
-    }
-
-    public Money creditLimit() {
-        return creditLimit;
-    }
-
-    public boolean surchargeApply() {
-        return surchargeApply;
-    }
-
-    public String notes() {
-        return notes;
-    }
-
-    public boolean isActive() {
-        return active;
-    }
-
-    public Instant createdAt() {
-        return createdAt;
-    }
-
-    public Instant updatedAt() {
-        return updatedAt;
-    }
-
-    public Instant deletedAt() {
-        return deletedAt;
-    }
-
-    public CustomerType getType() {
-        return type;
-    }
-
-    public void setType(CustomerType type) {
-        this.type = type;
-    }
-
-    public String getOrigin() {
-        return origin;
-    }
-
-    public void setOrigin(String origin) {
-        this.origin = origin;
-    }
-
-    public List<String> getTags() {
-        return tags;
-    }
-
-    public void setTags(List<String> tags) {
-        this.tags = tags != null ? new ArrayList<>(tags) : new ArrayList<>();
-    }
-
-    public boolean isMarketingConsent() {
-        return marketingConsent;
-    }
-
-    public void setMarketingConsent(boolean marketingConsent) {
-        this.marketingConsent = marketingConsent;
-    }
-
-    public MarketingStatus getMarketingStatus() {
-        return marketingStatus;
-    }
-
-    public void setMarketingStatus(MarketingStatus marketingStatus) {
-        this.marketingStatus = marketingStatus;
-    }
-
-    public String getUnsubscribeToken() {
-        return unsubscribeToken;
-    }
-
-    public void setUnsubscribeToken(String unsubscribeToken) {
-        this.unsubscribeToken = unsubscribeToken;
-    }
-
-    public Instant getLastInteractionAt() {
-        return lastInteractionAt;
-    }
-
-    public void setLastInteractionAt(Instant lastInteractionAt) {
-        this.lastInteractionAt = lastInteractionAt;
-    }
-
-    public Instant getSnoozedUntil() {
-        return snoozedUntil;
-    }
-
-    public void setSnoozedUntil(Instant snoozedUntil) {
-        this.snoozedUntil = snoozedUntil;
-    }
+    public CustomerId id() { return id; }
+    public UUID uuid() { return uuid; }
+    public CompanyId companyId() { return companyId; }
+    public TaxId taxId() { return taxId; }
+    public String legalName() { return legalName; }
+    public String commercialName() { return commercialName; }
+    public Email email() { return email; }
+    public String phone() { return phone; }
+    public String address() { return address; }
+    public String zipCode() { return zipCode; }
+    public String city() { return city; }
+    public String country() { return country; }
+    public Long tariffId() { return tariffId; }
+    public boolean allowCredit() { return allowCredit; }
+    public Money creditLimit() { return creditLimit; }
+    public boolean surchargeApply() { return surchargeApply; }
+    public String notes() { return notes; }
+    public boolean isActive() { return active; }
+    public Instant createdAt() { return createdAt; }
+    public Instant updatedAt() { return updatedAt; }
+    public Instant deletedAt() { return deletedAt; }
+    public CustomerType getType() { return type; }
+    public void setType(CustomerType type) { this.type = type; }
+    public String getOrigin() { return origin; }
+    public void setOrigin(String origin) { this.origin = origin; }
+    public List<String> getTags() { return tags; }
+    public void setTags(List<String> tags) { this.tags = tags != null ? new ArrayList<>(tags) : new ArrayList<>(); }
+    public boolean isMarketingConsent() { return marketingConsent; }
+    public void setMarketingConsent(boolean marketingConsent) { this.marketingConsent = marketingConsent; }
+    public MarketingStatus getMarketingStatus() { return marketingStatus; }
+    public void setMarketingStatus(MarketingStatus marketingStatus) { this.marketingStatus = marketingStatus; }
+    public String getUnsubscribeToken() { return unsubscribeToken; }
+    public void setUnsubscribeToken(String unsubscribeToken) { this.unsubscribeToken = unsubscribeToken; }
+    public Instant getLastInteractionAt() { return lastInteractionAt; }
+    public void setLastInteractionAt(Instant lastInteractionAt) { this.lastInteractionAt = lastInteractionAt; }
+    public Instant getSnoozedUntil() { return snoozedUntil; }
+    public void setSnoozedUntil(Instant snoozedUntil) { this.snoozedUntil = snoozedUntil; }
 }
