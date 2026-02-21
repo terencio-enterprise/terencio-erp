@@ -48,16 +48,16 @@ public class JdbcCampaignRepository implements CampaignRepositoryPort {
         String sql;
         if (!isRelaunch) {
             sql = """
-                UPDATE marketing_campaigns
-                SET status = 'SENDING', started_at = NOW(), updated_at = NOW()
-                WHERE id = :id AND status IN ('DRAFT', 'SCHEDULED')
-            """;
+                        UPDATE marketing_campaigns
+                        SET status = 'SENDING', started_at = NOW(), updated_at = NOW()
+                        WHERE id = :id AND status IN ('DRAFT', 'SCHEDULED')
+                    """;
         } else {
             sql = """
-                UPDATE marketing_campaigns
-                SET status = 'SENDING', updated_at = NOW()
-                WHERE id = :id AND status IN ('COMPLETED', 'SENDING')
-            """;
+                        UPDATE marketing_campaigns
+                        SET status = 'SENDING', updated_at = NOW()
+                        WHERE id = :id AND status IN ('COMPLETED', 'SENDING')
+                    """;
         }
         int updatedRows = jdbc.update(sql, new MapSqlParameterSource("id", campaignId));
         return updatedRows > 0;
@@ -72,11 +72,11 @@ public class JdbcCampaignRepository implements CampaignRepositoryPort {
     @Override
     public void completeCampaign(Long campaignId, int sentInThisSession) {
         String sql = """
-            UPDATE marketing_campaigns
-            SET status = 'COMPLETED', completed_at = NOW(), updated_at = NOW(),
-                metrics_sent = metrics_sent + :sent
-            WHERE id = :id
-        """;
+                    UPDATE marketing_campaigns
+                    SET status = 'COMPLETED', completed_at = NOW(), updated_at = NOW(),
+                        metrics_sent = metrics_sent + :sent
+                    WHERE id = :id
+                """;
         jdbc.update(sql, new MapSqlParameterSource("sent", sentInThisSession).addValue("id", campaignId));
     }
 
@@ -88,21 +88,21 @@ public class JdbcCampaignRepository implements CampaignRepositoryPort {
     public MarketingCampaign saveCampaign(MarketingCampaign campaign) {
         if (campaign.getId() == null) {
             String sql = """
-                INSERT INTO marketing_campaigns (
-                    company_id, name, template_id, status, scheduled_at, started_at, completed_at,
-                    metrics_total_recipients, metrics_sent, metrics_delivered, metrics_opened,
-                    metrics_clicked, metrics_bounced, metrics_unsubscribed, audience_filter, 
-                    created_at, updated_at
-                ) VALUES (
-                    :companyId, :name, :templateId, :status, :scheduledAt, :startedAt, :completedAt,
-                    :recipients, :sent, :delivered, :opened, :clicked, :bounced, :unsubscribed, 
-                    :audienceFilter::jsonb, :createdAt, :updatedAt
-                ) RETURNING id
-            """;
-            
+                        INSERT INTO marketing_campaigns (
+                            company_id, name, template_id, status, scheduled_at, started_at, completed_at,
+                            metrics_total_recipients, metrics_sent, metrics_delivered, metrics_opened,
+                            metrics_clicked, metrics_bounced, metrics_unsubscribed, audience_filter,
+                            created_at, updated_at
+                        ) VALUES (
+                            :companyId, :name, :templateId, :status, :scheduledAt, :startedAt, :completedAt,
+                            :recipients, :sent, :delivered, :opened, :clicked, :bounced, :unsubscribed,
+                            :audienceFilter::jsonb, :createdAt, :updatedAt
+                        ) RETURNING id
+                    """;
+
             KeyHolder keyHolder = new GeneratedKeyHolder();
-            jdbc.update(sql, mapCampaignParams(campaign), keyHolder, new String[]{"id"});
-            
+            jdbc.update(sql, mapCampaignParams(campaign), keyHolder, new String[] { "id" });
+
             try {
                 Number key = keyHolder.getKey();
                 if (key != null) {
@@ -117,28 +117,29 @@ public class JdbcCampaignRepository implements CampaignRepositoryPort {
             }
         } else {
             String sql = """
-                UPDATE marketing_campaigns SET
-                    status = :status, scheduled_at = :scheduledAt, started_at = :startedAt, completed_at = :completedAt,
-                    metrics_total_recipients = :recipients, metrics_sent = :sent, metrics_delivered = :delivered,
-                    metrics_opened = :opened, metrics_clicked = :clicked, metrics_bounced = :bounced, 
-                    metrics_unsubscribed = :unsubscribed, audience_filter = :audienceFilter::jsonb, updated_at = :updatedAt
-                WHERE id = :id
-            """;
+                        UPDATE marketing_campaigns SET
+                            status = :status, scheduled_at = :scheduledAt, started_at = :startedAt, completed_at = :completedAt,
+                            metrics_total_recipients = :recipients, metrics_sent = :sent, metrics_delivered = :delivered,
+                            metrics_opened = :opened, metrics_clicked = :clicked, metrics_bounced = :bounced,
+                            metrics_unsubscribed = :unsubscribed, audience_filter = :audienceFilter::jsonb, updated_at = :updatedAt
+                        WHERE id = :id
+                    """;
             jdbc.update(sql, mapCampaignParams(campaign));
         }
         return campaign;
     }
 
     @Override
-    public PageResult<MarketingCampaign> findCampaigns(UUID companyId, String search, String status, int page, int size) {
+    public PageResult<MarketingCampaign> findCampaigns(UUID companyId, String search, String status, int page,
+            int size) {
         int safeSize = Math.max(size, 1);
         int offset = page * safeSize;
 
         StringBuilder sql = new StringBuilder("""
-            SELECT *, COUNT(*) OVER() as total_elements 
-            FROM marketing_campaigns 
-            WHERE company_id = :companyId
-        """);
+                    SELECT *, COUNT(*) OVER() as total_elements
+                    FROM marketing_campaigns
+                    WHERE company_id = :companyId
+                """);
         MapSqlParameterSource params = new MapSqlParameterSource("companyId", companyId);
 
         if (search != null && !search.isBlank()) {
@@ -152,10 +153,11 @@ public class JdbcCampaignRepository implements CampaignRepositoryPort {
         sql.append(" ORDER BY created_at DESC LIMIT :limit OFFSET :offset");
         params.addValue("limit", safeSize).addValue("offset", offset);
 
-        record RowWithTotal(MarketingCampaign c, long total) {}
-        List<RowWithTotal> rows = jdbc.query(sql.toString(), params, (rs, rowNum) -> 
-            new RowWithTotal(mapRowToCampaign(rs, rowNum), rs.getLong("total_elements")));
-            
+        record RowWithTotal(MarketingCampaign c, long total) {
+        }
+        List<RowWithTotal> rows = jdbc.query(sql.toString(), params,
+                (rs, rowNum) -> new RowWithTotal(mapRowToCampaign(rs, rowNum), rs.getLong("total_elements")));
+
         long totalElements = rows.isEmpty() ? 0 : rows.get(0).total();
         int totalPages = (int) Math.ceil((double) totalElements / safeSize);
 
@@ -172,9 +174,9 @@ public class JdbcCampaignRepository implements CampaignRepositoryPort {
     @Override
     public List<MarketingCampaign> findScheduledCampaignsToLaunch(Instant now) {
         String sql = """
-            SELECT * FROM marketing_campaigns 
-            WHERE status = 'SCHEDULED' AND scheduled_at <= :now
-        """;
+                    SELECT * FROM marketing_campaigns
+                    WHERE status = 'SCHEDULED' AND scheduled_at <= :now
+                """;
         return jdbc.query(sql, new MapSqlParameterSource("now", java.sql.Timestamp.from(now)), this::mapRowToCampaign);
     }
 
@@ -189,7 +191,7 @@ public class JdbcCampaignRepository implements CampaignRepositoryPort {
             case "unsubscribed" -> "metrics_unsubscribed";
             default -> throw new IllegalArgumentException("Invalid metric name: " + metric);
         };
-        
+
         String sql = "UPDATE marketing_campaigns SET " + columnName + " = " + columnName + " + 1 WHERE id = :id";
         jdbc.update(sql, new MapSqlParameterSource("id", campaignId));
     }
@@ -202,13 +204,13 @@ public class JdbcCampaignRepository implements CampaignRepositoryPort {
     public MarketingTemplate saveTemplate(MarketingTemplate template) {
         if (template.getId() == null) {
             String sql = """
-                INSERT INTO marketing_templates (company_id, name, subject_template, body_html, is_active, created_at, updated_at)
-                VALUES (:companyId, :name, :subjectTemplate, :bodyHtml, :isActive, :createdAt, :updatedAt)
-                RETURNING id
-            """;
+                        INSERT INTO marketing_templates (company_id, code, name, subject_template, body_html, is_active, created_at, updated_at)
+                        VALUES (:companyId, :code, :name, :subjectTemplate, :bodyHtml, :isActive, :createdAt, :updatedAt)
+                        RETURNING id
+                    """;
             KeyHolder keyHolder = new GeneratedKeyHolder();
-            jdbc.update(sql, mapTemplateParams(template), keyHolder, new String[]{"id"});
-            
+            jdbc.update(sql, mapTemplateParams(template), keyHolder, new String[] { "id" });
+
             try {
                 Number key = keyHolder.getKey();
                 if (key != null) {
@@ -223,11 +225,11 @@ public class JdbcCampaignRepository implements CampaignRepositoryPort {
             }
         } else {
             String sql = """
-                UPDATE marketing_templates SET 
-                    name = :name, subject_template = :subjectTemplate, body_html = :bodyHtml, 
-                    is_active = :isActive, updated_at = :updatedAt 
-                WHERE id = :id
-            """;
+                        UPDATE marketing_templates SET
+                            code = :code, name = :name, subject_template = :subjectTemplate, body_html = :bodyHtml,
+                            is_active = :isActive, updated_at = :updatedAt
+                        WHERE id = :id
+                    """;
             jdbc.update(sql, mapTemplateParams(template));
         }
         return template;
@@ -236,7 +238,8 @@ public class JdbcCampaignRepository implements CampaignRepositoryPort {
     @Override
     public Optional<MarketingTemplate> findTemplateById(Long templateId) {
         String sql = "SELECT * FROM marketing_templates WHERE id = :id";
-        List<MarketingTemplate> list = jdbc.query(sql, new MapSqlParameterSource("id", templateId), this::mapRowToTemplate);
+        List<MarketingTemplate> list = jdbc.query(sql, new MapSqlParameterSource("id", templateId),
+                this::mapRowToTemplate);
         return list.isEmpty() ? Optional.empty() : Optional.of(list.get(0));
     }
 
@@ -244,13 +247,13 @@ public class JdbcCampaignRepository implements CampaignRepositoryPort {
     public List<MarketingTemplate> findAllTemplates(UUID companyId, String search) {
         StringBuilder sql = new StringBuilder("SELECT * FROM marketing_templates WHERE company_id = :companyId");
         MapSqlParameterSource params = new MapSqlParameterSource("companyId", companyId);
-        
+
         if (search != null && !search.isBlank()) {
             sql.append(" AND name ILIKE :search");
             params.addValue("search", "%" + search + "%");
         }
         sql.append(" ORDER BY id DESC");
-        
+
         return jdbc.query(sql.toString(), params, this::mapRowToTemplate);
     }
 
@@ -267,17 +270,17 @@ public class JdbcCampaignRepository implements CampaignRepositoryPort {
     public void saveLog(CampaignLog log) {
         if (log.getId() == null) {
             String sql = """
-                INSERT INTO marketing_email_logs (
-                    company_id, customer_id, template_id, campaign_id, message_id, 
-                    status, error_message, sent_at, created_at
-                ) VALUES (
-                    :companyId, :customerId, :templateId, :campaignId, :messageId, 
-                    :status, :errorMessage, :sentAt, NOW()
-                ) RETURNING id
-            """;
+                        INSERT INTO marketing_email_logs (
+                            company_id, customer_id, template_id, campaign_id, message_id,
+                            status, error_message, sent_at, created_at
+                        ) VALUES (
+                            :companyId, :customerId, :templateId, :campaignId, :messageId,
+                            :status, :errorMessage, :sentAt, NOW()
+                        ) RETURNING id
+                    """;
             KeyHolder keyHolder = new GeneratedKeyHolder();
-            jdbc.update(sql, mapLogParams(log), keyHolder, new String[]{"id"});
-            
+            jdbc.update(sql, mapLogParams(log), keyHolder, new String[] { "id" });
+
             try {
                 Number key = keyHolder.getKey();
                 if (key != null) {
@@ -292,13 +295,13 @@ public class JdbcCampaignRepository implements CampaignRepositoryPort {
             }
         } else {
             String sql = """
-                UPDATE marketing_email_logs SET 
-                    status = :status, message_id = :messageId, error_message = :errorMessage,
-                    sent_at = :sentAt, delivered_at = :deliveredAt, opened_at = :openedAt, 
-                    clicked_at = :clickedAt, bounced_at = :bouncedAt, unsubscribed_at = :unsubscribedAt,
-                    complained_at = :complainedAt
-                WHERE id = :id
-            """;
+                        UPDATE marketing_email_logs SET
+                            status = :status, message_id = :messageId, error_message = :errorMessage,
+                            sent_at = :sentAt, delivered_at = :deliveredAt, opened_at = :openedAt,
+                            clicked_at = :clickedAt, bounced_at = :bouncedAt, unsubscribed_at = :unsubscribedAt,
+                            complained_at = :complainedAt
+                        WHERE id = :id
+                    """;
             jdbc.update(sql, mapLogParams(log));
         }
     }
@@ -318,20 +321,22 @@ public class JdbcCampaignRepository implements CampaignRepositoryPort {
     }
 
     @Override
-    public PageResult<CampaignLogResponse> findCampaignLogs(UUID companyId, Long campaignId, String status, int page, int size) {
+    public PageResult<CampaignLogResponse> findCampaignLogs(UUID companyId, Long campaignId, String status, int page,
+            int size) {
         int safeSize = Math.max(size, 1);
         int offset = page * safeSize;
 
         StringBuilder sql = new StringBuilder("""
-            SELECT 
-                l.*, 
-                c.legal_name as customer_name, 
-                c.email as customer_email
-            FROM marketing_email_logs l
-            JOIN customers c ON l.customer_id = c.id
-            WHERE l.company_id = :companyId AND l.campaign_id = :campaignId
-        """);
-        MapSqlParameterSource params = new MapSqlParameterSource("companyId", companyId).addValue("campaignId", campaignId);
+                    SELECT
+                        l.*,
+                        c.legal_name as customer_name,
+                        c.email as customer_email
+                    FROM marketing_email_logs l
+                    JOIN customers c ON l.customer_id = c.id
+                    WHERE l.company_id = :companyId AND l.campaign_id = :campaignId
+                """);
+        MapSqlParameterSource params = new MapSqlParameterSource("companyId", companyId).addValue("campaignId",
+                campaignId);
 
         if (status != null && !status.isBlank()) {
             sql.append(" AND l.status = :status");
@@ -353,11 +358,11 @@ public class JdbcCampaignRepository implements CampaignRepositoryPort {
                 getInstant(rs, "clicked_at"),
                 getInstant(rs, "bounced_at"),
                 getInstant(rs, "unsubscribed_at"),
-                getInstant(rs, "complained_at")
-        ));
+                getInstant(rs, "complained_at")));
 
         String countSql = "SELECT COUNT(*) FROM marketing_email_logs l WHERE company_id = :companyId AND campaign_id = :campaignId";
-        if (status != null && !status.isBlank()) countSql += " AND status = :status";
+        if (status != null && !status.isBlank())
+            countSql += " AND status = :status";
         long total = jdbc.queryForObject(countSql, params, Long.class);
 
         int totalPages = (int) Math.ceil((double) total / safeSize);
@@ -376,19 +381,19 @@ public class JdbcCampaignRepository implements CampaignRepositoryPort {
     @Override
     public void saveDeliveryEvent(EmailDeliveryEvent event) {
         String sql = """
-            INSERT INTO email_delivery_events (
-                provider_message_id, email_address, event_type, bounce_type, raw_payload, created_at
-            ) VALUES (
-                :messageId, :email, :eventType, :bounceType, :payload::jsonb, :createdAt
-            )
-        """;
+                    INSERT INTO email_delivery_events (
+                        provider_message_id, email_address, event_type, bounce_type, raw_payload, created_at
+                    ) VALUES (
+                        :messageId, :email, :eventType, :bounceType, :payload::jsonb, :createdAt
+                    )
+                """;
         MapSqlParameterSource params = new MapSqlParameterSource()
-            .addValue("messageId", event.getProviderMessageId())
-            .addValue("email", event.getEmailAddress())
-            .addValue("eventType", event.getEventType())
-            .addValue("bounceType", event.getBounceType())
-            .addValue("payload", event.getRawPayload())
-            .addValue("createdAt", java.sql.Timestamp.from(event.getCreatedAt()));
+                .addValue("messageId", event.getProviderMessageId())
+                .addValue("email", event.getEmailAddress())
+                .addValue("eventType", event.getEventType())
+                .addValue("bounceType", event.getBounceType())
+                .addValue("payload", event.getRawPayload())
+                .addValue("createdAt", java.sql.Timestamp.from(event.getCreatedAt()));
         jdbc.update(sql, params);
     }
 
@@ -399,54 +404,62 @@ public class JdbcCampaignRepository implements CampaignRepositoryPort {
     }
 
     @Override
-    public PageResult<CampaignAudienceMember> findCampaignAudience(UUID companyId, Long campaignId, int page, int size) {
+    public PageResult<CampaignAudienceMember> findCampaignAudience(UUID companyId, Long campaignId, int page,
+            int size) {
         int safeSize = Math.min(Math.max(size, 1), 500);
         int safePage = Math.max(page, 0);
         int offset = safePage * safeSize;
 
         String sql = """
-            SELECT
-                c.id                  AS customer_id,
-                c.email               AS email,
-                c.legal_name          AS name,
-                c.marketing_status    AS marketing_status,
-                COALESCE(cl.status, 'NOT_SENT') AS send_status,
-                COUNT(*) OVER()       AS total_elements
-            FROM marketing_campaigns mc
-            JOIN customers c
-            ON c.company_id = mc.company_id
-            LEFT JOIN marketing_segments ms
-            ON mc.segment_id = ms.id
-            LEFT JOIN LATERAL (
-                SELECT cl.status
-                FROM marketing_email_logs cl
-                WHERE cl.campaign_id = mc.id
-                AND cl.customer_id = c.id
-                ORDER BY cl.id DESC
-                LIMIT 1
-            ) cl ON true
-            WHERE mc.id = :campaignId
-            AND mc.company_id = :companyId
-            AND c.email IS NOT NULL
-            AND c.active = true
-            AND c.deleted_at IS NULL
-            AND (
-                    mc.segment_id IS NULL
-                    OR (
-                        (ms.filter_types IS NULL OR c.type = ANY(ms.filter_types))
-                        AND (ms.filter_tags IS NULL OR c.tags && ms.filter_tags)
-                        AND (ms.filter_city IS NULL OR c.city = ms.filter_city)
-                        AND (ms.filter_origin IS NULL OR c.origin = ms.filter_origin)
-                        AND (ms.filter_marketing_status IS NULL OR c.marketing_status = ms.filter_marketing_status)
-                        AND (ms.filter_registered_after IS NULL OR c.created_at >= ms.filter_registered_after)
-                        AND (ms.filter_registered_before IS NULL OR c.created_at <= ms.filter_registered_before)
-                    )
-            )
-            ORDER BY c.created_at DESC, c.id DESC
-            LIMIT :limit OFFSET :offset
-            """;
+                SELECT
+                    c.id                  AS customer_id,
+                    c.email               AS email,
+                    c.legal_name          AS name,
+                    c.marketing_status    AS marketing_status,
+                    c.unsubscribe_token   AS unsubscribe_token,
+                    COALESCE(cl.status, 'NOT_SENT') AS send_status,
+                    COUNT(*) OVER()       AS total_elements
+                FROM marketing_campaigns mc
+                JOIN customers c
+                ON c.company_id = mc.company_id
+                LEFT JOIN marketing_segments ms
+                ON mc.segment_id = ms.id
+                LEFT JOIN LATERAL (
+                    SELECT cl.status
+                    FROM marketing_email_logs cl
+                    WHERE cl.campaign_id = mc.id
+                    AND cl.customer_id = c.id
+                    ORDER BY cl.id DESC
+                    LIMIT 1
+                ) cl ON true
+                WHERE mc.id = :campaignId
+                AND mc.company_id = :companyId
+                AND c.email IS NOT NULL
+                AND c.active = true
+                AND c.deleted_at IS NULL
+                AND (
+                    c.marketing_status <> 'SNOOZED'
+                    OR c.marketing_snooze_until IS NULL
+                    OR c.marketing_snooze_until <= NOW()
+                )
+                AND (
+                        mc.segment_id IS NULL
+                        OR (
+                            (ms.filter_types IS NULL OR c.type = ANY(ms.filter_types))
+                            AND (ms.filter_tags IS NULL OR c.tags && ms.filter_tags)
+                            AND (ms.filter_city IS NULL OR c.city = ms.filter_city)
+                            AND (ms.filter_origin IS NULL OR c.origin = ms.filter_origin)
+                            AND (ms.filter_marketing_status IS NULL OR c.marketing_status = ms.filter_marketing_status)
+                            AND (ms.filter_registered_after IS NULL OR c.created_at >= ms.filter_registered_after)
+                            AND (ms.filter_registered_before IS NULL OR c.created_at <= ms.filter_registered_before)
+                        )
+                )
+                ORDER BY c.created_at DESC, c.id DESC
+                LIMIT :limit OFFSET :offset
+                """;
 
-        record Row(CampaignAudienceMember member, long total) {}
+        record Row(CampaignAudienceMember member, long total) {
+        }
 
         List<Row> rows = jdbc.query(sql, new MapSqlParameterSource()
                 .addValue("campaignId", campaignId)
@@ -459,10 +472,9 @@ public class JdbcCampaignRepository implements CampaignRepositoryPort {
                                 rs.getString("email"),
                                 rs.getString("name"),
                                 rs.getString("marketing_status"),
-                                rs.getString("send_status")
-                        ),
-                        rs.getLong("total_elements")
-                )); 
+                                rs.getString("send_status"),
+                                rs.getString("unsubscribe_token")),
+                        rs.getLong("total_elements")));
 
         long totalElements = rows.isEmpty() ? 0 : rows.get(0).total();
         int totalPages = totalElements == 0 ? 0 : (int) Math.ceil((double) totalElements / safeSize);
@@ -472,8 +484,76 @@ public class JdbcCampaignRepository implements CampaignRepositoryPort {
                 totalElements,
                 totalPages,
                 safePage,
-                safeSize
-        );
+                safeSize);
+    }
+
+    @Override
+    public List<CampaignAudienceMember> findCampaignAudienceBatch(UUID companyId, Long campaignId,
+            Long lastCustomerIdExclusive, int size) {
+        int safeSize = Math.min(Math.max(size, 1), 500);
+        long lastSeen = lastCustomerIdExclusive != null ? lastCustomerIdExclusive : 0L;
+
+        String sql = """
+                SELECT
+                        c.id                AS customer_id,
+                        c.email             AS email,
+                        c.legal_name        AS name,
+                        c.marketing_status  AS marketing_status,
+                        c.unsubscribe_token AS unsubscribe_token,
+                        COALESCE(cl.status, 'NOT_SENT') AS send_status
+                FROM marketing_campaigns mc
+                JOIN customers c
+                    ON c.company_id = mc.company_id
+                LEFT JOIN marketing_segments ms
+                    ON mc.segment_id = ms.id
+                LEFT JOIN LATERAL (
+                        SELECT cl.status
+                        FROM marketing_email_logs cl
+                        WHERE cl.campaign_id = mc.id
+                            AND cl.customer_id = c.id
+                        ORDER BY cl.id DESC
+                        LIMIT 1
+                ) cl ON true
+                WHERE mc.id = :campaignId
+                    AND mc.company_id = :companyId
+                    AND c.id > :lastSeen
+                    AND c.email IS NOT NULL
+                    AND c.active = true
+                    AND c.deleted_at IS NULL
+                    AND (
+                            c.marketing_status <> 'SNOOZED'
+                            OR c.marketing_snooze_until IS NULL
+                            OR c.marketing_snooze_until <= NOW()
+                    )
+                    AND (
+                                mc.segment_id IS NULL
+                                OR (
+                                        (ms.filter_types IS NULL OR c.type = ANY(ms.filter_types))
+                                        AND (ms.filter_tags IS NULL OR c.tags && ms.filter_tags)
+                                        AND (ms.filter_city IS NULL OR c.city = ms.filter_city)
+                                        AND (ms.filter_origin IS NULL OR c.origin = ms.filter_origin)
+                                        AND (ms.filter_marketing_status IS NULL OR c.marketing_status = ms.filter_marketing_status)
+                                        AND (ms.filter_registered_after IS NULL OR c.created_at >= ms.filter_registered_after)
+                                        AND (ms.filter_registered_before IS NULL OR c.created_at <= ms.filter_registered_before)
+                                )
+                    )
+                ORDER BY c.id ASC
+                LIMIT :limit
+                """;
+
+        return jdbc.query(sql,
+                new MapSqlParameterSource()
+                        .addValue("campaignId", campaignId)
+                        .addValue("companyId", companyId)
+                        .addValue("lastSeen", lastSeen)
+                        .addValue("limit", safeSize),
+                (rs, rowNum) -> new CampaignAudienceMember(
+                        rs.getLong("customer_id"),
+                        rs.getString("email"),
+                        rs.getString("name"),
+                        rs.getString("marketing_status"),
+                        rs.getString("send_status"),
+                        rs.getString("unsubscribe_token")));
     }
 
     // ==========================================
@@ -499,55 +579,61 @@ public class JdbcCampaignRepository implements CampaignRepositoryPort {
 
     private MapSqlParameterSource mapCampaignParams(MarketingCampaign c) {
         return new MapSqlParameterSource()
-            .addValue("id", c.getId())
-            .addValue("companyId", c.getCompanyId())
-            .addValue("name", c.getName())
-            .addValue("templateId", c.getTemplateId())
-            .addValue("status", c.getStatus().name())
-            .addValue("scheduledAt", c.getScheduledAt() != null ? java.sql.Timestamp.from(c.getScheduledAt()) : null)
-            .addValue("startedAt", c.getStartedAt() != null ? java.sql.Timestamp.from(c.getStartedAt()) : null)
-            .addValue("completedAt", c.getCompletedAt() != null ? java.sql.Timestamp.from(c.getCompletedAt()) : null)
-            .addValue("recipients", c.getTotalRecipients())
-            .addValue("sent", c.getSent())
-            .addValue("delivered", c.getDelivered())
-            .addValue("opened", c.getOpened())
-            .addValue("clicked", c.getClicked())
-            .addValue("bounced", c.getBounced())
-            .addValue("unsubscribed", c.getUnsubscribed())
-            .addValue("audienceFilter", serializeJson(c.getAudienceFilter()))
-            .addValue("createdAt", java.sql.Timestamp.from(c.getCreatedAt()))
-            .addValue("updatedAt", java.sql.Timestamp.from(c.getUpdatedAt()));
+                .addValue("id", c.getId())
+                .addValue("companyId", c.getCompanyId())
+                .addValue("name", c.getName())
+                .addValue("templateId", c.getTemplateId())
+                .addValue("status", c.getStatus().name())
+                .addValue("scheduledAt",
+                        c.getScheduledAt() != null ? java.sql.Timestamp.from(c.getScheduledAt()) : null)
+                .addValue("startedAt", c.getStartedAt() != null ? java.sql.Timestamp.from(c.getStartedAt()) : null)
+                .addValue("completedAt",
+                        c.getCompletedAt() != null ? java.sql.Timestamp.from(c.getCompletedAt()) : null)
+                .addValue("recipients", c.getTotalRecipients())
+                .addValue("sent", c.getSent())
+                .addValue("delivered", c.getDelivered())
+                .addValue("opened", c.getOpened())
+                .addValue("clicked", c.getClicked())
+                .addValue("bounced", c.getBounced())
+                .addValue("unsubscribed", c.getUnsubscribed())
+                .addValue("audienceFilter", serializeJson(c.getAudienceFilter()))
+                .addValue("createdAt", java.sql.Timestamp.from(c.getCreatedAt()))
+                .addValue("updatedAt", java.sql.Timestamp.from(c.getUpdatedAt()));
     }
 
     private MapSqlParameterSource mapTemplateParams(MarketingTemplate t) {
         return new MapSqlParameterSource()
-            .addValue("id", t.getId())
-            .addValue("companyId", t.getCompanyId())
-            .addValue("name", t.getName())
-            .addValue("subjectTemplate", t.getSubjectTemplate())
-            .addValue("bodyHtml", t.getBodyHtml())
-            .addValue("isActive", t.isActive())
-            .addValue("createdAt", java.sql.Timestamp.from(t.getCreatedAt()))
-            .addValue("updatedAt", java.sql.Timestamp.from(t.getUpdatedAt()));
+                .addValue("id", t.getId())
+                .addValue("companyId", t.getCompanyId())
+                .addValue("code", t.getCode())
+                .addValue("name", t.getName())
+                .addValue("subjectTemplate", t.getSubjectTemplate())
+                .addValue("bodyHtml", t.getBodyHtml())
+                .addValue("isActive", t.isActive())
+                .addValue("createdAt", java.sql.Timestamp.from(t.getCreatedAt()))
+                .addValue("updatedAt", java.sql.Timestamp.from(t.getUpdatedAt()));
     }
 
     private MapSqlParameterSource mapLogParams(CampaignLog l) {
         return new MapSqlParameterSource()
-            .addValue("id", l.getId())
-            .addValue("companyId", l.getCompanyId())
-            .addValue("customerId", l.getCustomerId())
-            .addValue("templateId", l.getTemplateId())
-            .addValue("campaignId", l.getCampaignId())
-            .addValue("status", l.getStatus().name())
-            .addValue("messageId", l.getMessageId())
-            .addValue("errorMessage", l.getErrorMessage())
-            .addValue("sentAt", l.getSentAt() != null ? java.sql.Timestamp.from(l.getSentAt()) : null)
-            .addValue("deliveredAt", l.getDeliveredAt() != null ? java.sql.Timestamp.from(l.getDeliveredAt()) : null)
-            .addValue("openedAt", l.getOpenedAt() != null ? java.sql.Timestamp.from(l.getOpenedAt()) : null)
-            .addValue("clickedAt", l.getClickedAt() != null ? java.sql.Timestamp.from(l.getClickedAt()) : null)
-            .addValue("bouncedAt", l.getBouncedAt() != null ? java.sql.Timestamp.from(l.getBouncedAt()) : null)
-            .addValue("unsubscribedAt", l.getUnsubscribedAt() != null ? java.sql.Timestamp.from(l.getUnsubscribedAt()) : null)
-            .addValue("complainedAt", l.getComplainedAt() != null ? java.sql.Timestamp.from(l.getComplainedAt()) : null);
+                .addValue("id", l.getId())
+                .addValue("companyId", l.getCompanyId())
+                .addValue("customerId", l.getCustomerId())
+                .addValue("templateId", l.getTemplateId())
+                .addValue("campaignId", l.getCampaignId())
+                .addValue("status", l.getStatus().name())
+                .addValue("messageId", l.getMessageId())
+                .addValue("errorMessage", l.getErrorMessage())
+                .addValue("sentAt", l.getSentAt() != null ? java.sql.Timestamp.from(l.getSentAt()) : null)
+                .addValue("deliveredAt",
+                        l.getDeliveredAt() != null ? java.sql.Timestamp.from(l.getDeliveredAt()) : null)
+                .addValue("openedAt", l.getOpenedAt() != null ? java.sql.Timestamp.from(l.getOpenedAt()) : null)
+                .addValue("clickedAt", l.getClickedAt() != null ? java.sql.Timestamp.from(l.getClickedAt()) : null)
+                .addValue("bouncedAt", l.getBouncedAt() != null ? java.sql.Timestamp.from(l.getBouncedAt()) : null)
+                .addValue("unsubscribedAt",
+                        l.getUnsubscribedAt() != null ? java.sql.Timestamp.from(l.getUnsubscribedAt()) : null)
+                .addValue("complainedAt",
+                        l.getComplainedAt() != null ? java.sql.Timestamp.from(l.getComplainedAt()) : null);
     }
 
     private MarketingCampaign mapRowToCampaign(ResultSet rs, int rowNum) throws SQLException {
@@ -555,25 +641,24 @@ public class JdbcCampaignRepository implements CampaignRepositoryPort {
             var constructor = MarketingCampaign.class.getDeclaredConstructors()[0];
             constructor.setAccessible(true);
             return (MarketingCampaign) constructor.newInstance(
-                rs.getLong("id"),
-                rs.getObject("company_id", UUID.class),
-                rs.getString("name"),
-                rs.getLong("template_id"),
-                deserializeJson(rs.getString("audience_filter"), AudienceFilter.class),
-                CampaignStatus.valueOf(rs.getString("status")),
-                rs.getTimestamp("scheduled_at") != null ? rs.getTimestamp("scheduled_at").toInstant() : null,
-                rs.getTimestamp("started_at") != null ? rs.getTimestamp("started_at").toInstant() : null,
-                rs.getTimestamp("completed_at") != null ? rs.getTimestamp("completed_at").toInstant() : null,
-                rs.getInt("metrics_total_recipients"),
-                rs.getInt("metrics_sent"),
-                rs.getInt("metrics_delivered"),
-                rs.getInt("metrics_opened"),
-                rs.getInt("metrics_clicked"),
-                rs.getInt("metrics_bounced"),
-                rs.getInt("metrics_unsubscribed"),
-                rs.getTimestamp("created_at").toInstant(),
-                rs.getTimestamp("updated_at").toInstant()
-            );
+                    rs.getLong("id"),
+                    rs.getObject("company_id", UUID.class),
+                    rs.getString("name"),
+                    rs.getLong("template_id"),
+                    deserializeJson(rs.getString("audience_filter"), AudienceFilter.class),
+                    CampaignStatus.valueOf(rs.getString("status")),
+                    rs.getTimestamp("scheduled_at") != null ? rs.getTimestamp("scheduled_at").toInstant() : null,
+                    rs.getTimestamp("started_at") != null ? rs.getTimestamp("started_at").toInstant() : null,
+                    rs.getTimestamp("completed_at") != null ? rs.getTimestamp("completed_at").toInstant() : null,
+                    rs.getInt("metrics_total_recipients"),
+                    rs.getInt("metrics_sent"),
+                    rs.getInt("metrics_delivered"),
+                    rs.getInt("metrics_opened"),
+                    rs.getInt("metrics_clicked"),
+                    rs.getInt("metrics_bounced"),
+                    rs.getInt("metrics_unsubscribed"),
+                    rs.getTimestamp("created_at").toInstant(),
+                    rs.getTimestamp("updated_at").toInstant());
         } catch (Exception e) {
             throw new SQLException("Failed to instantiate MarketingCampaign via reflection", e);
         }
@@ -581,26 +666,24 @@ public class JdbcCampaignRepository implements CampaignRepositoryPort {
 
     private MarketingTemplate mapRowToTemplate(ResultSet rs, int rowNum) throws SQLException {
         return new MarketingTemplate(
-            rs.getLong("id"),
-            rs.getObject("company_id", UUID.class),
-            "", // Template code omitted in current SQL schema
-            rs.getString("name"),
-            rs.getString("subject_template"),
-            rs.getString("body_html"),
-            rs.getBoolean("is_active"),
-            rs.getTimestamp("created_at") != null ? rs.getTimestamp("created_at").toInstant() : null,
-            rs.getTimestamp("updated_at") != null ? rs.getTimestamp("updated_at").toInstant() : null
-        );
+                rs.getLong("id"),
+                rs.getObject("company_id", UUID.class),
+                rs.getString("code"),
+                rs.getString("name"),
+                rs.getString("subject_template"),
+                rs.getString("body_html"),
+                rs.getBoolean("is_active"),
+                rs.getTimestamp("created_at") != null ? rs.getTimestamp("created_at").toInstant() : null,
+                rs.getTimestamp("updated_at") != null ? rs.getTimestamp("updated_at").toInstant() : null);
     }
 
     private CampaignLog mapRowToLog(ResultSet rs, int rowNum) throws SQLException {
         try {
             CampaignLog log = CampaignLog.createPending(
-                rs.getLong("campaign_id"),
-                rs.getObject("company_id", UUID.class),
-                rs.getLong("customer_id"),
-                rs.getLong("template_id")
-            );
+                    rs.getLong("campaign_id"),
+                    rs.getObject("company_id", UUID.class),
+                    rs.getLong("customer_id"),
+                    rs.getLong("template_id"));
 
             // Rehydrate fields
             var idField = CampaignLog.class.getDeclaredField("id");
@@ -644,7 +727,8 @@ public class JdbcCampaignRepository implements CampaignRepositoryPort {
     }
 
     private String serializeJson(Object obj) {
-        if (obj == null) return null;
+        if (obj == null)
+            return null;
         try {
             return mapper.writeValueAsString(obj);
         } catch (JsonProcessingException e) {
@@ -653,7 +737,8 @@ public class JdbcCampaignRepository implements CampaignRepositoryPort {
     }
 
     private <T> T deserializeJson(String json, Class<T> clazz) {
-        if (json == null || json.isBlank()) return null;
+        if (json == null || json.isBlank())
+            return null;
         try {
             return mapper.readValue(json, clazz);
         } catch (JsonProcessingException e) {

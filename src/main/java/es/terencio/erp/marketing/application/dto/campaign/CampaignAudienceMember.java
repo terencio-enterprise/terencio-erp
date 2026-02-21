@@ -9,12 +9,32 @@ public record CampaignAudienceMember(
         String name,
         MarketingStatus marketingStatus,
         DeliveryStatus sendStatus,
-        String unsubscribeToken
-) {
-        public CampaignAudienceMember(long customerId, String email, String name, String marketingStatusStr, String unsubscribeToken) {
-            this(customerId, email, name, 
-                 marketingStatusStr != null ? MarketingStatus.valueOf(marketingStatusStr) : null, 
-                 null, 
-                 unsubscribeToken);
+        String unsubscribeToken) {
+    public CampaignAudienceMember(long customerId, String email, String name, String marketingStatusStr,
+            String unsubscribeToken) {
+        this(customerId, email, name,
+                MarketingStatus.parseOrDefault(marketingStatusStr, MarketingStatus.UNSUBSCRIBED),
+                null,
+                unsubscribeToken);
+    }
+
+    public CampaignAudienceMember(long customerId, String email, String name, String marketingStatusStr,
+            String sendStatusStr, String unsubscribeToken) {
+        this(customerId, email, name,
+                MarketingStatus.parseOrDefault(marketingStatusStr, MarketingStatus.UNSUBSCRIBED),
+                parseDeliveryStatus(sendStatusStr),
+                unsubscribeToken);
+    }
+
+    private static DeliveryStatus parseDeliveryStatus(String rawValue) {
+        if (rawValue == null || rawValue.isBlank()) {
+            return DeliveryStatus.NOT_SENT;
         }
+
+        try {
+            return DeliveryStatus.valueOf(rawValue.trim().toUpperCase());
+        } catch (IllegalArgumentException ex) {
+            return DeliveryStatus.NOT_SENT;
+        }
+    }
 }

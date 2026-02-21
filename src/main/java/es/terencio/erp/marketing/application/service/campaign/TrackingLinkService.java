@@ -13,7 +13,7 @@ import es.terencio.erp.marketing.infrastructure.config.MarketingProperties;
 
 public class TrackingLinkService {
     private final MarketingProperties properties;
-    private static final Pattern LINK_PATTERN = Pattern.compile("href=\"(https?://[^\"]+)\"");
+    private static final Pattern LINK_PATTERN = Pattern.compile("(?i)href\\s*=\\s*(['\"])(https?://[^'\\\"\\s]+)\\1");
 
     public TrackingLinkService(MarketingProperties properties) {
         this.properties = properties;
@@ -25,9 +25,10 @@ public class TrackingLinkService {
         long expiresAt = Instant.now().plus(properties.getLinkExpirationHours(), ChronoUnit.HOURS).toEpochMilli();
 
         while (matcher.find()) {
-            String originalUrl = matcher.group(1);
+            String quote = matcher.group(1);
+            String originalUrl = matcher.group(2);
             if (originalUrl.contains("/marketing/preferences") || originalUrl.contains("/marketing/track/click/")) {
-                matcher.appendReplacement(sb, "href=\"" + originalUrl + "\"");
+                matcher.appendReplacement(sb, Matcher.quoteReplacement("href=" + quote + originalUrl + quote));
                 continue;
             }
 
@@ -37,7 +38,7 @@ public class TrackingLinkService {
             String trackUrl = String.format("%s/api/v1/public/marketing/track/click/%d?p=%s&sig=%s",
                     properties.getPublicBaseUrl(), logId, encodedPayload, signature);
 
-            matcher.appendReplacement(sb, "href=\"" + trackUrl + "\"");
+            matcher.appendReplacement(sb, Matcher.quoteReplacement("href=" + quote + trackUrl + quote));
         }
         matcher.appendTail(sb);
         return sb.toString();

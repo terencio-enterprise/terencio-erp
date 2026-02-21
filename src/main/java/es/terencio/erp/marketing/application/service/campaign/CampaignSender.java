@@ -39,7 +39,9 @@ public class CampaignSender {
     public void executeCampaign(UUID companyId, Long campaignId, boolean isRelaunch) {
         boolean acquired = campaignRepository.tryStartCampaign(campaignId, isRelaunch);
         if (!acquired) {
-            log.warn("Execution Aborted: Campaign {} could not be locked. It is already running or in an invalid state.", campaignId);
+            log.warn(
+                    "Execution Aborted: Campaign {} could not be locked. It is already running or in an invalid state.",
+                    campaignId);
             return;
         }
 
@@ -53,35 +55,39 @@ public class CampaignSender {
             return;
         }
 
-        PageResult<CampaignAudienceMember> firstPage = campaignRepository.findCampaignAudience(companyId, campaignId, 0, 1);
+        PageResult<CampaignAudienceMember> firstPage = campaignRepository.findCampaignAudience(companyId, campaignId, 0,
+                1);
         int totalRecipients = (int) firstPage.totalElements();
         campaignRepository.updateCampaignTotalRecipients(campaignId, totalRecipients);
 
         CampaignRateLimiter rateLimiter = new CampaignRateLimiter(properties.getRateLimitPerSecond());
         EmailRetryPolicy retryPolicy = new EmailRetryPolicy(properties.getMaxRetries());
 
-        int page = 0;
+        long lastSeenCustomerId = 0L;
         int sentInThisSession = 0;
 
         while (true) {
-            PageResult<CampaignAudienceMember> batch = campaignRepository.findCampaignAudience(
-                    campaign.getCompanyId(), campaign.getId(), page, properties.getBatchSize());
-            
-            if (batch.content() == null || batch.content().isEmpty()) break;
+            var batch = campaignRepository.findCampaignAudienceBatch(
+                    campaign.getCompanyId(), campaign.getId(), lastSeenCustomerId, properties.getBatchSize());
 
-            for (CampaignAudienceMember member : batch.content()) {
+            if (batch == null || batch.isEmpty())
+                break;
+
+            for (CampaignAudienceMember member : batch) {
+                lastSeenCustomerId = member.customerId();
                 boolean isSubscribed = member.marketingStatus() == MarketingStatus.SUBSCRIBED;
                 boolean shouldSend;
 
                 if (isRelaunch) {
                     shouldSend = member.sendStatus() == DeliveryStatus.NOT_SENT
-                              || member.sendStatus() == DeliveryStatus.FAILED;
+                            || member.sendStatus() == DeliveryStatus.FAILED;
                 } else {
                     shouldSend = member.sendStatus() == null
-                              || member.sendStatus() == DeliveryStatus.NOT_SENT;
+                            || member.sendStatus() == DeliveryStatus.NOT_SENT;
                 }
 
-                if (!isSubscribed || !shouldSend) continue;
+                if (!isSubscribed || !shouldSend)
+                    continue;
 
                 rateLimiter.acquire();
 
@@ -91,35 +97,36 @@ public class CampaignSender {
                         sentInThisSession++;
                     }
                 } catch (DataIntegrityViolationException e) {
-                    log.warn("DB Idempotency: Duplicate log prevented for campaign {} and customer {}", campaign.getId(), member.customerId());
+                    log.warn("DB Idempotency: Duplicate log prevented for campaign {} and customer {}",
+                            campaign.getId(), member.customerId());
                 } catch (Exception e) {
                     log.error("Unexpected error processing customer {}", member.customerId(), e);
                 }
             }
-            
-            page++;
         }
 
         campaignRepository.completeCampaign(campaignId, sentInThisSession);
         log.info("Campaign {} execution finished. Emails sent this session: {}", campaignId, sentInThisSession);
     }
 
-    private boolean processSingleCustomer(MarketingCampaign campaign, MarketingTemplate tpl, CampaignAudienceMember member, EmailRetryPolicy retryPolicy) {
-        CampaignLog logEntry = CampaignLog.createPending(campaign.getId(), campaign.getCompanyId(), member.customerId(), tpl.getId());
+    private boolean processSingleCustomer(MarketingCampaign campaign, MarketingTemplate tpl,
+            CampaignAudienceMember member, EmailRetryPolicy retryPolicy) {
+        CampaignLog logEntry = CampaignLog.createPending(campaign.getId(), campaign.getCompanyId(), member.customerId(),
+                tpl.getId());
         campaignRepository.saveLog(logEntry);
 
         return retryPolicy.execute(() -> {
             try {
                 EmailMessage msg = contentBuilder.buildMessage(tpl, member, logEntry.getId());
                 String messageId = mailingSystem.send(msg);
-                
+
                 logEntry.markSent(messageId);
                 campaignRepository.saveLog(logEntry);
                 return true;
             } catch (Exception e) {
                 logEntry.markFailed(e.getMessage());
                 campaignRepository.saveLog(logEntry);
-                throw e; 
+                throw e;
             }
         }, member.email());
     }

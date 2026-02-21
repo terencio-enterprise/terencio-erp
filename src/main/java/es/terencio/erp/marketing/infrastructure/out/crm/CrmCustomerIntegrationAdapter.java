@@ -25,16 +25,17 @@ public class CrmCustomerIntegrationAdapter implements CustomerIntegrationPort {
     @Override
     public Optional<MarketingCustomer> findByToken(String token) {
         String sql = """
-            SELECT id,
-                   email,
-                   COALESCE(commercial_name, legal_name, 'Customer') AS name,
-                   marketing_status,
-                   unsubscribe_token,
-                   active
-            FROM customers
-            WHERE unsubscribe_token = ?
-              AND deleted_at IS NULL
-            """;
+                SELECT id,
+                       email,
+                       COALESCE(commercial_name, legal_name, 'Customer') AS name,
+                       marketing_status,
+                         marketing_snooze_until,
+                       unsubscribe_token,
+                       active
+                FROM customers
+                WHERE unsubscribe_token = ?
+                  AND deleted_at IS NULL
+                """;
 
         List<MarketingCustomer> results = jdbcTemplate.query(sql, this::mapRow, token);
         return results.stream().findFirst();
@@ -43,32 +44,37 @@ public class CrmCustomerIntegrationAdapter implements CustomerIntegrationPort {
     @Override
     public void updateMarketingStatus(String token, MarketingStatus status, Instant snoozeUntil) {
         String sql = """
-            UPDATE customers
-            SET marketing_status = ?,
-                marketing_snooze_until = ?,
-                updated_at = NOW()
-            WHERE unsubscribe_token = ?
-              AND deleted_at IS NULL
-            """;
+                UPDATE customers
+                SET marketing_status = ?,
+                    marketing_snooze_until = ?,
+                    updated_at = NOW()
+                WHERE unsubscribe_token = ?
+                  AND deleted_at IS NULL
+                """;
 
         jdbcTemplate.update(sql, status.name(), snoozeUntil, token);
     }
 
     private MarketingCustomer mapRow(ResultSet rs, int rowNum) throws SQLException {
         String statusStr = rs.getString("marketing_status");
-        MarketingStatus status =
-            statusStr != null ? MarketingStatus.valueOf(statusStr) : MarketingStatus.UNSUBSCRIBED;
+        MarketingStatus status = MarketingStatus.parseOrDefault(statusStr, MarketingStatus.UNSUBSCRIBED);
+
+        Instant snoozeUntil = rs.getTimestamp("marketing_snooze_until") != null
+                ? rs.getTimestamp("marketing_snooze_until").toInstant()
+                : null;
+        boolean snoozedActive = status == MarketingStatus.SNOOZED
+                && snoozeUntil != null
+                && snoozeUntil.isAfter(Instant.now());
 
         boolean active = rs.getBoolean("active");
-        boolean canReceive = active && status == MarketingStatus.SUBSCRIBED;
+        boolean canReceive = active && status == MarketingStatus.SUBSCRIBED && !snoozedActive;
 
         return new MarketingCustomer(
-            rs.getLong("id"),
-            rs.getString("email"),
-            rs.getString("name"),
-            canReceive,
-            status,
-            rs.getString("unsubscribe_token")
-        );
+                rs.getLong("id"),
+                rs.getString("email"),
+                rs.getString("name"),
+                canReceive,
+                status,
+                rs.getString("unsubscribe_token"));
     }
 }

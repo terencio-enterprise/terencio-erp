@@ -4,6 +4,7 @@ import java.net.URI;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.List;
+import java.util.Locale;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -19,7 +20,7 @@ public class CampaignTrackingService implements CampaignTrackingUseCase {
     private static final Logger log = LoggerFactory.getLogger(CampaignTrackingService.class);
     private static final byte[] PIXEL_BYTES = Base64.getDecoder()
             .decode("R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7");
-            
+
     private static final String METRIC_OPENED = "opened";
     private static final String METRIC_CLICKED = "clicked";
 
@@ -27,7 +28,8 @@ public class CampaignTrackingService implements CampaignTrackingUseCase {
     private final TrackingLinkService trackingLinkService;
     private final MarketingProperties properties;
 
-    public CampaignTrackingService(CampaignRepositoryPort campaignRepository, TrackingLinkService trackingLinkService, MarketingProperties properties) {
+    public CampaignTrackingService(CampaignRepositoryPort campaignRepository, TrackingLinkService trackingLinkService,
+            MarketingProperties properties) {
         this.campaignRepository = campaignRepository;
         this.trackingLinkService = trackingLinkService;
         this.properties = properties;
@@ -58,7 +60,7 @@ public class CampaignTrackingService implements CampaignTrackingUseCase {
             String[] parts = decoded.split("\\|");
             String originalUrl = parts[0];
             long expiresAt = Long.parseLong(parts[1]);
-            
+
             if (!originalUrl.startsWith("http://") && !originalUrl.startsWith("https://")) {
                 log.warn("Invalid scheme on redirect: {}", originalUrl);
                 return properties.getPublicBaseUrl();
@@ -67,8 +69,9 @@ public class CampaignTrackingService implements CampaignTrackingUseCase {
             List<String> allowedDomains = properties.getAllowedRedirectDomains();
             if (allowedDomains != null && !allowedDomains.isEmpty()) {
                 URI uri = URI.create(originalUrl);
-                if (!allowedDomains.contains(uri.getHost())) {
-                    log.warn("Security Block: Attempted redirect to unauthorized host: {}", uri.getHost());
+                String host = normalizeHost(uri.getHost());
+                if (!isAllowedDomain(host, allowedDomains)) {
+                    log.warn("Security Block: Attempted redirect to unauthorized host: {}", host);
                     return properties.getPublicBaseUrl();
                 }
             }
@@ -89,5 +92,36 @@ public class CampaignTrackingService implements CampaignTrackingUseCase {
             log.error("Click tracking resolution failed for log {}", logId, e);
             return properties.getPublicBaseUrl();
         }
+    }
+
+    private static boolean isAllowedDomain(String host, List<String> allowedDomains) {
+        if (host == null || host.isBlank()) {
+            return false;
+        }
+
+        for (String allowed : allowedDomains) {
+            String normalizedAllowed = normalizeHost(allowed);
+            if (normalizedAllowed == null || normalizedAllowed.isBlank()) {
+                continue;
+            }
+
+            if (host.equals(normalizedAllowed) || host.endsWith("." + normalizedAllowed)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static String normalizeHost(String host) {
+        if (host == null) {
+            return null;
+        }
+
+        String normalized = host.trim().toLowerCase(Locale.ROOT);
+        if (normalized.endsWith(".")) {
+            normalized = normalized.substring(0, normalized.length() - 1);
+        }
+        return normalized;
     }
 }
