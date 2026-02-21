@@ -1,13 +1,14 @@
 package es.terencio.erp.marketing.application.service;
 
 import java.time.Instant;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import es.terencio.erp.marketing.application.port.in.ProcessWebhookUseCase;
 import es.terencio.erp.marketing.application.port.out.CampaignRepositoryPort;
@@ -15,45 +16,66 @@ import es.terencio.erp.marketing.domain.model.CampaignLog;
 import es.terencio.erp.marketing.domain.model.EmailDeliveryEvent;
 
 /**
- * Handles incoming webhooks from AWS SNS/SES for email delivery events.
+ * Handles incoming webhooks from AWS SNS/SES for email delivery events safely using Jackson.
  */
 public class WebhookService implements ProcessWebhookUseCase {
     private static final Logger log = LoggerFactory.getLogger(WebhookService.class);
     private final CampaignRepositoryPort repository;
+    private final ObjectMapper objectMapper;
     private final RestTemplate restTemplate = new RestTemplate();
 
-    public WebhookService(CampaignRepositoryPort repository) {
+    public WebhookService(CampaignRepositoryPort repository, ObjectMapper objectMapper) {
         this.repository = repository;
+        this.objectMapper = objectMapper;
     }
 
     @Override
     @Transactional
     public void processSesEvent(String payload) {
-        String messageType = extractField(payload, "\"Type\"\\s*:\\s*\"([^\"]+)\"");
-        if ("SubscriptionConfirmation".equals(messageType)) {
-            String subscribeUrl = extractField(payload, "\"SubscribeURL\"\\s*:\\s*\"([^\"]+)\"");
-            if (subscribeUrl != null) {
-                log.info("Auto-confirming SNS Subscription...");
-                restTemplate.getForEntity(subscribeUrl, String.class);
+        try {
+            JsonNode root = objectMapper.readTree(payload);
+            String type = root.path("Type").asText(null);
+
+            if ("SubscriptionConfirmation".equals(type)) {
+                String subscribeUrl = root.path("SubscribeURL").asText(null);
+                if (subscribeUrl != null) {
+                    log.info("Auto-confirming SNS Subscription...");
+                    restTemplate.getForEntity(subscribeUrl, String.class);
+                }
+                return;
             }
-            return;
+
+            // SNS encapsulates SES payload inside 'Message' field
+            if ("Notification".equals(type) && root.has("Message")) {
+                String messageStr = root.path("Message").asText();
+                root = objectMapper.readTree(messageStr);
+            }
+
+            String messageId = root.path("mail").path("messageId").asText(null);
+            if (messageId == null) messageId = root.path("messageId").asText(null); // fallback direct SES
+            
+            String eventType = root.path("notificationType").asText(null);
+            if (eventType == null) eventType = root.path("eventType").asText(null);
+
+            JsonNode mailNode = root.has("mail") ? root.get("mail") : root;
+            String email = mailNode.path("destination").path(0).asText(null);
+
+            if (messageId == null || eventType == null) return;
+
+            String bounceType = root.path("bounce").path("bounceType").asText(null);
+            String bounceSubtype = root.path("bounce").path("bounceSubType").asText(null);
+
+            EmailDeliveryEvent event = new EmailDeliveryEvent(null, messageId, email, eventType, bounceType, bounceSubtype, payload,
+                    Instant.now());
+            repository.saveDeliveryEvent(event);
+
+            repository.findLogByMessageId(messageId).ifPresent(logEntry -> {
+                updateLogEntry(logEntry, eventType);
+                repository.saveLog(logEntry);
+            });
+        } catch (Exception e) {
+            log.error("Failed to parse SES webhook payload", e);
         }
-
-        String messageId = extractField(payload, "\"messageId\"\\s*:\\s*\"([^\"]+)\"");
-        String notificationType = extractField(payload, "\"notificationType\"\\s*:\\s*\"([^\"]+)\"");
-        String email = extractField(payload, "\"destination\"\\s*:\\s*\\[\\s*\"([^\"]+)\"");
-
-        if (messageId == null || notificationType == null)
-            return;
-
-        EmailDeliveryEvent event = new EmailDeliveryEvent(null, messageId, email, notificationType, null, null, payload,
-                Instant.now());
-        repository.saveDeliveryEvent(event);
-
-        repository.findLogByMessageId(messageId).ifPresent(logEntry -> {
-            updateLogEntry(logEntry, notificationType);
-            repository.saveLog(logEntry);
-        });
     }
 
     private void updateLogEntry(CampaignLog logEntry, String type) {
@@ -75,10 +97,5 @@ public class WebhookService implements ProcessWebhookUseCase {
                 }
             }
         }
-    }
-
-    private String extractField(String payload, String regex) {
-        Matcher matcher = Pattern.compile(regex).matcher(payload);
-        return matcher.find() ? matcher.group(1) : null;
     }
 }

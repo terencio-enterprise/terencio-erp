@@ -20,8 +20,8 @@ public final class MarketingDtos {
     ) {}
 
     public record CampaignResponse(Long id, String name, CampaignStatus status, Instant scheduledAt, 
-                                   int metricsTotalRecipients, int metricsSent, int metricsOpened, 
-                                   int metricsClicked, int metricsBounced) {}
+                                   int metricsTotalRecipients, int metricsSent, int metricsDelivered, 
+                                   int metricsOpened, int metricsClicked, int metricsBounced, int metricsUnsubscribed) {}
                                    
     public record CampaignAudienceMember(Long customerId, String email, String name, String status) {}
 

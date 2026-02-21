@@ -4,13 +4,11 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import es.terencio.erp.marketing.application.dto.MarketingDtos.AudienceFilter;
 
 public interface CustomerIntegrationPort {
     record MarketingCustomer(Long id, UUID companyId, String email, String name, boolean canReceiveMarketing, String unsubscribeToken) {}
     
-    // Supporting Pagination for Memory Safety
-    List<MarketingCustomer> findAudience(AudienceFilter filter, int limit, int offset);
+    List<MarketingCustomer> findAudience(Long campaignId, int limit, int page);
     
     Optional<MarketingCustomer> findByToken(String token);
     void updateMarketingStatus(String token, String status, Instant snoozedUntil);

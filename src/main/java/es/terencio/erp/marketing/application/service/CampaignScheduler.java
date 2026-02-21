@@ -35,8 +35,8 @@ public class CampaignScheduler {
         try {
             List<MarketingCampaign> dueCampaigns = repository.findScheduledCampaignsToLaunch(Instant.now());
             for (MarketingCampaign campaign : dueCampaigns) {
-                log.info("Scheduler: Auto-launching Scheduled Campaign ID: {}", campaign.getId());
-                manageCampaignsUseCase.launchCampaign(campaign.getId());
+                log.info("Scheduler: Auto-launching Scheduled Campaign ID: {} for Company: {}", campaign.getId(), campaign.getCompanyId());
+                manageCampaignsUseCase.launchCampaign(campaign.getCompanyId(), campaign.getId());
             }
         } finally {
             repository.releaseSchedulerLock(LOCK_NAME);

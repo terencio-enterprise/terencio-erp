@@ -11,8 +11,9 @@ public class MarketingCampaign {
 
     private Long id;
     private final UUID companyId;
-    private final String name;
-    private final Long templateId;
+    private String name;
+    private Long templateId;
+    private String audienceFilter;
 
     private CampaignStatus status;
     private Instant scheduledAt;
@@ -33,55 +34,32 @@ public class MarketingCampaign {
     public static MarketingCampaign createDraft(
             UUID companyId,
             String name,
-            Long templateId
+            Long templateId,
+            String audienceFilterJson
     ) {
-        if (companyId == null)
-            throw new InvariantViolationException("Campaign must belong to a company");
-
-        if (name == null || name.isBlank())
-            throw new InvariantViolationException("Campaign name cannot be blank");
-
-        if (templateId == null)
-            throw new InvariantViolationException("Campaign must have a template");
+        if (companyId == null) throw new InvariantViolationException("Campaign must belong to a company");
+        if (name == null || name.isBlank()) throw new InvariantViolationException("Campaign name cannot be blank");
+        if (templateId == null) throw new InvariantViolationException("Campaign must have a template");
 
         return new MarketingCampaign(
-                null,
-                companyId,
-                name,
-                templateId,
-                CampaignStatus.DRAFT,
-                null,
-                null,
-                null,
+                null, companyId, name, templateId, audienceFilterJson,
+                CampaignStatus.DRAFT, null, null, null,
                 0,0,0,0,0,0,0,
-                Instant.now(),
-                Instant.now()
+                Instant.now(), Instant.now()
         );
     }
 
     private MarketingCampaign(
-            Long id,
-            UUID companyId,
-            String name,
-            Long templateId,
-            CampaignStatus status,
-            Instant scheduledAt,
-            Instant startedAt,
-            Instant completedAt,
-            int totalRecipients,
-            int sent,
-            int delivered,
-            int opened,
-            int clicked,
-            int bounced,
-            int unsubscribed,
-            Instant createdAt,
-            Instant updatedAt
+            Long id, UUID companyId, String name, Long templateId, String audienceFilter,
+            CampaignStatus status, Instant scheduledAt, Instant startedAt, Instant completedAt,
+            int totalRecipients, int sent, int delivered, int opened, int clicked, int bounced, int unsubscribed,
+            Instant createdAt, Instant updatedAt
     ) {
         this.id = id;
         this.companyId = companyId;
         this.name = name;
         this.templateId = templateId;
+        this.audienceFilter = audienceFilter;
         this.status = status;
         this.scheduledAt = scheduledAt;
         this.startedAt = startedAt;
@@ -96,10 +74,21 @@ public class MarketingCampaign {
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
     }
+    
+    public void updateDraft(String name, Long templateId, String audienceFilter) {
+        if (status != CampaignStatus.DRAFT) throw new InvariantViolationException("Only DRAFT campaigns can be updated");
+        if (name == null || name.isBlank()) throw new InvariantViolationException("Campaign name cannot be blank");
+        if (templateId == null) throw new InvariantViolationException("Campaign must have a template");
+
+        this.name = name;
+        this.templateId = templateId;
+        this.audienceFilter = audienceFilter;
+        touch();
+    }
 
     public void schedule(Instant when) {
-        if (status != CampaignStatus.DRAFT)
-            throw new InvariantViolationException("Only DRAFT campaigns can be scheduled");
+        if (status != CampaignStatus.DRAFT && status != CampaignStatus.SCHEDULED)
+            throw new InvariantViolationException("Only DRAFT or SCHEDULED campaigns can be scheduled");
 
         if (when == null || when.isBefore(Instant.now()))
             throw new InvariantViolationException("Scheduled time must be in the future");
@@ -128,8 +117,8 @@ public class MarketingCampaign {
     }
 
     public void cancel() {
-        if (status == CampaignStatus.COMPLETED)
-            throw new InvariantViolationException("Completed campaign cannot be cancelled");
+        if (status == CampaignStatus.COMPLETED || status == CampaignStatus.CANCELLED)
+            throw new InvariantViolationException("Completed or already cancelled campaign cannot be cancelled");
 
         this.status = CampaignStatus.CANCELLED;
         touch();

@@ -8,6 +8,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -17,6 +18,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import es.terencio.erp.marketing.application.dto.MarketingDtos.CampaignAudienceMember;
 import es.terencio.erp.marketing.application.dto.MarketingDtos.CampaignResponse;
@@ -33,6 +36,7 @@ import es.terencio.erp.marketing.domain.model.EmailMessage;
 import es.terencio.erp.marketing.domain.model.MarketingCampaign;
 import es.terencio.erp.marketing.domain.model.MarketingTemplate;
 import es.terencio.erp.marketing.infrastructure.config.MarketingProperties;
+import es.terencio.erp.shared.domain.exception.InvariantViolationException;
 import es.terencio.erp.shared.exception.ResourceNotFoundException;
 
 public class CampaignService implements ManageCampaignsUseCase, CampaignTrackingUseCase {
@@ -44,48 +48,94 @@ public class CampaignService implements ManageCampaignsUseCase, CampaignTracking
     private final CustomerIntegrationPort customerPort;
     private final MailingSystemPort mailingSystem;
     private final MarketingProperties properties;
+    private final ObjectMapper objectMapper;
 
     public CampaignService(CampaignRepositoryPort campaignRepository, CustomerIntegrationPort customerPort,
-            MailingSystemPort mailingSystem, MarketingProperties properties) {
+            MailingSystemPort mailingSystem, MarketingProperties properties, ObjectMapper objectMapper) {
         this.campaignRepository = campaignRepository;
         this.customerPort = customerPort;
         this.mailingSystem = mailingSystem;
         this.properties = properties;
+        this.objectMapper = objectMapper;
+    }
+
+    private MarketingCampaign getCampaignEntity(UUID companyId, Long campaignId) {
+        MarketingCampaign campaign = campaignRepository.findCampaignById(campaignId)
+                .orElseThrow(() -> new ResourceNotFoundException("Campaign not found: " + campaignId));
+        if (!campaign.getCompanyId().equals(companyId)) {
+            throw new ResourceNotFoundException("Campaign not found");
+        }
+        return campaign;
     }
 
     @Override
     @Transactional
     public CampaignResponse createDraft(UUID companyId, CreateCampaignRequest request) {
-        MarketingCampaign campaign = MarketingCampaign.createDraft(companyId, request.name(), request.templateId());
+        String filterJson = null;
+        try {
+            if (request.audienceFilter() != null) {
+                filterJson = objectMapper.writeValueAsString(request.audienceFilter());
+            }
+        } catch (Exception e) { log.warn("Failed to serialize audience filter", e); }
+
+        MarketingCampaign campaign = MarketingCampaign.createDraft(companyId, request.name(), request.templateId(), filterJson);
         MarketingCampaign saved = campaignRepository.saveCampaign(campaign);
         return toCampaignDto(saved);
     }
 
     @Override
-    public CampaignResponse getCampaign(Long campaignId) {
-        return campaignRepository.findCampaignById(campaignId)
-                .map(this::toCampaignDto)
-                .orElseThrow(() -> new ResourceNotFoundException("Campaign not found: " + campaignId));
+    @Transactional
+    public CampaignResponse updateDraft(UUID companyId, Long campaignId, CreateCampaignRequest request) {
+        MarketingCampaign campaign = getCampaignEntity(companyId, campaignId);
+        String filterJson = null;
+        try {
+            if (request.audienceFilter() != null) {
+                filterJson = objectMapper.writeValueAsString(request.audienceFilter());
+            }
+        } catch (Exception e) { log.warn("Failed to serialize audience filter", e); }
+        
+        campaign.updateDraft(request.name(), request.templateId(), filterJson);
+        return toCampaignDto(campaignRepository.saveCampaign(campaign));
+    }
+
+    @Override
+    public CampaignResponse getCampaign(UUID companyId, Long campaignId) {
+        return toCampaignDto(getCampaignEntity(companyId, campaignId));
+    }
+
+    @Override
+    public List<CampaignAudienceMember> getCampaignAudience(UUID companyId, Long campaignId, int limit, int page) {
+        List<MarketingCustomer> batch = customerPort.findAudience(campaignId, limit, page);
+        return batch.stream()
+            .map(c -> new CampaignAudienceMember(c.id(), c.email(), c.name(), c.canReceiveMarketing() ? "SUBSCRIBED" : "UNSUBSCRIBED"))
+            .collect(Collectors.toList());
     }
 
     @Override
     @Async
-    public void launchCampaign(Long campaignId) {
-        executeCampaign(campaignId, false);
+    public void launchCampaign(UUID companyId, Long campaignId) {
+        executeCampaign(companyId, campaignId, false);
     }
 
     @Override
     @Async
-    public void relaunchCampaign(Long campaignId) {
-        executeCampaign(campaignId, true);
+    public void relaunchCampaign(UUID companyId, Long campaignId) {
+        executeCampaign(companyId, campaignId, true);
     }
 
-    private void executeCampaign(Long campaignId, boolean isRelaunch) {
-        MarketingCampaign campaign = campaignRepository.findCampaignById(campaignId)
-                .orElseThrow(() -> new ResourceNotFoundException("Campaign not found"));
+    private void executeCampaign(UUID companyId, Long campaignId, boolean isRelaunch) {
+        MarketingCampaign campaign;
+        try {
+            campaign = getCampaignEntity(companyId, campaignId);
+        } catch(Exception e) { log.error("Abort launch, campaign not found: {}", campaignId); return; }
 
         if (campaign.getStatus() == CampaignStatus.SENDING && !isRelaunch) {
             log.warn("Campaign {} is already sending. Aborting execution.", campaignId);
+            return;
+        }
+        
+        if (campaign.getStatus() != CampaignStatus.DRAFT && campaign.getStatus() != CampaignStatus.SCHEDULED && !isRelaunch) {
+            log.warn("Campaign {} is not in a valid state to launch.", campaignId);
             return;
         }
 
@@ -100,20 +150,19 @@ public class CampaignService implements ManageCampaignsUseCase, CampaignTracking
         long delay = 1000 / Math.max(1, properties.getRateLimitPerSecond());
 
         while (true) {
-            List<MarketingCustomer> batch = customerPort.findAudience(null, properties.getBatchSize(), offset);
-            if (batch.isEmpty())
-                break;
+            List<MarketingCustomer> batch = customerPort.findAudience(campaignId, properties.getBatchSize(), offset);
+            if (batch.isEmpty()) break;
 
             for (MarketingCustomer customer : batch) {
                 if (!customer.canReceiveMarketing() || campaignRepository.hasLog(campaignId, customer.id()))
                     continue;
 
-                processSingleCustomer(campaign, tpl, customer);
-                sentInThisSession++;
+                boolean success = processSingleCustomer(campaign, tpl, customer);
+                if (success) {
+                    sentInThisSession++;
+                }
 
-                try {
-                    Thread.sleep(delay);
-                } catch (InterruptedException e) {
+                try { Thread.sleep(delay); } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                     return;
                 }
@@ -126,22 +175,39 @@ public class CampaignService implements ManageCampaignsUseCase, CampaignTracking
         campaignRepository.saveCampaign(campaign);
     }
 
-    private void processSingleCustomer(MarketingCampaign campaign, MarketingTemplate tpl, MarketingCustomer customer) {
+    private boolean processSingleCustomer(MarketingCampaign campaign, MarketingTemplate tpl, MarketingCustomer customer) {
         CampaignLog logEntry = CampaignLog.createPending(campaign.getId(), campaign.getCompanyId(), customer.id(), tpl.getId());
         campaignRepository.saveLog(logEntry);
 
-        try {
-            sendEmailToCustomer(campaign.getId(), logEntry.getId(), tpl, customer, logEntry);
-        } catch (Exception e) {
-            log.error("Failed to send email to {}: {}", customer.email(), e.getMessage());
-            logEntry.markFailed(e.getMessage());
+        int attempts = 0;
+        int maxRetries = properties.getMaxRetries();
+        
+        while (attempts <= maxRetries) {
+            try {
+                sendEmailToCustomer(campaign.getId(), logEntry.getId(), tpl, customer, logEntry);
+                campaignRepository.saveLog(logEntry);
+                return true;
+            } catch (Exception e) {
+                attempts++;
+                log.warn("Failed sending to {} (attempt {}): {}", customer.email(), attempts, e.getMessage());
+                if (attempts > maxRetries) {
+                    logEntry.markFailed(e.getMessage());
+                    campaignRepository.saveLog(logEntry);
+                    return false;
+                }
+                try {
+                    Thread.sleep((long) Math.pow(2, attempts) * 1000L); // simple exponential backoff
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    return false;
+                }
+            }
         }
-        campaignRepository.saveLog(logEntry);
+        return false;
     }
 
     private void sendEmailToCustomer(Long campaignId, Long logId, MarketingTemplate tpl, MarketingCustomer customer, CampaignLog logEntry) {
-        String unsubscribeLink = properties.getPublicBaseUrl() + "/api/v1/public/marketing/preferences?token="
-                + customer.unsubscribeToken();
+        String unsubscribeLink = properties.getPublicBaseUrl() + "/api/v1/public/marketing/preferences?token=" + customer.unsubscribeToken();
         Map<String, String> vars = Map.of(
                 "name", customer.name() != null ? customer.name() : "Customer",
                 "unsubscribe_link", unsubscribeLink);
@@ -159,14 +225,14 @@ public class CampaignService implements ManageCampaignsUseCase, CampaignTracking
     }
 
     private String rewriteLinksForTracking(Long logId, String html) {
-        Pattern pattern = Pattern.compile("href=\"(http[s]?://[^\"]+)\"");
+        Pattern pattern = Pattern.compile("href=\"(https?://[^\"]+)\"");
         Matcher matcher = pattern.matcher(html);
         StringBuilder sb = new StringBuilder();
         long expiresAt = Instant.now().plus(properties.getLinkExpirationHours(), ChronoUnit.HOURS).toEpochMilli();
 
         while (matcher.find()) {
             String originalUrl = matcher.group(1);
-            if (originalUrl.contains("/marketing/preferences")) {
+            if (originalUrl.contains("/marketing/preferences") || originalUrl.contains("/marketing/track/click/")) {
                 matcher.appendReplacement(sb, "href=\"" + originalUrl + "\"");
                 continue;
             }
@@ -218,6 +284,11 @@ public class CampaignService implements ManageCampaignsUseCase, CampaignTracking
             String[] parts = decoded.split("\\|");
             String originalUrl = parts[0];
             long expiresAt = Long.parseLong(parts[1]);
+            
+            if (!originalUrl.startsWith("http://") && !originalUrl.startsWith("https://")) {
+                log.warn("Invalid scheme on redirect: {}", originalUrl);
+                return properties.getPublicBaseUrl();
+            }
 
             if (Instant.now().toEpochMilli() > expiresAt) {
                 log.warn("Expired tracking link: {}", logId);
@@ -238,24 +309,41 @@ public class CampaignService implements ManageCampaignsUseCase, CampaignTracking
 
     private CampaignResponse toCampaignDto(MarketingCampaign c) {
         return new CampaignResponse(c.getId(), c.getName(), c.getStatus(), c.getScheduledAt(),
-                c.getTotalRecipients(), c.getSent(), c.getOpened(),
-                c.getClicked(), c.getBounced());
+                c.getTotalRecipients(), c.getSent(), c.getDelivered(), c.getOpened(),
+                c.getClicked(), c.getBounced(), c.getUnsubscribed());
     }
 
     @Override
-    public List<CampaignAudienceMember> getCampaignAudience(Long campaignId) {
-        return List.of();
-    }
-
-    @Override
-    public void scheduleCampaign(Long campaignId, Instant s) {
-        MarketingCampaign campaign = campaignRepository.findCampaignById(campaignId)
-                .orElseThrow(() -> new ResourceNotFoundException("Campaign not found"));
+    @Transactional
+    public void scheduleCampaign(UUID companyId, Long campaignId, Instant s) {
+        MarketingCampaign campaign = getCampaignEntity(companyId, campaignId);
         campaign.schedule(s);
+        campaignRepository.saveCampaign(campaign);
+    }
+    
+    @Override
+    @Transactional
+    public void cancelCampaign(UUID companyId, Long campaignId) {
+        MarketingCampaign campaign = getCampaignEntity(companyId, campaignId);
+        campaign.cancel();
         campaignRepository.saveCampaign(campaign);
     }
 
     @Override
-    public void dryRun(Long t, String e) {
+    public void dryRun(UUID companyId, Long templateId, String testEmail) {
+        MarketingTemplate tpl = campaignRepository.findTemplateById(templateId)
+                .orElseThrow(() -> new ResourceNotFoundException("Template not found"));
+                
+        if (!tpl.getCompanyId().equals(companyId)) {
+            throw new InvariantViolationException("Template access denied");
+        }
+        
+        Map<String, String> vars = Map.of(
+                "name", "Jane Doe",
+                "unsubscribe_link", properties.getPublicBaseUrl() + "/api/v1/public/marketing/preferences?token=test-token"
+        );
+        String body = tpl.compile(vars);
+        EmailMessage msg = EmailMessage.of(testEmail, tpl.compileSubject(vars), body, "test-token");
+        mailingSystem.send(msg);
     }
 }

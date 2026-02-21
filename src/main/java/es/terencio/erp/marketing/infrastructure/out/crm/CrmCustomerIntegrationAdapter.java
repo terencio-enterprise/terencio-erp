@@ -21,13 +21,13 @@ public class CrmCustomerIntegrationAdapter implements CustomerIntegrationPort {
     }
 
     @Override
-    public List<MarketingCustomer> findAudience(AudienceFilter filter, int limit, int offset) {
+    public List<MarketingCustomer> findAudience(Long campaignId, int limit, int page) {
+        int offset = page * limit;
         StringBuilder sql = new StringBuilder(
                 "SELECT id, company_id, legal_name, email, unsubscribe_token, marketing_status, marketing_consent " +
                         "FROM customers " +
                         "WHERE email IS NOT NULL AND active = true");
 
-        // Basic filtering (can be expanded)
         if (filter.customerType() != null) {
             sql.append(" AND type = '").append(filter.customerType()).append("'");
         }

@@ -48,26 +48,33 @@ public class AdminAssetController {
         return ResponseEntity.ok(ApiResponse.success(result));
     }
 
+    @GetMapping("/{assetId}")
+    @Operation(summary = "Get asset metadata by ID")
+    @RequiresPermission(permission = Permission.MARKETING_TEMPLATE_VIEW, scope = AccessScope.COMPANY, targetIdParam = "companyId")
+    public ResponseEntity<ApiResponse<AssetResponse>> getAsset(@PathVariable UUID companyId, @PathVariable UUID assetId) {
+        return ResponseEntity.ok(ApiResponse.success(manageAssetsUseCase.getAsset(companyId, assetId)));
+    }
+
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(summary = "Upload a new file/asset")
     @RequiresPermission(permission = Permission.MARKETING_TEMPLATE_EDIT, scope = AccessScope.COMPANY, targetIdParam = "companyId")
     public ResponseEntity<ApiResponse<AssetResponse>> uploadAsset(
             @PathVariable UUID companyId,
             @RequestParam("file") MultipartFile file,
-            @RequestParam(defaultValue = "true") boolean isPublic) {
-        try {
-            AssetResponse uploaded = manageAssetsUseCase.uploadAsset(
-                    companyId,
-                    file.getOriginalFilename(),
-                    file.getContentType(),
-                    file.getSize(),
-                    file.getInputStream(),
-                    isPublic);
-            return ResponseEntity.ok(ApiResponse.success("Asset uploaded successfully", uploaded));
-        } catch (Exception e) {
-            return ResponseEntity.internalServerError()
-                    .body(ApiResponse.error("Failed to upload file: " + e.getMessage()));
+            @RequestParam(defaultValue = "true") boolean isPublic) throws Exception {
+        
+        if (file.isEmpty()) {
+            return ResponseEntity.badRequest().body(ApiResponse.error("File is empty or missing"));
         }
+        
+        AssetResponse uploaded = manageAssetsUseCase.uploadAsset(
+                companyId,
+                file.getOriginalFilename(),
+                file.getContentType(),
+                file.getSize(),
+                file.getInputStream(),
+                isPublic);
+        return ResponseEntity.ok(ApiResponse.success("Asset uploaded successfully", uploaded));
     }
 
     @DeleteMapping("/{assetId}")

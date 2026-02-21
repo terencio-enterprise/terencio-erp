@@ -21,6 +21,8 @@ public class MarketingTemplate {
             boolean active, Instant createdAt, Instant updatedAt) {
         if (companyId == null) throw new InvariantViolationException("MarketingTemplate companyId is required");
         if (name == null || name.isBlank()) throw new InvariantViolationException("MarketingTemplate name is required");
+        if (subjectTemplate == null || subjectTemplate.isBlank()) throw new InvariantViolationException("MarketingTemplate subject is required");
+        if (bodyHtml == null || bodyHtml.isBlank()) throw new InvariantViolationException("MarketingTemplate body is required");
         
         this.id = id;
         this.companyId = companyId;
@@ -51,6 +53,9 @@ public class MarketingTemplate {
 
     public void update(String name, String code, String subjectTemplate, String bodyHtml) {
         if (name == null || name.isBlank()) throw new InvariantViolationException("Template name cannot be blank");
+        if (subjectTemplate == null || subjectTemplate.isBlank()) throw new InvariantViolationException("MarketingTemplate subject is required");
+        if (bodyHtml == null || bodyHtml.isBlank()) throw new InvariantViolationException("MarketingTemplate body is required");
+        
         this.name = name;
         this.code = code;
         this.subjectTemplate = subjectTemplate;

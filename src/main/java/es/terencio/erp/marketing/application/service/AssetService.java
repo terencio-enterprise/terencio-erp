@@ -33,21 +33,38 @@ public class AssetService implements ManageAssetsUseCase {
     @Transactional
     public AssetResponse uploadAsset(UUID companyId, String filename, String contentType, long sizeBytes,
             InputStream inputStream, boolean isPublic) {
-        log.info("Uploading new asset {} for company {}", filename, companyId);
+        if (sizeBytes == 0 || filename == null || filename.isBlank()) {
+            throw new IllegalArgumentException("Invalid file: name and size must be valid");
+        }
 
+        log.info("Uploading new asset {} for company {}", filename, companyId);
         StorageResult storageResult = fileStoragePort.upload(companyId, filename, contentType, sizeBytes, inputStream, isPublic);
 
-        CompanyAsset asset = new CompanyAsset(
-                companyId,
-                filename,
-                contentType,
-                sizeBytes,
-                storageResult.storagePath(),
-                storageResult.publicUrl(),
-                isPublic);
+        try {
+            CompanyAsset asset = new CompanyAsset(
+                    companyId,
+                    filename,
+                    contentType,
+                    sizeBytes,
+                    storageResult.storagePath(),
+                    storageResult.publicUrl(),
+                    isPublic);
 
-        CompanyAsset saved = assetRepository.save(asset);
-        return toDto(saved);
+            CompanyAsset saved = assetRepository.save(asset);
+            return toDto(saved);
+        } catch (Exception e) {
+            log.error("Database save failed for asset {}, cleaning up storage", filename);
+            fileStoragePort.delete(storageResult.storagePath());
+            throw e;
+        }
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public AssetResponse getAsset(UUID companyId, UUID assetId) {
+        CompanyAsset asset = assetRepository.findByIdAndCompanyId(assetId, companyId)
+                .orElseThrow(() -> new ResourceNotFoundException("Asset not found"));
+        return toDto(asset);
     }
 
     @Override
@@ -56,8 +73,12 @@ public class AssetService implements ManageAssetsUseCase {
         int safeSize = Math.min(Math.max(size, 1), 200);
         int safePage = Math.max(page, 0);
         int offset = safePage * safeSize;
-        long totalElements = assetRepository.countByFilters(companyId, search, contentType);
-        List<CompanyAsset> assets = assetRepository.findByFiltersPaginated(companyId, search, contentType, offset, safeSize);
+        
+        String normSearch = search != null ? search.trim() : null;
+        String normContentType = contentType != null ? contentType.trim() : null;
+        
+        long totalElements = assetRepository.countByFilters(companyId, normSearch, normContentType);
+        List<CompanyAsset> assets = assetRepository.findByFiltersPaginated(companyId, normSearch, normContentType, offset, safeSize);
 
         List<AssetResponse> content = assets.stream().map(this::toDto).collect(Collectors.toList());
         int totalPages = (int) Math.ceil((double) totalElements / safeSize);

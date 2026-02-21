@@ -3,6 +3,8 @@ package es.terencio.erp.marketing.infrastructure.config;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import es.terencio.erp.marketing.application.port.in.CampaignTrackingUseCase;
 import es.terencio.erp.marketing.application.port.in.ManageCampaignsUseCase;
 import es.terencio.erp.marketing.application.port.in.ManagePreferencesUseCase;
@@ -24,9 +26,10 @@ public class MarketingConfig {
             CampaignRepositoryPort campaignRepository,
             CustomerIntegrationPort customerPort,
             MailingSystemPort mailingSystem,
-            MarketingProperties properties
+            MarketingProperties properties,
+            ObjectMapper objectMapper
     ) {
-        return new CampaignService(campaignRepository, customerPort, mailingSystem, properties);
+        return new CampaignService(campaignRepository, customerPort, mailingSystem, properties, objectMapper);
     }
 
     @Bean
@@ -50,7 +53,7 @@ public class MarketingConfig {
     }
 
     @Bean
-    public ProcessWebhookUseCase processWebhookUseCase(CampaignRepositoryPort repository) {
-        return new WebhookService(repository);
+    public ProcessWebhookUseCase processWebhookUseCase(CampaignRepositoryPort repository, ObjectMapper objectMapper) {
+        return new WebhookService(repository, objectMapper);
     }
 }
