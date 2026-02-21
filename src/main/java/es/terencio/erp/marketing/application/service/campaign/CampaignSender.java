@@ -98,7 +98,6 @@ public class CampaignSender {
             }
             
             page++;
-            if (page >= batch.totalPages()) break;
         }
 
         campaignRepository.completeCampaign(campaignId, sentInThisSession);
