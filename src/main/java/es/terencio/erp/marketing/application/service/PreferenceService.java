@@ -11,6 +11,7 @@ import es.terencio.erp.marketing.application.dto.MarketingDtos.UnsubscribeReques
 import es.terencio.erp.marketing.application.port.in.ManagePreferencesUseCase;
 import es.terencio.erp.marketing.application.port.out.CustomerIntegrationPort;
 import es.terencio.erp.marketing.application.port.out.CustomerIntegrationPort.MarketingCustomer;
+import es.terencio.erp.marketing.domain.model.MarketingStatus;
 import es.terencio.erp.shared.exception.ResourceNotFoundException;
 
 public class PreferenceService implements ManagePreferencesUseCase {
@@ -33,17 +34,17 @@ public class PreferenceService implements ManagePreferencesUseCase {
     @Transactional
     public void updatePreferences(UnsubscribeRequest request) {
         String token = request.token();
-        if ("UNSUBSCRIBE".equals(request.action())) {
-            customerPort.updateMarketingStatus(token, "UNSUBSCRIBED", null);
-        } else if ("SNOOZE".equals(request.action()) && request.snoozeDays() != null) {
+        if (MarketingStatus.UNSUBSCRIBED == request.action()) {
+            customerPort.updateMarketingStatus(token, MarketingStatus.UNSUBSCRIBED, null);
+        } else if (MarketingStatus.SNOOZED == request.action() && request.snoozeDays() != null) {
             Instant snoozeUntil = Instant.now().plus(request.snoozeDays(), ChronoUnit.DAYS);
-            customerPort.updateMarketingStatus(token, "SNOOZED", snoozeUntil);
+            customerPort.updateMarketingStatus(token, MarketingStatus.SNOOZED, snoozeUntil);
         }
     }
 
     @Override
     @Transactional
     public void unsubscribeOneClick(String token) {
-        customerPort.updateMarketingStatus(token, "UNSUBSCRIBED", null);
+        customerPort.updateMarketingStatus(token, MarketingStatus.UNSUBSCRIBED, null);
     }
 }

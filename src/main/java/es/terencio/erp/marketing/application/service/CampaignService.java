@@ -28,8 +28,10 @@ import es.terencio.erp.marketing.application.port.out.CampaignRepositoryPort;
 import es.terencio.erp.marketing.application.port.out.MailingSystemPort;
 import es.terencio.erp.marketing.domain.model.CampaignLog;
 import es.terencio.erp.marketing.domain.model.CampaignStatus;
+import es.terencio.erp.marketing.domain.model.DeliveryStatus;
 import es.terencio.erp.marketing.domain.model.EmailMessage;
 import es.terencio.erp.marketing.domain.model.MarketingCampaign;
+import es.terencio.erp.marketing.domain.model.MarketingStatus;
 import es.terencio.erp.marketing.domain.model.MarketingTemplate;
 import es.terencio.erp.marketing.infrastructure.config.MarketingProperties;
 import es.terencio.erp.shared.domain.exception.InvariantViolationException;
@@ -146,14 +148,13 @@ public class CampaignService implements ManageCampaignsUseCase, CampaignTracking
             PageResult<CampaignAudienceMember> batch = campaignRepository.findCampaignAudience(
                     campaign.getCompanyId(), campaign.getId(), page, properties.getBatchSize());
             
-            if (batch.getContent() == null || batch.getContent().isEmpty()) break;
+            if (batch.content() == null || batch.content().isEmpty()) break;
 
-            for (CampaignAudienceMember member : batch.getContent()) {
-                // Unified source-of-truth segment filtering
-                boolean isSubscribed = "SUBSCRIBED".equalsIgnoreCase(member.marketingStatus());
+            for (CampaignAudienceMember member : batch.content()) {
+                boolean isSubscribed = member.marketingStatus() == MarketingStatus.SUBSCRIBED;
                 boolean isNotSentOrFailed = member.sendStatus() == null || 
-                                            "NOT_SENT".equalsIgnoreCase(member.sendStatus()) || 
-                                            "FAILED".equalsIgnoreCase(member.sendStatus());
+                                            member.sendStatus() == DeliveryStatus.NOT_SENT || 
+                                            member.sendStatus() == DeliveryStatus.FAILED;
 
                 if (!isSubscribed || !isNotSentOrFailed) {
                     continue;
@@ -171,7 +172,7 @@ public class CampaignService implements ManageCampaignsUseCase, CampaignTracking
             }
             
             page++;
-            if (page >= batch.getTotalPages()) {
+            if (page >= batch.totalPages()) {
                 break;
             }
         }

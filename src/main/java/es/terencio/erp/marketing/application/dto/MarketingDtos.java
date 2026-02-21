@@ -32,7 +32,14 @@ public final class MarketingDtos {
         MarketingStatus marketingStatus,
         DeliveryStatus sendStatus,
         String unsubscribeToken
-    ) {}
+    ) {
+        public CampaignAudienceMember(long customerId, String email, String name, String marketingStatusStr, String unsubscribeToken) {
+            this(customerId, email, name, 
+                 marketingStatusStr != null ? MarketingStatus.valueOf(marketingStatusStr) : null, 
+                 null, 
+                 unsubscribeToken);
+        }
+    }
 
     public record TemplateDto(Long id, String code, String name, String subject, String bodyHtml, boolean active, Instant lastModified) {}
 
@@ -41,5 +48,10 @@ public final class MarketingDtos {
         @NotNull(message = "Action is required") MarketingStatus action,
         Integer snoozeDays, 
         String reason
-    ) {}
+    ) {
+        // Overloaded constructor for tests or mapping resolving action string
+        public UnsubscribeRequest(String token, String actionStr, Integer snoozeDays, String reason) {
+            this(token, actionStr != null ? MarketingStatus.valueOf(actionStr) : null, snoozeDays, reason);
+        }
+    }
 }
