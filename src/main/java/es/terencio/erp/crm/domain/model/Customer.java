@@ -7,7 +7,6 @@ import java.util.UUID;
 import es.terencio.erp.shared.domain.exception.InvariantViolationException;
 import es.terencio.erp.shared.domain.identifier.CompanyId;
 import es.terencio.erp.shared.domain.identifier.CustomerId;
-import es.terencio.erp.shared.domain.utils.SecurityUtils;
 import es.terencio.erp.shared.domain.valueobject.Email;
 import es.terencio.erp.shared.domain.valueobject.TaxId;
 import lombok.AccessLevel;
@@ -41,27 +40,6 @@ public class Customer {
     private final Instant createdAt;
     private Instant updatedAt;
     private Instant deletedAt;
-
-    // --- Domain Value Objects (Java Records for immutability & simplicity) ---
-
-    public record ContactInfo(Email email, String phone, String address, String zipCode, String city, String country) {
-        public static ContactInfo empty() { return new ContactInfo(null, null, null, null, null, "ES"); }
-    }
-
-    public record BillingInfo(Long tariffId, boolean allowCredit, Long creditLimitCents, boolean surchargeApply) {
-        public static BillingInfo defaultSettings() { return new BillingInfo(null, false, 0L, false); }
-    }
-
-    public record MarketingProfile(String origin, List<String> tags, boolean consent, MarketingStatus status, String unsubscribeToken, Instant lastInteractionAt) {
-        public static MarketingProfile createLead(String origin, List<String> tags, boolean consent) {
-            return new MarketingProfile(origin, tags != null ? tags : List.of(), consent, 
-                    consent ? MarketingStatus.SUBSCRIBED : MarketingStatus.UNSUBSCRIBED, 
-                    SecurityUtils.generateSecureToken(), Instant.now());
-        }
-        public static MarketingProfile empty() {
-            return new MarketingProfile(null, List.of(), false, MarketingStatus.UNSUBSCRIBED, SecurityUtils.generateSecureToken(), null);
-        }
-    }
 
     // --- Domain Behaviors (Factory Methods) ---
 

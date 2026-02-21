@@ -1,11 +1,19 @@
 package es.terencio.erp.crm.infrastructure.in.web;
 
 import java.util.UUID;
+
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
 import es.terencio.erp.crm.application.port.in.IngestLeadUseCase;
+import es.terencio.erp.crm.infrastructure.in.web.dto.IngestLeadRequest;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
 @RestController
@@ -20,9 +28,9 @@ public class PublicLeadController {
     @Operation(summary = "Ingest an inbound lead")
     public ResponseEntity<Void> ingestLead(
             @PathVariable UUID companyId, 
-            @RequestBody IngestLeadUseCase.LeadCommand command) {
+            @Valid @RequestBody IngestLeadRequest request) {
         
-        ingestLeadUseCase.ingest(companyId, command);
+        ingestLeadUseCase.ingest(companyId, request.toCommand());
         return ResponseEntity.ok().build();
     }
 }

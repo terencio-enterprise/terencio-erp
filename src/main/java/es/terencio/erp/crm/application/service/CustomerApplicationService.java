@@ -7,7 +7,12 @@ import org.springframework.transaction.annotation.Transactional;
 
 import es.terencio.erp.crm.application.port.in.IngestLeadUseCase;
 import es.terencio.erp.crm.application.port.in.ManageCustomerUseCase;
+import es.terencio.erp.crm.application.port.in.command.CreateCustomerCommand;
+import es.terencio.erp.crm.application.port.in.command.IngestLeadCommand;
+import es.terencio.erp.crm.application.port.in.command.UpdateCustomerCommand;
+import es.terencio.erp.crm.application.port.in.query.SearchCustomerQuery;
 import es.terencio.erp.crm.application.port.out.CustomerRepositoryPort;
+import es.terencio.erp.crm.domain.model.ContactInfo;
 import es.terencio.erp.crm.domain.model.Customer;
 import es.terencio.erp.shared.domain.identifier.CompanyId;
 import es.terencio.erp.shared.domain.query.PageResult;
@@ -26,7 +31,7 @@ public class CustomerApplicationService implements IngestLeadUseCase, ManageCust
 
     @Override
     @Transactional
-    public void ingest(UUID companyId, LeadCommand command) {
+    public void ingest(UUID companyId, IngestLeadCommand command) {
         CompanyId cid = new CompanyId(companyId);
         Email email = Email.of(command.email());
 
@@ -55,7 +60,7 @@ public class CustomerApplicationService implements IngestLeadUseCase, ManageCust
 
     @Override
     @Transactional(readOnly = true)
-    public PageResult<Customer> search(UUID companyId, CustomerQuery query) {
+    public PageResult<Customer> search(UUID companyId, SearchCustomerQuery query) {
         return customerRepository.searchPaginated(new CompanyId(companyId), query);
     }
 
@@ -68,7 +73,7 @@ public class CustomerApplicationService implements IngestLeadUseCase, ManageCust
         Customer newCustomer = Customer.newClient(cid, command.legalName(), taxId, command.type());
 
         if (command.email() != null || command.phone() != null) {
-            newCustomer.updateContactInfo(new Customer.ContactInfo(
+            newCustomer.updateContactInfo(new ContactInfo(
                     command.email() != null ? Email.of(command.email()) : null,
                     command.phone(), null, null, null, "ES"));
         }
