@@ -1,5 +1,7 @@
 package es.terencio.erp.marketing.infrastructure.config;
 
+import java.util.List;
+
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 
@@ -19,6 +21,7 @@ public class MarketingProperties {
     
     private int batchSize = 500;
     private int maxRetries = 3;
-    private int rateLimitPerSecond = 14; 
+    private double rateLimitPerSecond = 14.0; 
     private long linkExpirationHours = 168; 
+    private List<String> allowedRedirectDomains = List.of(); 
 }

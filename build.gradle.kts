@@ -51,6 +51,9 @@ dependencies {
     // 5. UTILITIES
     compileOnly("org.projectlombok:lombok")
     annotationProcessor("org.projectlombok:lombok")
+    
+    // RateLimiter
+    implementation("com.google.guava:guava:33.0.0-jre")
 
     // 6. TESTING
     testImplementation("org.springframework.boot:spring-boot-starter-test")

@@ -13,7 +13,9 @@ import es.terencio.erp.marketing.application.port.in.ProcessWebhookUseCase;
 import es.terencio.erp.marketing.application.port.out.CampaignRepositoryPort;
 import es.terencio.erp.marketing.application.port.out.CustomerIntegrationPort;
 import es.terencio.erp.marketing.application.port.out.MailingSystemPort;
+import es.terencio.erp.marketing.application.service.CampaignExecutionWorker;
 import es.terencio.erp.marketing.application.service.CampaignService;
+import es.terencio.erp.marketing.application.service.CampaignTrackingService;
 import es.terencio.erp.marketing.application.service.PreferenceService;
 import es.terencio.erp.marketing.application.service.TemplateService;
 import es.terencio.erp.marketing.application.service.WebhookService;
@@ -22,13 +24,31 @@ import es.terencio.erp.marketing.application.service.WebhookService;
 public class MarketingConfig {
 
     @Bean
+    public CampaignExecutionWorker campaignExecutionWorker(
+            CampaignRepositoryPort campaignRepository,
+            MailingSystemPort mailingSystem,
+            MarketingProperties properties
+    ) {
+        return new CampaignExecutionWorker(campaignRepository, mailingSystem, properties);
+    }
+
+    @Bean
+    public CampaignTrackingService campaignTrackingService(
+            CampaignRepositoryPort campaignRepository,
+            MarketingProperties properties
+    ) {
+        return new CampaignTrackingService(campaignRepository, properties);
+    }
+
+    @Bean
     public CampaignService campaignService(
             CampaignRepositoryPort campaignRepository,
+            CampaignExecutionWorker executionWorker,
             MailingSystemPort mailingSystem,
             MarketingProperties properties,
             ObjectMapper objectMapper
     ) {
-        return new CampaignService(campaignRepository, mailingSystem, properties, objectMapper);
+        return new CampaignService(campaignRepository, executionWorker, mailingSystem, properties, objectMapper);
     }
 
     @Bean
@@ -37,7 +57,7 @@ public class MarketingConfig {
     }
 
     @Bean
-    public CampaignTrackingUseCase campaignTrackingUseCase(CampaignService service) {
+    public CampaignTrackingUseCase campaignTrackingUseCase(CampaignTrackingService service) {
         return service;
     }
 

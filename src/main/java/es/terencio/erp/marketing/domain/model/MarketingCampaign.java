@@ -97,6 +97,11 @@ public class MarketingCampaign {
         this.scheduledAt = when;
         touch();
     }
+    
+    public void setTotalRecipients(int total) {
+        this.totalRecipients = total;
+        touch();
+    }
 
     public void startSending() {
         startSending(false);
@@ -125,17 +130,17 @@ public class MarketingCampaign {
         touch();
     }
 
+    public void addSent(int count) {
+        if (count < 0) throw new InvariantViolationException("Sent count cannot be negative");
+        this.sent += count;
+        touch();
+    }
+
     public void cancel() {
         if (status == CampaignStatus.COMPLETED || status == CampaignStatus.CANCELLED)
             throw new InvariantViolationException("Completed or already cancelled campaign cannot be cancelled");
 
         this.status = CampaignStatus.CANCELLED;
-        touch();
-    }
-
-    public void addSent(int count) {
-        if (count < 0) throw new InvariantViolationException("Sent count cannot be negative");
-        this.sent += count;
         touch();
     }
 

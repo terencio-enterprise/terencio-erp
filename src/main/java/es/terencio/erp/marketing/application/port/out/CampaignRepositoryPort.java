@@ -13,31 +13,36 @@ import es.terencio.erp.marketing.domain.model.MarketingTemplate;
 import es.terencio.erp.shared.domain.query.PageResult;
 
 public interface CampaignRepositoryPort {
-    // Lock
-    boolean acquireSchedulerLock(String lockName);
-    void releaseSchedulerLock(String lockName);
+    
+    // --- ATOMIC OPERATIONS FOR SAFE EXECUTION ---
 
-    // Templates
+    boolean tryStartCampaign(Long campaignId, boolean isRelaunch);
+    
+    void updateCampaignTotalRecipients(Long campaignId, int totalRecipients);
+
+    void completeCampaign(Long campaignId, int sentInThisSession);
+
+    // --- STANDARD CRUD & QUERIES ---
+
+    Optional<MarketingCampaign> findCampaignById(Long id);
+    MarketingCampaign saveCampaign(MarketingCampaign campaign);
+    
+    PageResult<CampaignAudienceMember> findCampaignAudience(UUID companyId, Long campaignId, int page, int size);
+    List<MarketingCampaign> findScheduledCampaignsToLaunch(Instant now);
+    
     Optional<MarketingTemplate> findTemplateById(Long id);
     List<MarketingTemplate> findAllTemplates(UUID companyId, String search);
     MarketingTemplate saveTemplate(MarketingTemplate template);
     void deleteTemplate(Long id);
-
-    // Campaigns
-    Optional<MarketingCampaign> findCampaignById(Long id);
-    List<MarketingCampaign> findScheduledCampaignsToLaunch(Instant now);
-    MarketingCampaign saveCampaign(MarketingCampaign campaign);
-    void incrementCampaignMetric(Long campaignId, String metricType);
-    int countDailySendsForCompany(UUID companyId, Instant startOfDay);
-    PageResult<CampaignAudienceMember> findCampaignAudience(UUID companyId, Long campaignId, int page, int size);
-
-    // Logs & Events
-    CampaignLog saveLog(CampaignLog log);
-    Optional<CampaignLog> findLogById(Long id);
-    Optional<CampaignLog> findLogByMessageId(String messageId);
-    boolean hasLog(Long campaignId, Long customerId);
     
-    // Webhook Support
+    void saveLog(CampaignLog logEntry);
+    Optional<CampaignLog> findLogById(Long logId);
+    Optional<CampaignLog> findLogByMessageId(String messageId);
+    void incrementCampaignMetric(Long campaignId, String metricName);
+    
     void saveDeliveryEvent(EmailDeliveryEvent event);
     void markCustomerAsBouncedOrComplained(Long customerId, String status);
+    
+    boolean acquireSchedulerLock(String lockName);
+    void releaseSchedulerLock(String lockName);
 }
