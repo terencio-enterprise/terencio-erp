@@ -6,8 +6,8 @@ import java.util.UUID;
 import es.terencio.erp.crm.application.port.in.ManageCustomerUseCase.CustomerQuery;
 import es.terencio.erp.crm.domain.model.Customer;
 import es.terencio.erp.shared.domain.identifier.CompanyId;
+import es.terencio.erp.shared.domain.query.PageResult;
 import es.terencio.erp.shared.domain.valueobject.Email;
-import es.terencio.erp.shared.presentation.PageResult;
 
 public interface CustomerRepositoryPort {
 

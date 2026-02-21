@@ -1,6 +1,7 @@
 package es.terencio.erp.crm.application.port.in;
 
 import java.util.UUID;
+
 import es.terencio.erp.crm.domain.model.Customer;
 import es.terencio.erp.crm.domain.model.CustomerType;
 import es.terencio.erp.shared.domain.query.PageResult;

@@ -10,10 +10,10 @@ import es.terencio.erp.crm.application.port.in.ManageCustomerUseCase;
 import es.terencio.erp.crm.application.port.out.CustomerRepositoryPort;
 import es.terencio.erp.crm.domain.model.Customer;
 import es.terencio.erp.shared.domain.identifier.CompanyId;
+import es.terencio.erp.shared.domain.query.PageResult;
 import es.terencio.erp.shared.domain.valueobject.Email;
 import es.terencio.erp.shared.domain.valueobject.TaxId;
 import es.terencio.erp.shared.exception.ResourceNotFoundException;
-import es.terencio.erp.shared.presentation.PageResult;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 

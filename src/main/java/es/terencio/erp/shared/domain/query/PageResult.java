@@ -1,4 +1,4 @@
-package es.terencio.erp.shared.presentation;
+package es.terencio.erp.shared.domain.query;
 
 import java.util.List;
 import java.util.function.Function;
