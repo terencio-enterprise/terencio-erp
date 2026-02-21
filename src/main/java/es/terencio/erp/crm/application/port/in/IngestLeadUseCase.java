@@ -5,13 +5,10 @@ import java.util.UUID;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
-import lombok.Builder;
 
 public interface IngestLeadUseCase {
     void ingest(UUID companyId, LeadCommand command);
 
-    @Builder
     record LeadCommand(
             @NotBlank @Email String email,
             @NotBlank String name,
@@ -19,6 +16,6 @@ public interface IngestLeadUseCase {
             String origin,
             List<String> tags,
             String phone,
-            @NotNull boolean consent) {
+            boolean consent) {
     }
 }

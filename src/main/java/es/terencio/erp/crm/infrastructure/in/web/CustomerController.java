@@ -36,7 +36,6 @@ import jakarta.validation.Valid;
 public class CustomerController {
 
         private final CustomerRepositoryPort customerRepository;
-        private final CustomerProductPriceRepositoryPort priceRepository;
 
         public CustomerController(CustomerRepositoryPort customerRepository,
                         CustomerProductPriceRepositoryPort priceRepository) {
@@ -74,53 +73,5 @@ public class CustomerController {
 
                 Customer saved = customerRepository.save(customer);
                 return ResponseEntity.ok(ApiResponse.success("Customer created", toResponse(saved)));
-        }
-
-        @PutMapping("/{uuid}/special-prices")
-        @Operation(summary = "Batch update special prices for a customer")
-        @RequiresPermission(permission = Permission.CUSTOMER_UPDATE, scope = AccessScope.COMPANY, targetIdParam = "companyId")
-        public ResponseEntity<ApiResponse<Void>> updateSpecialPrices(
-                        @PathVariable UUID uuid,
-                        @RequestParam UUID companyId,
-                        @RequestBody SpecialPricesRequest request) {
-
-                Customer customer = customerRepository.findByUuid(uuid)
-                                .orElseThrow(() -> new IllegalArgumentException("Customer not found"));
-
-                for (SpecialPriceEntry entry : request.prices()) {
-                        CustomerProductPrice price = CustomerProductPrice.create(
-                                        customer.id(),
-                                        new ProductId(entry.productId()),
-                                        Money.ofEurosCents(entry.priceCents()));
-                        priceRepository.save(price);
-                }
-
-                return ResponseEntity.ok(ApiResponse.success("Special prices updated"));
-        }
-
-        private CustomerResponse toResponse(Customer c) {
-                return new CustomerResponse(
-                                c.uuid(),
-                                c.legalName(),
-                                c.taxId() != null ? c.taxId().value() : null,
-                                c.email() != null ? c.email().value() : null,
-                                c.phone(),
-                                c.tariffId(),
-                                c.allowCredit(),
-                                c.creditLimit().cents());
-        }
-
-        public record CustomerResponse(UUID uuid, String legalName, String taxId, String email, String phone,
-                        Long tariffId, boolean allowCredit, long creditLimitCents) {
-        }
-
-        public record CreateCustomerRequest(UUID companyId, String legalName, String taxId, String email, String phone,
-                        String address, String zipCode, String city) {
-        }
-
-        public record SpecialPricesRequest(List<SpecialPriceEntry> prices) {
-        }
-
-        public record SpecialPriceEntry(Long productId, long priceCents) {
         }
 }
