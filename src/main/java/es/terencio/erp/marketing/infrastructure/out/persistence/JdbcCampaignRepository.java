@@ -13,7 +13,7 @@ import org.springframework.jdbc.support.GeneratedKeyHolder;
 import org.springframework.jdbc.support.KeyHolder;
 import org.springframework.stereotype.Repository;
 
-import es.terencio.erp.marketing.application.dto.MarketingDtos.CampaignAudienceMember;
+import es.terencio.erp.marketing.application.dto.campaign.CampaignAudienceMember;
 import es.terencio.erp.marketing.application.port.out.CampaignRepositoryPort;
 import es.terencio.erp.marketing.domain.model.CampaignLog;
 import es.terencio.erp.marketing.domain.model.CampaignStatus;

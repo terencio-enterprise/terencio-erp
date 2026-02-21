@@ -5,7 +5,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-import es.terencio.erp.marketing.application.dto.MarketingDtos.CampaignAudienceMember;
+import es.terencio.erp.marketing.application.dto.campaign.CampaignAudienceMember;
 import es.terencio.erp.marketing.domain.model.CampaignLog;
 import es.terencio.erp.marketing.domain.model.EmailDeliveryEvent;
 import es.terencio.erp.marketing.domain.model.MarketingCampaign;
