@@ -5,11 +5,11 @@ import java.time.temporal.ChronoUnit;
 
 import org.springframework.transaction.annotation.Transactional;
 
+import es.terencio.erp.marketing.application.dto.customer.MarketingCustomer;
 import es.terencio.erp.marketing.application.dto.preference.PreferencesResponse;
 import es.terencio.erp.marketing.application.dto.preference.UnsubscribeRequest;
 import es.terencio.erp.marketing.application.port.in.CustomerPreferenceUseCase;
 import es.terencio.erp.marketing.application.port.out.CustomerIntegrationPort;
-import es.terencio.erp.marketing.application.port.out.CustomerIntegrationPort.MarketingCustomer;
 import es.terencio.erp.marketing.domain.model.MarketingStatus;
 import es.terencio.erp.shared.exception.ResourceNotFoundException;
 

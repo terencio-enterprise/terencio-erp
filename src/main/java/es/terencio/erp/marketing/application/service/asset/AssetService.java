@@ -10,10 +10,10 @@ import org.slf4j.LoggerFactory;
 import org.springframework.transaction.annotation.Transactional;
 
 import es.terencio.erp.marketing.application.dto.asset.AssetResponse;
+import es.terencio.erp.marketing.application.dto.asset.StorageResult;
 import es.terencio.erp.marketing.application.port.in.AssetManagementUseCase;
 import es.terencio.erp.marketing.application.port.out.AssetRepositoryPort;
 import es.terencio.erp.marketing.application.port.out.FileStoragePort;
-import es.terencio.erp.marketing.application.port.out.FileStoragePort.StorageResult;
 import es.terencio.erp.marketing.domain.model.CompanyAsset;
 import es.terencio.erp.shared.domain.query.PageResult;
 import es.terencio.erp.shared.exception.ResourceNotFoundException;

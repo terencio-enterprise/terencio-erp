@@ -14,35 +14,37 @@ import es.terencio.erp.marketing.domain.model.MarketingTemplate;
 import es.terencio.erp.shared.domain.query.PageResult;
 
 public interface CampaignRepositoryPort {
-    // Campaign Management
-    Optional<MarketingCampaign> findCampaignById(Long id);
+
+    // Campaigns
+    Optional<MarketingCampaign> findCampaignById(Long campaignId);
     MarketingCampaign saveCampaign(MarketingCampaign campaign);
     PageResult<MarketingCampaign> findCampaigns(UUID companyId, String search, String status, int page, int size);
-    
-    // Templates
-    Optional<MarketingTemplate> findTemplateById(Long id);
-    MarketingTemplate saveTemplate(MarketingTemplate template);
-    List<MarketingTemplate> findAllTemplates(UUID companyId, String search);
-    void deleteTemplate(Long id);
-    
-    // Execution & Sending
-    boolean tryStartCampaign(Long campaignId, boolean isRelaunch);
-    void updateCampaignTotalRecipients(Long campaignId, int total);
-    PageResult<CampaignAudienceMember> findCampaignAudience(UUID companyId, Long campaignId, int page, int size);
-    void completeCampaign(Long campaignId, int sentCount);
-    
-    // Scheduler
-    boolean acquireSchedulerLock(String lockName);
-    void releaseSchedulerLock(String lockName);
     List<MarketingCampaign> findScheduledCampaignsToLaunch(Instant now);
     
-    // Logs & Metrics
-    void saveLog(CampaignLog log);
-    Optional<CampaignLog> findLogById(Long id);
-    Optional<CampaignLog> findLogByMessageId(String messageId);
-    PageResult<CampaignLogResponse> findCampaignLogs(UUID companyId, Long campaignId, String status, int page, int size);
+    // Audience & Execution
+    PageResult<CampaignAudienceMember> findCampaignAudience(UUID companyId, Long campaignId, int page, int size);
+    boolean tryStartCampaign(Long campaignId, boolean isRelaunch);
+    void updateCampaignTotalRecipients(Long campaignId, int totalRecipients);
+    void completeCampaign(Long campaignId, int sentInThisSession);
+    void incrementCampaignMetric(Long campaignId, String metricName);
     
-    void incrementCampaignMetric(Long campaignId, String metric);
-    void markCustomerAsBouncedOrComplained(Long customerId, String type);
+    // Logs & Metrics
+    PageResult<CampaignLogResponse> findCampaignLogs(UUID companyId, Long campaignId, String status, int page, int size);
+    void saveLog(CampaignLog logEntry);
+    Optional<CampaignLog> findLogById(Long logId);
+    Optional<CampaignLog> findLogByMessageId(String messageId);
+    
+    // Templates
+    Optional<MarketingTemplate> findTemplateById(Long templateId);
+    List<MarketingTemplate> findAllTemplates(UUID companyId, String search);
+    MarketingTemplate saveTemplate(MarketingTemplate template);
+    void deleteTemplate(Long id);
+
+    // Concurrency
+    boolean acquireSchedulerLock(String lockName);
+    void releaseSchedulerLock(String lockName);
+    
+    // Webhooks & Events
     void saveDeliveryEvent(EmailDeliveryEvent event);
+    void markCustomerAsBouncedOrComplained(Long customerId, String type);
 }
