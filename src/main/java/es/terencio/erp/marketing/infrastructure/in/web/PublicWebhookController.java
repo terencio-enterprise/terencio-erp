@@ -1,7 +1,11 @@
 package es.terencio.erp.marketing.infrastructure.in.web;
 
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
 import es.terencio.erp.marketing.application.port.in.ProcessWebhookUseCase;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -20,7 +24,6 @@ public class PublicWebhookController {
     @PostMapping(value = "/ses", consumes = {"text/plain", "application/json"})
     @Operation(summary = "Receive AWS SES/SNS Webhook for Bounces and Complaints")
     public ResponseEntity<Void> handleSesWebhook(@RequestBody String payload) {
-        // En producción real validaríamos la firma SNS-Header, pero procesamos el JSON directamente.
         webhookUseCase.processSesEvent(payload);
         return ResponseEntity.ok().build();
     }

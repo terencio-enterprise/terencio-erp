@@ -2,6 +2,7 @@ package es.terencio.erp.marketing.application.service;
 
 import java.time.Instant;
 import java.util.List;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -24,9 +25,8 @@ public class CampaignScheduler {
         this.manageCampaignsUseCase = manageCampaignsUseCase;
     }
 
-    @Scheduled(cron = "0 * * * * *") // Every minute
+    @Scheduled(cron = "0 * * * * *")
     public void launchScheduledCampaigns() {
-        // 🔥 CLUSTER SAFETY: Prevent multiple pods from launching same campaign
         if (!repository.acquireSchedulerLock(LOCK_NAME)) {
             log.debug("Scheduler lock acquired by another instance. Skipping.");
             return;

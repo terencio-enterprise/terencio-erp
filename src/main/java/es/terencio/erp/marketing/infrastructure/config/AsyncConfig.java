@@ -8,5 +8,4 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @EnableAsync
 @EnableScheduling
 public class AsyncConfig {
-    // Enables background execution and CRON scheduling for marketing campaigns
 }

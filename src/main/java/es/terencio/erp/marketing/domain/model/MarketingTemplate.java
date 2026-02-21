@@ -4,6 +4,8 @@ import java.time.Instant;
 import java.util.Map;
 import java.util.UUID;
 
+import es.terencio.erp.shared.domain.exception.InvariantViolationException;
+
 public class MarketingTemplate {
     private Long id;
     private final UUID companyId;
@@ -17,8 +19,9 @@ public class MarketingTemplate {
 
     public MarketingTemplate(Long id, UUID companyId, String code, String name, String subjectTemplate, String bodyHtml,
             boolean active, Instant createdAt, Instant updatedAt) {
-        if (companyId == null) throw new IllegalArgumentException("MarketingTemplate companyId is required");
-        if (name == null || name.isBlank()) throw new IllegalArgumentException("MarketingTemplate name is required");
+        if (companyId == null) throw new InvariantViolationException("MarketingTemplate companyId is required");
+        if (name == null || name.isBlank()) throw new InvariantViolationException("MarketingTemplate name is required");
+        
         this.id = id;
         this.companyId = companyId;
         this.code = code;
@@ -47,7 +50,7 @@ public class MarketingTemplate {
     }
 
     public void update(String name, String code, String subjectTemplate, String bodyHtml) {
-        if (name == null || name.isBlank()) throw new IllegalArgumentException("Template name cannot be blank");
+        if (name == null || name.isBlank()) throw new InvariantViolationException("Template name cannot be blank");
         this.name = name;
         this.code = code;
         this.subjectTemplate = subjectTemplate;
@@ -56,7 +59,6 @@ public class MarketingTemplate {
     }
 
     public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
     public UUID getCompanyId() { return companyId; }
     public String getCode() { return code; }
     public String getName() { return name; }

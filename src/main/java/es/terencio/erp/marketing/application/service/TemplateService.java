@@ -36,9 +36,8 @@ public class TemplateService implements ManageTemplatesUseCase {
     @Override
     @Transactional
     public TemplateDto createTemplate(UUID companyId, TemplateDto dto) {
-        Instant now = Instant.now();
         MarketingTemplate template = new MarketingTemplate(null, companyId, dto.code(), dto.name(), dto.subject(),
-                dto.bodyHtml(), true, now, now);
+                dto.bodyHtml(), true, Instant.now(), Instant.now());
         MarketingTemplate t = repository.saveTemplate(template);
         return toDto(t);
     }

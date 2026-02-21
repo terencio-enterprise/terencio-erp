@@ -3,13 +3,10 @@ package es.terencio.erp.marketing.domain.model;
 import java.time.Instant;
 import java.util.UUID;
 
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import es.terencio.erp.shared.domain.exception.InvariantViolationException;
+import lombok.Getter;
 
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
+@Getter
 public class CompanyAsset {
     private UUID id;
     private UUID companyId;
@@ -22,8 +19,15 @@ public class CompanyAsset {
     private Instant createdAt;
     private Instant updatedAt;
 
+    protected CompanyAsset() {
+    }
+
     public CompanyAsset(UUID companyId, String filename, String contentType, long fileSizeBytes,
             String storagePath, String publicUrl, boolean isPublic) {
+        if (companyId == null || filename == null || filename.isBlank() || storagePath == null || storagePath.isBlank()) {
+            throw new InvariantViolationException("CompanyAsset requires company, filename, and storage path");
+        }
+        
         this.id = UUID.randomUUID();
         this.companyId = companyId;
         this.filename = filename;

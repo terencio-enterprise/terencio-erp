@@ -29,7 +29,6 @@ import es.terencio.erp.marketing.application.port.out.CustomerIntegrationPort.Ma
 import es.terencio.erp.marketing.application.port.out.MailingSystemPort;
 import es.terencio.erp.marketing.domain.model.CampaignLog;
 import es.terencio.erp.marketing.domain.model.CampaignStatus;
-import es.terencio.erp.marketing.domain.model.DeliveryStatus;
 import es.terencio.erp.marketing.domain.model.EmailMessage;
 import es.terencio.erp.marketing.domain.model.MarketingCampaign;
 import es.terencio.erp.marketing.domain.model.MarketingTemplate;
@@ -57,9 +56,7 @@ public class CampaignService implements ManageCampaignsUseCase, CampaignTracking
     @Override
     @Transactional
     public CampaignResponse createDraft(UUID companyId, CreateCampaignRequest request) {
-        MarketingCampaign campaign = new MarketingCampaign(
-                null, companyId, request.name(), request.templateId(), CampaignStatus.DRAFT);
-
+        MarketingCampaign campaign = MarketingCampaign.createDraft(companyId, request.name(), request.templateId());
         MarketingCampaign saved = campaignRepository.saveCampaign(campaign);
         return toCampaignDto(saved);
     }
@@ -92,7 +89,7 @@ public class CampaignService implements ManageCampaignsUseCase, CampaignTracking
             return;
         }
 
-        campaign.setStatus(CampaignStatus.SENDING);
+        campaign.startSending();
         campaignRepository.saveCampaign(campaign);
 
         MarketingTemplate tpl = campaignRepository.findTemplateById(campaign.getTemplateId())
@@ -108,7 +105,6 @@ public class CampaignService implements ManageCampaignsUseCase, CampaignTracking
                 break;
 
             for (MarketingCustomer customer : batch) {
-                // Skip if already emailed in this campaign (Idempotency)
                 if (!customer.canReceiveMarketing() || campaignRepository.hasLog(campaignId, customer.id()))
                     continue;
 
@@ -125,35 +121,25 @@ public class CampaignService implements ManageCampaignsUseCase, CampaignTracking
             offset += properties.getBatchSize();
         }
 
-        campaign.setStatus(CampaignStatus.COMPLETED);
-        campaign.setMetricsSent(campaign.getMetricsSent() + sentInThisSession);
+        campaign.complete();
+        campaign.addSent(sentInThisSession);
         campaignRepository.saveCampaign(campaign);
     }
 
     private void processSingleCustomer(MarketingCampaign campaign, MarketingTemplate tpl, MarketingCustomer customer) {
-        CampaignLog logEntry = new CampaignLog();
-        logEntry.setCampaignId(campaign.getId());
-        logEntry.setCompanyId(campaign.getCompanyId());
-        logEntry.setCustomerId(customer.id());
-        logEntry.setTemplateId(tpl.getId());
-        logEntry.setStatus(DeliveryStatus.PENDING);
-        logEntry.setSentAt(Instant.now());
-
+        CampaignLog logEntry = CampaignLog.createPending(campaign.getId(), campaign.getCompanyId(), customer.id(), tpl.getId());
         campaignRepository.saveLog(logEntry);
 
         try {
             sendEmailToCustomer(campaign.getId(), logEntry.getId(), tpl, customer, logEntry);
-            logEntry.setStatus(DeliveryStatus.SENT);
         } catch (Exception e) {
             log.error("Failed to send email to {}: {}", customer.email(), e.getMessage());
-            logEntry.setStatus(DeliveryStatus.FAILED);
-            logEntry.setErrorMessage(e.getMessage());
+            logEntry.markFailed(e.getMessage());
         }
         campaignRepository.saveLog(logEntry);
     }
 
-    private void sendEmailToCustomer(Long campaignId, Long logId, MarketingTemplate tpl, MarketingCustomer customer,
-            CampaignLog logEntry) {
+    private void sendEmailToCustomer(Long campaignId, Long logId, MarketingTemplate tpl, MarketingCustomer customer, CampaignLog logEntry) {
         String unsubscribeLink = properties.getPublicBaseUrl() + "/api/v1/public/marketing/preferences?token="
                 + customer.unsubscribeToken();
         Map<String, String> vars = Map.of(
@@ -163,14 +149,13 @@ public class CampaignService implements ManageCampaignsUseCase, CampaignTracking
         String body = tpl.compile(vars);
         body = rewriteLinksForTracking(logId, body);
 
-        // Append invisible tracking pixel
         String pixelUrl = properties.getPublicBaseUrl() + "/api/v1/public/marketing/track/open/" + logId + "/pixel.gif";
         body += "<img src=\"" + pixelUrl + "\" width=\"1\" height=\"1\" style=\"display:none;\" />";
 
-        EmailMessage msg = EmailMessage.of(customer.email(), tpl.compileSubject(vars), body,
-                customer.unsubscribeToken());
+        EmailMessage msg = EmailMessage.of(customer.email(), tpl.compileSubject(vars), body, customer.unsubscribeToken());
         String messageId = mailingSystem.send(msg);
-        logEntry.setMessageId(messageId);
+        
+        logEntry.markSent(messageId);
     }
 
     private String rewriteLinksForTracking(Long logId, String html) {
@@ -182,7 +167,7 @@ public class CampaignService implements ManageCampaignsUseCase, CampaignTracking
         while (matcher.find()) {
             String originalUrl = matcher.group(1);
             if (originalUrl.contains("/marketing/preferences")) {
-                matcher.appendReplacement(sb, "href=\"" + originalUrl + "\""); // Don't track preference link
+                matcher.appendReplacement(sb, "href=\"" + originalUrl + "\"");
                 continue;
             }
 
@@ -212,9 +197,7 @@ public class CampaignService implements ManageCampaignsUseCase, CampaignTracking
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public byte[] registerOpenAndGetPixel(Long logId) {
         campaignRepository.findLogById(logId).ifPresent(entry -> {
-            if (entry.getOpenedAt() == null) {
-                entry.setOpenedAt(Instant.now());
-                entry.setStatus(DeliveryStatus.OPENED);
+            if (entry.markOpened()) {
                 campaignRepository.saveLog(entry);
                 campaignRepository.incrementCampaignMetric(entry.getCampaignId(), "opened");
             }
@@ -238,12 +221,11 @@ public class CampaignService implements ManageCampaignsUseCase, CampaignTracking
 
             if (Instant.now().toEpochMilli() > expiresAt) {
                 log.warn("Expired tracking link: {}", logId);
-                return originalUrl; // Redirect anyway, but log it
+                return originalUrl;
             }
 
             campaignRepository.findLogById(logId).ifPresent(entry -> {
-                if (entry.getClickedAt() == null) {
-                    entry.setClickedAt(Instant.now());
+                if (entry.markClicked()) {
                     campaignRepository.saveLog(entry);
                     campaignRepository.incrementCampaignMetric(entry.getCampaignId(), "clicked");
                 }
@@ -256,11 +238,10 @@ public class CampaignService implements ManageCampaignsUseCase, CampaignTracking
 
     private CampaignResponse toCampaignDto(MarketingCampaign c) {
         return new CampaignResponse(c.getId(), c.getName(), c.getStatus(), c.getScheduledAt(),
-                c.getMetricsTotalRecipients(), c.getMetricsSent(), c.getMetricsOpened(),
-                c.getMetricsClicked(), c.getMetricsBounced());
+                c.getTotalRecipients(), c.getSent(), c.getOpened(),
+                c.getClicked(), c.getBounced());
     }
 
-    // --- Unused Boilerplate Omitted for this preview ---
     @Override
     public List<CampaignAudienceMember> getCampaignAudience(Long campaignId) {
         return List.of();
@@ -268,6 +249,10 @@ public class CampaignService implements ManageCampaignsUseCase, CampaignTracking
 
     @Override
     public void scheduleCampaign(Long campaignId, Instant s) {
+        MarketingCampaign campaign = campaignRepository.findCampaignById(campaignId)
+                .orElseThrow(() -> new ResourceNotFoundException("Campaign not found"));
+        campaign.schedule(s);
+        campaignRepository.saveCampaign(campaign);
     }
 
     @Override

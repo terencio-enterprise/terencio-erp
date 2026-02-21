@@ -10,12 +10,12 @@ import org.slf4j.LoggerFactory;
 import org.springframework.transaction.annotation.Transactional;
 
 import es.terencio.erp.marketing.application.dto.AssetDtos.AssetResponse;
-import es.terencio.erp.marketing.application.dto.AssetDtos.PageDto;
 import es.terencio.erp.marketing.application.port.in.ManageAssetsUseCase;
 import es.terencio.erp.marketing.application.port.out.AssetRepositoryPort;
 import es.terencio.erp.marketing.application.port.out.FileStoragePort;
 import es.terencio.erp.marketing.application.port.out.FileStoragePort.StorageResult;
 import es.terencio.erp.marketing.domain.model.CompanyAsset;
+import es.terencio.erp.shared.domain.query.PageResult;
 import es.terencio.erp.shared.exception.ResourceNotFoundException;
 
 public class AssetService implements ManageAssetsUseCase {
@@ -35,11 +35,8 @@ public class AssetService implements ManageAssetsUseCase {
             InputStream inputStream, boolean isPublic) {
         log.info("Uploading new asset {} for company {}", filename, companyId);
 
-        // 1. Upload to S3 (or local storage)
-        StorageResult storageResult = fileStoragePort.upload(companyId, filename, contentType, sizeBytes, inputStream,
-                isPublic);
+        StorageResult storageResult = fileStoragePort.upload(companyId, filename, contentType, sizeBytes, inputStream, isPublic);
 
-        // 2. Save metadata to DB
         CompanyAsset asset = new CompanyAsset(
                 companyId,
                 filename,
@@ -55,16 +52,15 @@ public class AssetService implements ManageAssetsUseCase {
 
     @Override
     @Transactional(readOnly = true)
-    public PageDto<AssetResponse> searchAssets(UUID companyId, String search, String contentType, int page, int size) {
+    public PageResult<AssetResponse> searchAssets(UUID companyId, String search, String contentType, int page, int size) {
         int offset = page * size;
         long totalElements = assetRepository.countByFilters(companyId, search, contentType);
-        List<CompanyAsset> assets = assetRepository.findByFiltersPaginated(companyId, search, contentType, offset,
-                size);
+        List<CompanyAsset> assets = assetRepository.findByFiltersPaginated(companyId, search, contentType, offset, size);
 
         List<AssetResponse> content = assets.stream().map(this::toDto).collect(Collectors.toList());
         int totalPages = (int) Math.ceil((double) totalElements / size);
 
-        return new PageDto<>(content, page, size, totalElements, totalPages);
+        return new PageResult<AssetResponse>(content, totalElements, totalPages, page, size);
     }
 
     @Override
@@ -74,11 +70,7 @@ public class AssetService implements ManageAssetsUseCase {
                 .orElseThrow(() -> new ResourceNotFoundException("Asset not found"));
 
         log.info("Deleting asset {} for company {}", assetId, companyId);
-
-        // 1. Delete from S3/Storage
         fileStoragePort.delete(asset.getStoragePath());
-
-        // 2. Delete from DB
         assetRepository.deleteById(assetId);
     }
 

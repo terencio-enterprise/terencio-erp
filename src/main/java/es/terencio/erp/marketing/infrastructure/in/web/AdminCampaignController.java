@@ -3,19 +3,29 @@ package es.terencio.erp.marketing.infrastructure.in.web;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
-import org.springframework.web.bind.annotation.*;
-import jakarta.validation.Valid;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
 import es.terencio.erp.auth.domain.model.AccessScope;
 import es.terencio.erp.auth.domain.model.Permission;
 import es.terencio.erp.auth.infrastructure.config.security.aop.RequiresPermission;
-import es.terencio.erp.marketing.application.dto.MarketingDtos.*;
+import es.terencio.erp.marketing.application.dto.MarketingDtos.CampaignAudienceMember;
+import es.terencio.erp.marketing.application.dto.MarketingDtos.CampaignResponse;
+import es.terencio.erp.marketing.application.dto.MarketingDtos.CreateCampaignRequest;
 import es.terencio.erp.marketing.application.port.in.ManageCampaignsUseCase;
 import es.terencio.erp.shared.presentation.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 
 @RestController
 @RequestMapping("/api/v1/companies/{companyId}/marketing/campaigns")
@@ -55,7 +65,6 @@ public class AdminCampaignController {
     @RequiresPermission(permission = Permission.MARKETING_CAMPAIGN_LAUNCH, scope = AccessScope.COMPANY, targetIdParam = "companyId")
     public ResponseEntity<ApiResponse<Void>> launchCampaign(@PathVariable UUID companyId, @PathVariable Long id) {
         manageCampaignsUseCase.launchCampaign(id);
-        // Using 202 Accepted because the task is processed in background
         return ResponseEntity.status(HttpStatus.ACCEPTED).body(ApiResponse.success("Campaign enqueued successfully."));
     }
 

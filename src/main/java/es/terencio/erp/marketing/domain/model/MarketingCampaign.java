@@ -30,10 +30,6 @@ public class MarketingCampaign {
     private final Instant createdAt;
     private Instant updatedAt;
 
-    // ==========================
-    // FACTORY
-    // ==========================
-
     public static MarketingCampaign createDraft(
             UUID companyId,
             String name,
@@ -101,10 +97,6 @@ public class MarketingCampaign {
         this.updatedAt = updatedAt;
     }
 
-    // ==========================
-    // STATE TRANSITIONS
-    // ==========================
-
     public void schedule(Instant when) {
         if (status != CampaignStatus.DRAFT)
             throw new InvariantViolationException("Only DRAFT campaigns can be scheduled");
@@ -143,32 +135,10 @@ public class MarketingCampaign {
         touch();
     }
 
-    // ==========================
-    // METRICS
-    // ==========================
-
-    public void incrementSent() {
-        this.sent++;
-    }
-
-    public void incrementDelivered() {
-        this.delivered++;
-    }
-
-    public void incrementOpened() {
-        this.opened++;
-    }
-
-    public void incrementClicked() {
-        this.clicked++;
-    }
-
-    public void incrementBounced() {
-        this.bounced++;
-    }
-
-    public void incrementUnsubscribed() {
-        this.unsubscribed++;
+    public void addSent(int count) {
+        if (count < 0) throw new InvariantViolationException("Sent count cannot be negative");
+        this.sent += count;
+        touch();
     }
 
     private void touch() {

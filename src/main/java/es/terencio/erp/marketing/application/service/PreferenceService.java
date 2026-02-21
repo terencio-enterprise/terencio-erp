@@ -4,7 +4,9 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.HashMap;
 import java.util.Map;
+
 import org.springframework.transaction.annotation.Transactional;
+
 import es.terencio.erp.marketing.application.dto.MarketingDtos.UnsubscribeRequest;
 import es.terencio.erp.marketing.application.port.in.ManagePreferencesUseCase;
 import es.terencio.erp.marketing.application.port.out.CustomerIntegrationPort;

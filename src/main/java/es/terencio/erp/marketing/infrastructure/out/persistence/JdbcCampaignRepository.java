@@ -1,0 +1,444 @@
+package es.terencio.erp.marketing.infrastructure.out.persistence;
+
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.time.Instant;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
+import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
+import org.springframework.jdbc.support.GeneratedKeyHolder;
+import org.springframework.jdbc.support.KeyHolder;
+import org.springframework.stereotype.Repository;
+
+import es.terencio.erp.marketing.application.port.out.CampaignRepositoryPort;
+import es.terencio.erp.marketing.domain.model.CampaignLog;
+import es.terencio.erp.marketing.domain.model.CampaignStatus;
+import es.terencio.erp.marketing.domain.model.DeliveryStatus;
+import es.terencio.erp.marketing.domain.model.EmailDeliveryEvent;
+import es.terencio.erp.marketing.domain.model.MarketingCampaign;
+import es.terencio.erp.marketing.domain.model.MarketingTemplate;
+
+@Repository
+public class JdbcCampaignRepository implements CampaignRepositoryPort {
+
+    private final NamedParameterJdbcTemplate jdbc;
+
+    public JdbcCampaignRepository(NamedParameterJdbcTemplate jdbc) {
+        this.jdbc = jdbc;
+    }
+
+    // ==========================================
+    // CAMPAIGNS
+    // ==========================================
+
+    @Override
+    public MarketingCampaign saveCampaign(MarketingCampaign campaign) {
+        if (campaign.getId() == null) {
+            String sql = """
+                INSERT INTO marketing_campaigns (
+                    company_id, name, template_id, status, scheduled_at, started_at, completed_at,
+                    metrics_total_recipients, metrics_sent, metrics_delivered, metrics_opened,
+                    metrics_clicked, metrics_bounced, metrics_unsubscribed, created_at, updated_at
+                ) VALUES (
+                    :companyId, :name, :templateId, :status, :scheduledAt, :startedAt, :completedAt,
+                    :recipients, :sent, :delivered, :opened, :clicked, :bounced, :unsubscribed, :createdAt, :updatedAt
+                ) RETURNING id
+            """;
+            
+            KeyHolder keyHolder = new GeneratedKeyHolder();
+            jdbc.update(sql, mapCampaignParams(campaign), keyHolder, new String[]{"id"});
+            
+            try {
+                Number key = keyHolder.getKey();
+                if (key != null) {
+                    var idField = MarketingCampaign.class.getDeclaredField("id");
+                    idField.setAccessible(true);
+                    idField.set(campaign, key.longValue());
+                } else {
+                    throw new RuntimeException("Failed to generate campaign ID");
+                }
+            } catch (Exception e) {
+                throw new RuntimeException("Error mapping campaign ID", e);
+            }
+        } else {
+            String sql = """
+                UPDATE marketing_campaigns SET
+                    status = :status, scheduled_at = :scheduledAt, started_at = :startedAt, completed_at = :completedAt,
+                    metrics_total_recipients = :recipients, metrics_sent = :sent, metrics_delivered = :delivered,
+                    metrics_opened = :opened, metrics_clicked = :clicked, metrics_bounced = :bounced, 
+                    metrics_unsubscribed = :unsubscribed, updated_at = :updatedAt
+                WHERE id = :id
+            """;
+            jdbc.update(sql, mapCampaignParams(campaign));
+        }
+        return campaign;
+    }
+
+    @Override
+    public Optional<MarketingCampaign> findCampaignById(Long id) {
+        String sql = "SELECT * FROM marketing_campaigns WHERE id = :id";
+        List<MarketingCampaign> list = jdbc.query(sql, new MapSqlParameterSource("id", id), this::mapRowToCampaign);
+        return list.isEmpty() ? Optional.empty() : Optional.of(list.get(0));
+    }
+
+    @Override
+    public List<MarketingCampaign> findScheduledCampaignsToLaunch(Instant now) {
+        String sql = """
+            SELECT * FROM marketing_campaigns 
+            WHERE status = 'SCHEDULED' AND scheduled_at <= :now
+        """;
+        return jdbc.query(sql, new MapSqlParameterSource("now", java.sql.Timestamp.from(now)), this::mapRowToCampaign);
+    }
+
+    @Override
+    public void incrementCampaignMetric(Long campaignId, String metric) {
+        // Prevent SQL Injection by matching exact metric names
+        String columnName = switch (metric.toLowerCase()) {
+            case "sent" -> "metrics_sent";
+            case "delivered" -> "metrics_delivered";
+            case "opened" -> "metrics_opened";
+            case "clicked" -> "metrics_clicked";
+            case "bounced" -> "metrics_bounced";
+            case "unsubscribed" -> "metrics_unsubscribed";
+            default -> throw new IllegalArgumentException("Invalid metric name: " + metric);
+        };
+        
+        String sql = "UPDATE marketing_campaigns SET " + columnName + " = " + columnName + " + 1 WHERE id = :id";
+        jdbc.update(sql, new MapSqlParameterSource("id", campaignId));
+    }
+
+    // ==========================================
+    // TEMPLATES
+    // ==========================================
+
+    @Override
+    public MarketingTemplate saveTemplate(MarketingTemplate template) {
+        if (template.getId() == null) {
+            String sql = """
+                INSERT INTO marketing_templates (company_id, name, subject_template, body_html, is_active, created_at, updated_at)
+                VALUES (:companyId, :name, :subjectTemplate, :bodyHtml, :isActive, :createdAt, :updatedAt)
+                RETURNING id
+            """;
+            KeyHolder keyHolder = new GeneratedKeyHolder();
+            jdbc.update(sql, mapTemplateParams(template), keyHolder, new String[]{"id"});
+            
+            try {
+                Number key = keyHolder.getKey();
+                if (key != null) {
+                    var idField = MarketingTemplate.class.getDeclaredField("id");
+                    idField.setAccessible(true);
+                    idField.set(template, key.longValue());
+                } else {
+                    throw new RuntimeException("Failed to generate template ID");
+                }
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        } else {
+            String sql = """
+                UPDATE marketing_templates SET 
+                    name = :name, subject_template = :subjectTemplate, body_html = :bodyHtml, 
+                    is_active = :isActive, updated_at = :updatedAt 
+                WHERE id = :id
+            """;
+            jdbc.update(sql, mapTemplateParams(template));
+        }
+        return template;
+    }
+
+    @Override
+    public Optional<MarketingTemplate> findTemplateById(Long templateId) {
+        String sql = "SELECT * FROM marketing_templates WHERE id = :id";
+        List<MarketingTemplate> list = jdbc.query(sql, new MapSqlParameterSource("id", templateId), this::mapRowToTemplate);
+        return list.isEmpty() ? Optional.empty() : Optional.of(list.get(0));
+    }
+
+    @Override
+    public List<MarketingTemplate> findAllTemplates(UUID companyId, String search) {
+        StringBuilder sql = new StringBuilder("SELECT * FROM marketing_templates WHERE company_id = :companyId");
+        MapSqlParameterSource params = new MapSqlParameterSource("companyId", companyId);
+        
+        if (search != null && !search.isBlank()) {
+            sql.append(" AND name ILIKE :search");
+            params.addValue("search", "%" + search + "%");
+        }
+        sql.append(" ORDER BY id DESC");
+        
+        return jdbc.query(sql.toString(), params, this::mapRowToTemplate);
+    }
+
+    @Override
+    public void deleteTemplate(Long id) {
+        jdbc.update("DELETE FROM marketing_templates WHERE id = :id", new MapSqlParameterSource("id", id));
+    }
+
+    // ==========================================
+    // CAMPAIGN LOGS
+    // ==========================================
+
+    @Override
+    public boolean hasLog(Long campaignId, Long customerId) {
+        String sql = "SELECT COUNT(*) FROM marketing_email_logs WHERE campaign_id = :campaignId AND customer_id = :customerId AND status != 'FAILED'";
+        Integer count = jdbc.queryForObject(sql, new MapSqlParameterSource().addValue("campaignId", campaignId).addValue("customerId", customerId), Integer.class);
+        return count != null && count > 0;
+    }
+
+    @Override
+    public CampaignLog saveLog(CampaignLog log) {
+        if (log.getId() == null) {
+            String sql = """
+                INSERT INTO marketing_email_logs (
+                    company_id, customer_id, template_id, campaign_id, message_id, 
+                    status, error_message, sent_at, created_at
+                ) VALUES (
+                    :companyId, :customerId, :templateId, :campaignId, :messageId, 
+                    :status, :errorMessage, :sentAt, NOW()
+                ) RETURNING id
+            """;
+            KeyHolder keyHolder = new GeneratedKeyHolder();
+            jdbc.update(sql, mapLogParams(log), keyHolder, new String[]{"id"});
+            
+            try {
+                Number key = keyHolder.getKey();
+                if (key != null) {
+                    var idField = CampaignLog.class.getDeclaredField("id");
+                    idField.setAccessible(true);
+                    idField.set(log, key.longValue());
+                } else {
+                    throw new RuntimeException("Failed to generate campaign log ID");
+                }
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        } else {
+            String sql = """
+                UPDATE marketing_email_logs SET 
+                    status = :status, message_id = :messageId, error_message = :errorMessage,
+                    sent_at = :sentAt, delivered_at = :deliveredAt, opened_at = :openedAt, 
+                    clicked_at = :clickedAt, bounced_at = :bouncedAt, unsubscribed_at = :unsubscribedAt
+                WHERE id = :id
+            """;
+            jdbc.update(sql, mapLogParams(log));
+        }
+        
+        return log;
+    }
+
+    @Override
+    public Optional<CampaignLog> findLogById(Long logId) {
+        String sql = "SELECT * FROM marketing_email_logs WHERE id = :id";
+        List<CampaignLog> list = jdbc.query(sql, new MapSqlParameterSource("id", logId), this::mapRowToLog);
+        return list.isEmpty() ? Optional.empty() : Optional.of(list.get(0));
+    }
+
+    @Override
+    public Optional<CampaignLog> findLogByMessageId(String messageId) {
+        String sql = "SELECT * FROM marketing_email_logs WHERE message_id = :messageId";
+        List<CampaignLog> list = jdbc.query(sql, new MapSqlParameterSource("messageId", messageId), this::mapRowToLog);
+        return list.isEmpty() ? Optional.empty() : Optional.of(list.get(0));
+    }
+
+    // ==========================================
+    // DELIVERY EVENTS & CRM STATUS
+    // ==========================================
+
+    @Override
+    public void saveDeliveryEvent(EmailDeliveryEvent event) {
+        String sql = """
+            INSERT INTO email_delivery_events (
+                provider_message_id, email_address, event_type, bounce_type, raw_payload, created_at
+            ) VALUES (
+                :messageId, :email, :eventType, :bounceType, :payload::jsonb, :createdAt
+            )
+        """;
+        MapSqlParameterSource params = new MapSqlParameterSource()
+            .addValue("messageId", event.getProviderMessageId())
+            .addValue("email", event.getEmailAddress())
+            .addValue("eventType", event.getEventType())
+            .addValue("bounceType", event.getBounceType())
+            .addValue("payload", event.getRawPayload())
+            .addValue("createdAt", java.sql.Timestamp.from(event.getCreatedAt()));
+        jdbc.update(sql, params);
+    }
+
+    @Override
+    public void markCustomerAsBouncedOrComplained(Long customerId, String status) {
+        String sql = "UPDATE customers SET marketing_status = :status WHERE id = :id";
+        jdbc.update(sql, new MapSqlParameterSource().addValue("status", status).addValue("id", customerId));
+    }
+
+    @Override
+    public int countDailySendsForCompany(UUID companyId, Instant since) {
+        String sql = "SELECT COUNT(*) FROM marketing_email_logs WHERE company_id = :companyId AND sent_at >= :since";
+        Integer count = jdbc.queryForObject(sql, new MapSqlParameterSource()
+                .addValue("companyId", companyId)
+                .addValue("since", java.sql.Timestamp.from(since)), Integer.class);
+        return count != null ? count : 0;
+    }
+
+    // ==========================================
+    // DISTRIBUTED SCHEDULER LOCKING
+    // ==========================================
+
+    @Override
+    public boolean acquireSchedulerLock(String lockName) {
+        String sql = "SELECT pg_try_advisory_lock(hashtext(:lockName))";
+        Boolean locked = jdbc.queryForObject(sql, new MapSqlParameterSource("lockName", lockName), Boolean.class);
+        return Boolean.TRUE.equals(locked);
+    }
+
+    @Override
+    public void releaseSchedulerLock(String lockName) {
+        String sql = "SELECT pg_advisory_unlock(hashtext(:lockName))";
+        jdbc.queryForObject(sql, new MapSqlParameterSource("lockName", lockName), Boolean.class);
+    }
+
+    // ==========================================
+    // MAPPER UTILS
+    // ==========================================
+
+    private MapSqlParameterSource mapCampaignParams(MarketingCampaign c) {
+        return new MapSqlParameterSource()
+            .addValue("id", c.getId())
+            .addValue("companyId", c.getCompanyId())
+            .addValue("name", c.getName())
+            .addValue("templateId", c.getTemplateId())
+            .addValue("status", c.getStatus().name())
+            .addValue("scheduledAt", c.getScheduledAt() != null ? java.sql.Timestamp.from(c.getScheduledAt()) : null)
+            .addValue("startedAt", c.getStartedAt() != null ? java.sql.Timestamp.from(c.getStartedAt()) : null)
+            .addValue("completedAt", c.getCompletedAt() != null ? java.sql.Timestamp.from(c.getCompletedAt()) : null)
+            .addValue("recipients", c.getTotalRecipients())
+            .addValue("sent", c.getSent())
+            .addValue("delivered", c.getDelivered())
+            .addValue("opened", c.getOpened())
+            .addValue("clicked", c.getClicked())
+            .addValue("bounced", c.getBounced())
+            .addValue("unsubscribed", c.getUnsubscribed())
+            .addValue("createdAt", java.sql.Timestamp.from(c.getCreatedAt()))
+            .addValue("updatedAt", java.sql.Timestamp.from(c.getUpdatedAt()));
+    }
+
+    private MapSqlParameterSource mapTemplateParams(MarketingTemplate t) {
+        return new MapSqlParameterSource()
+            .addValue("id", t.getId())
+            .addValue("companyId", t.getCompanyId())
+            .addValue("name", t.getName())
+            .addValue("subjectTemplate", t.getSubjectTemplate())
+            .addValue("bodyHtml", t.getBodyHtml())
+            .addValue("isActive", t.isActive())
+            .addValue("createdAt", java.sql.Timestamp.from(t.getCreatedAt()))
+            .addValue("updatedAt", java.sql.Timestamp.from(t.getUpdatedAt()));
+    }
+
+    private MapSqlParameterSource mapLogParams(CampaignLog l) {
+        return new MapSqlParameterSource()
+            .addValue("id", l.getId())
+            .addValue("companyId", l.getCompanyId())
+            .addValue("customerId", l.getCustomerId())
+            .addValue("templateId", l.getTemplateId())
+            .addValue("campaignId", l.getCampaignId())
+            .addValue("status", l.getStatus().name())
+            .addValue("messageId", l.getMessageId())
+            .addValue("errorMessage", l.getErrorMessage())
+            .addValue("sentAt", l.getSentAt() != null ? java.sql.Timestamp.from(l.getSentAt()) : null)
+            .addValue("deliveredAt", l.getDeliveredAt() != null ? java.sql.Timestamp.from(l.getDeliveredAt()) : null)
+            .addValue("openedAt", l.getOpenedAt() != null ? java.sql.Timestamp.from(l.getOpenedAt()) : null)
+            .addValue("clickedAt", l.getClickedAt() != null ? java.sql.Timestamp.from(l.getClickedAt()) : null)
+            .addValue("bouncedAt", l.getBouncedAt() != null ? java.sql.Timestamp.from(l.getBouncedAt()) : null)
+            .addValue("unsubscribedAt", l.getUnsubscribedAt() != null ? java.sql.Timestamp.from(l.getUnsubscribedAt()) : null);
+    }
+
+    private MarketingCampaign mapRowToCampaign(ResultSet rs, int rowNum) throws SQLException {
+        try {
+            var constructor = MarketingCampaign.class.getDeclaredConstructors()[0]; // Getting the private constructor
+            constructor.setAccessible(true);
+            return (MarketingCampaign) constructor.newInstance(
+                rs.getLong("id"),
+                rs.getObject("company_id", UUID.class),
+                rs.getString("name"),
+                rs.getLong("template_id"),
+                CampaignStatus.valueOf(rs.getString("status")),
+                rs.getTimestamp("scheduled_at") != null ? rs.getTimestamp("scheduled_at").toInstant() : null,
+                rs.getTimestamp("started_at") != null ? rs.getTimestamp("started_at").toInstant() : null,
+                rs.getTimestamp("completed_at") != null ? rs.getTimestamp("completed_at").toInstant() : null,
+                rs.getInt("metrics_total_recipients"),
+                rs.getInt("metrics_sent"),
+                rs.getInt("metrics_delivered"),
+                rs.getInt("metrics_opened"),
+                rs.getInt("metrics_clicked"),
+                rs.getInt("metrics_bounced"),
+                rs.getInt("metrics_unsubscribed"),
+                rs.getTimestamp("created_at").toInstant(),
+                rs.getTimestamp("updated_at").toInstant()
+            );
+        } catch (Exception e) {
+            throw new SQLException("Failed to instantiate MarketingCampaign via reflection", e);
+        }
+    }
+
+    private MarketingTemplate mapRowToTemplate(ResultSet rs, int rowNum) throws SQLException {
+        return new MarketingTemplate(
+            rs.getLong("id"),
+            rs.getObject("company_id", UUID.class),
+            "", // Template code omitted in current SQL schema
+            rs.getString("name"),
+            rs.getString("subject_template"),
+            rs.getString("body_html"),
+            rs.getBoolean("is_active"),
+            rs.getTimestamp("created_at") != null ? rs.getTimestamp("created_at").toInstant() : null,
+            rs.getTimestamp("updated_at") != null ? rs.getTimestamp("updated_at").toInstant() : null
+        );
+    }
+
+    private CampaignLog mapRowToLog(ResultSet rs, int rowNum) throws SQLException {
+        try {
+            CampaignLog log = CampaignLog.createPending(
+                rs.getLong("campaign_id"),
+                rs.getObject("company_id", UUID.class),
+                rs.getLong("customer_id"),
+                rs.getLong("template_id")
+            );
+
+            // Rehydrate fields
+            var idField = CampaignLog.class.getDeclaredField("id");
+            idField.setAccessible(true);
+            idField.set(log, rs.getLong("id"));
+
+            var statusField = CampaignLog.class.getDeclaredField("status");
+            statusField.setAccessible(true);
+            statusField.set(log, DeliveryStatus.valueOf(rs.getString("status")));
+
+            var messageIdField = CampaignLog.class.getDeclaredField("messageId");
+            messageIdField.setAccessible(true);
+            messageIdField.set(log, rs.getString("message_id"));
+
+            var errorMessageField = CampaignLog.class.getDeclaredField("errorMessage");
+            errorMessageField.setAccessible(true);
+            errorMessageField.set(log, rs.getString("error_message"));
+
+            // Timestamps
+            setTimeField(log, "sentAt", rs, "sent_at");
+            setTimeField(log, "deliveredAt", rs, "delivered_at");
+            setTimeField(log, "openedAt", rs, "opened_at");
+            setTimeField(log, "clickedAt", rs, "clicked_at");
+            setTimeField(log, "bouncedAt", rs, "bounced_at");
+            setTimeField(log, "unsubscribedAt", rs, "unsubscribed_at");
+
+            return log;
+        } catch (Exception e) {
+            throw new SQLException("Failed to instantiate CampaignLog", e);
+        }
+    }
+
+    private void setTimeField(CampaignLog log, String fieldName, ResultSet rs, String colName) throws Exception {
+        var field = CampaignLog.class.getDeclaredField(fieldName);
+        field.setAccessible(true);
+        var ts = rs.getTimestamp(colName);
+        if (ts != null) {
+            field.set(log, ts.toInstant());
+        }
+    }
+}

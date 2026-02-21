@@ -17,8 +17,8 @@ import es.terencio.erp.auth.domain.model.AccessScope;
 import es.terencio.erp.auth.domain.model.Permission;
 import es.terencio.erp.auth.infrastructure.config.security.aop.RequiresPermission;
 import es.terencio.erp.marketing.application.dto.AssetDtos.AssetResponse;
-import es.terencio.erp.marketing.application.dto.AssetDtos.PageDto;
 import es.terencio.erp.marketing.application.port.in.ManageAssetsUseCase;
+import es.terencio.erp.shared.domain.query.PageResult;
 import es.terencio.erp.shared.presentation.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -37,14 +37,14 @@ public class AdminAssetController {
     @GetMapping
     @Operation(summary = "Search and list paginated assets")
     @RequiresPermission(permission = Permission.MARKETING_TEMPLATE_VIEW, scope = AccessScope.COMPANY, targetIdParam = "companyId")
-    public ResponseEntity<ApiResponse<PageDto<AssetResponse>>> listAssets(
+    public ResponseEntity<ApiResponse<PageResult<AssetResponse>>> listAssets(
             @PathVariable UUID companyId,
             @RequestParam(required = false) String search,
             @RequestParam(required = false) String contentType,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
 
-        PageDto<AssetResponse> result = manageAssetsUseCase.searchAssets(companyId, search, contentType, page, size);
+        PageResult<AssetResponse> result = manageAssetsUseCase.searchAssets(companyId, search, contentType, page, size);
         return ResponseEntity.ok(ApiResponse.success(result));
     }
 
