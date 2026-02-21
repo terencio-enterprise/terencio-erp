@@ -1,30 +1,10 @@
 -- ==================================================================================
--- PARTE 2: TERENCIO ERP - CRM & MARKETING (V1)
--- Requiere: 01_core_schema.sql (Tabla companies)
+-- TERENCIO ERP - CRM & MARKETING (V1)
+-- Requiere: 01_core_schema.sql (Tabla companies, extension uuid-ossp)
 -- ==================================================================================
 
 -- ==================================================================================
--- 1. CONFIGURACIÓN GENERAL DE MARKETING
--- ==================================================================================
-CREATE TABLE company_marketing_settings (
-    company_id UUID PRIMARY KEY REFERENCES companies(id),
-    
-    -- Configuración de envío
-    sender_name VARCHAR(100),
-    sender_email VARCHAR(255),
-    domain_verified BOOLEAN DEFAULT FALSE,
-    daily_send_limit INTEGER DEFAULT 500,
-    
-    -- Email de bienvenida rápido (Obligatorio en V1)
-    welcome_email_active BOOLEAN DEFAULT FALSE,
-    welcome_template_id BIGINT, -- Se enlazará a marketing_templates
-    welcome_delay_minutes INTEGER DEFAULT 5, -- Ej: 5 minutos
-    
-    updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- ==================================================================================
--- 2. GESTIÓN DE RECURSOS (ASSETS)
+-- 1. GESTIÓN DE RECURSOS (ASSETS)
 -- ==================================================================================
 CREATE TABLE company_assets (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -41,10 +21,11 @@ CREATE TABLE company_assets (
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
 CREATE INDEX idx_company_assets_company ON company_assets(company_id);
 
 -- ==================================================================================
--- 3. CRM & CLIENTES / LEADS (El corazón)
+-- 2. CRM & CLIENTES / LEADS (El corazón)
 -- ==================================================================================
 CREATE TABLE customers (
     id BIGSERIAL PRIMARY KEY,
@@ -75,7 +56,8 @@ CREATE TABLE customers (
     
     -- RGPD y Estado de Envíos
     marketing_consent BOOLEAN DEFAULT FALSE,
-    marketing_status VARCHAR(20) DEFAULT 'SUBSCRIBED', -- 'SUBSCRIBED', 'UNSUBSCRIBED', 'BLOCKED'
+    marketing_status VARCHAR(20) DEFAULT 'UNSUBSCRIBED', -- 'SUBSCRIBED', 'UNSUBSCRIBED', 'SNOOZED', 'BLOCKED'
+    marketing_snooze_until TIMESTAMPTZ,
     unsubscribe_token VARCHAR(64) UNIQUE, -- Token seguro para el link de baja
     
     last_interaction_at TIMESTAMPTZ,
@@ -84,21 +66,27 @@ CREATE TABLE customers (
     
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
-    deleted_at TIMESTAMPTZ
+    deleted_at TIMESTAMPTZ,
+
+    CONSTRAINT chk_customers_marketing_status 
+        CHECK (marketing_status IN ('SUBSCRIBED', 'UNSUBSCRIBED', 'SNOOZED', 'BLOCKED'))
 );
 
 CREATE UNIQUE INDEX idx_customers_email_company_unique ON customers (company_id, LOWER(email)) WHERE deleted_at IS NULL;
 CREATE INDEX idx_customers_marketing_status ON customers(company_id, marketing_status);
-CREATE INDEX idx_customers_tags ON customers USING GIN (tags); -- Para búsquedas rápidas por etiqueta
+CREATE INDEX idx_customers_tags ON customers USING GIN (tags);
+CREATE INDEX idx_customers_email_lower ON customers (LOWER(email));
+CREATE INDEX idx_customers_unsubscribe_token ON customers(unsubscribe_token);
 
 -- ==================================================================================
--- 4. PLANTILLAS DE EMAIL (TEMPLATES)
+-- 3. PLANTILLAS DE EMAIL (TEMPLATES)
 -- ==================================================================================
 CREATE TABLE marketing_templates (
     id BIGSERIAL PRIMARY KEY,
     company_id UUID NOT NULL REFERENCES companies(id),
     
     name VARCHAR(100) NOT NULL,
+    code VARCHAR(50),
     subject_template VARCHAR(255) NOT NULL,
     preheader_template VARCHAR(255), -- Útil para el texto de vista previa en Gmail
     body_html TEXT NOT NULL,
@@ -108,12 +96,30 @@ CREATE TABLE marketing_templates (
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Enlazar la configuración de bienvenida a la plantilla
-ALTER TABLE company_marketing_settings 
-ADD CONSTRAINT fk_welcome_template FOREIGN KEY (welcome_template_id) REFERENCES marketing_templates(id) ON DELETE SET NULL;
+CREATE UNIQUE INDEX uq_marketing_templates_company_code ON marketing_templates(company_id, LOWER(code)) WHERE code IS NOT NULL;
 
 -- ==================================================================================
--- 5. SEGMENTOS (Filtros guardados, sin complicaciones)
+-- 4. CONFIGURACIÓN GENERAL DE MARKETING
+-- ==================================================================================
+CREATE TABLE company_marketing_settings (
+    company_id UUID PRIMARY KEY REFERENCES companies(id),
+    
+    -- Configuración de envío
+    sender_name VARCHAR(100),
+    sender_email VARCHAR(255),
+    domain_verified BOOLEAN DEFAULT FALSE,
+    daily_send_limit INTEGER DEFAULT 500,
+    
+    -- Email de bienvenida rápido (Obligatorio en V1)
+    welcome_email_active BOOLEAN DEFAULT FALSE,
+    welcome_template_id BIGINT REFERENCES marketing_templates(id) ON DELETE SET NULL,
+    welcome_delay_minutes INTEGER DEFAULT 5, -- Ej: 5 minutos
+    
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ==================================================================================
+-- 5. SEGMENTOS (Filtros guardados)
 -- ==================================================================================
 CREATE TABLE marketing_segments (
     id BIGSERIAL PRIMARY KEY,
@@ -121,7 +127,7 @@ CREATE TABLE marketing_segments (
     name VARCHAR(100) NOT NULL,
     
     -- Filtros aplicables (si es NULL, no filtra por ese campo)
-    filter_types TEXT[], -- Ej: ['LEAD', 'CLIENT_RETAIL'] (Permite selección múltiple)
+    filter_types TEXT[], -- Ej: ['LEAD', 'CLIENT_RETAIL']
     filter_tags TEXT[], -- Debe contener ESTAS etiquetas
     filter_city VARCHAR(100),
     filter_origin VARCHAR(50),
@@ -149,7 +155,7 @@ CREATE TABLE marketing_campaigns (
     started_at TIMESTAMPTZ,
     completed_at TIMESTAMPTZ,
     
-    -- Métricas desnormalizadas (Para que el Dashboard sea instantáneo)
+    -- Métricas desnormalizadas
     metrics_total_recipients INTEGER DEFAULT 0,
     metrics_sent INTEGER DEFAULT 0,
     metrics_delivered INTEGER DEFAULT 0,
@@ -163,6 +169,8 @@ CREATE TABLE marketing_campaigns (
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+CREATE INDEX idx_marketing_campaigns_status_scheduled ON marketing_campaigns(status, scheduled_at) WHERE status = 'SCHEDULED';
 
 -- ==================================================================================
 -- 7. LOGS DE ENVÍO Y MÉTRICAS INDIVIDUALES
@@ -180,7 +188,7 @@ CREATE TABLE marketing_email_logs (
     status VARCHAR(20) NOT NULL DEFAULT 'PENDING', -- 'PENDING', 'SENT', 'FAILED'
     error_message TEXT,
     
-    -- Tiempos para trackear el embudo (Métricas)
+    -- Tiempos para trackear el embudo
     sent_at TIMESTAMPTZ,
     delivered_at TIMESTAMPTZ,
     opened_at TIMESTAMPTZ,
@@ -194,7 +202,9 @@ CREATE TABLE marketing_email_logs (
 
 CREATE INDEX idx_email_logs_campaign ON marketing_email_logs(campaign_id);
 CREATE INDEX idx_email_logs_customer ON marketing_email_logs(customer_id);
-CREATE INDEX idx_email_logs_message_id ON marketing_email_logs(message_id); -- Vital para conciliar webhooks
+CREATE INDEX idx_email_logs_message_id ON marketing_email_logs(message_id);
+CREATE INDEX idx_email_logs_status_metrics ON marketing_email_logs(campaign_id, status);
+CREATE UNIQUE INDEX uq_campaign_customer_log ON marketing_email_logs(campaign_id, customer_id) WHERE status != 'FAILED';
 
 -- ==================================================================================
 -- 8. EVENTOS DE PROVEEDOR (Webhooks de rebotes, quejas, etc.)
@@ -209,30 +219,6 @@ CREATE TABLE email_delivery_events (
     processed BOOLEAN DEFAULT FALSE, -- Para saber si nuestro worker ya actualizó el log y el cliente
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
 CREATE INDEX idx_delivery_events_msg_id ON email_delivery_events(provider_message_id);
 CREATE INDEX idx_delivery_events_processed ON email_delivery_events(processed);
-
-
--- ==================================================================================
--- INDICES ADICIONALES Y RESTRICCIONES V1.1
--- ==================================================================================
-
--- Optimization: Searching customers by email is case-insensitive in Java, so we do it here too
-CREATE INDEX IF NOT EXISTS idx_customers_email_lower ON customers (LOWER(email));
-
--- 1. Index scheduled campaigns for faster scheduler lookups
-CREATE INDEX IF NOT EXISTS idx_marketing_campaigns_status_scheduled 
-ON marketing_campaigns(status, scheduled_at) 
-WHERE status = 'SCHEDULED';
-
--- 2. Database level idempotency for campaign logs
-CREATE UNIQUE INDEX IF NOT EXISTS uq_campaign_customer_log 
-ON marketing_email_logs(campaign_id, customer_id) 
-WHERE status != 'FAILED';
-
--- 3. Token lookup optimization
-CREATE INDEX IF NOT EXISTS idx_customers_unsubscribe_token 
-ON customers(unsubscribe_token);
-
--- Performance: Aggregating logs for campaign metrics
-CREATE INDEX IF NOT EXISTS idx_email_logs_status_metrics ON marketing_email_logs(campaign_id, status);
