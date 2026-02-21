@@ -281,87 +281,83 @@ public class JdbcCampaignRepository implements CampaignRepositoryPort {
         return count != null ? count : 0;
     }
 
-
     @Override
-    public PageResult<CampaignAudienceMember> findCampaignAudience(
-            UUID companyId,
-            Long campaignId,
-            int page,
-            int size
-    ) {
-
+    public PageResult<CampaignAudienceMember> findCampaignAudience(UUID companyId, Long campaignId, int page, int size) {
         int safeSize = Math.min(Math.max(size, 1), 500);
         int safePage = Math.max(page, 0);
         int offset = safePage * safeSize;
 
-        // ---------------------------
-        // 1️⃣ Count query
-        // ---------------------------
-
-        String countSql = """
-            SELECT COUNT(*)
-            FROM marketing_campaigns mc
-            JOIN customers c
-            ON c.company_id = mc.company_id
-            AND c.email IS NOT NULL
-            AND c.active = true
-            WHERE mc.id = :campaignId
-            AND mc.company_id = :companyId
-            """;
-
-        long totalElements = jdbc.queryForObject(countSql, new MapSqlParameterSource()
-                .addValue("campaignId", campaignId)
-                .addValue("companyId", companyId), Long.class);
-
-        int totalPages = (int) Math.ceil((double) totalElements / safeSize);
-
-        if (totalElements == 0) {
-            return new PageResult<>(List.of(), 0, 0, safePage, safeSize);
-        }
-
-        // ---------------------------
-        // 2️⃣ Content query
-        // ---------------------------
-
-        String contentSql = """
+        String sql = """
             SELECT
-                c.id AS customer_id,
-                c.email,
-                c.legal_name AS name,
-                COALESCE(cl.status, 'NOT_SENT') AS status
+                c.id                      AS customer_id,
+                c.email                   AS email,
+                c.legal_name              AS name,
+                c.marketing_status        AS marketing_status,
+                COALESCE(cl.status, 'NOT_SENT') AS send_status,
+                COUNT(*) OVER()           AS total_elements
             FROM marketing_campaigns mc
             JOIN customers c
             ON c.company_id = mc.company_id
-            AND c.email IS NOT NULL
-            AND c.active = true
-            LEFT JOIN campaign_logs cl
-            ON cl.campaign_id = mc.id
-            AND cl.customer_id = c.id
+            LEFT JOIN marketing_segments ms
+            ON mc.segment_id = ms.id
+            LEFT JOIN LATERAL (
+                SELECT cl.status
+                FROM campaign_logs cl
+                WHERE cl.campaign_id = mc.id
+                AND cl.customer_id = c.id
+                ORDER BY cl.id DESC
+                LIMIT 1
+            ) cl ON true
             WHERE mc.id = :campaignId
             AND mc.company_id = :companyId
-            ORDER BY c.created_at DESC
+            AND c.email IS NOT NULL
+            AND c.active = true
+            AND c.deleted_at IS NULL
+            AND (
+                    mc.segment_id IS NULL
+                    OR (
+                        (ms.filter_types IS NULL OR c.type = ANY(ms.filter_types))
+                        AND (ms.filter_tags IS NULL OR c.tags && ms.filter_tags)
+                        AND (ms.filter_city IS NULL OR c.city = ms.filter_city)
+                        AND (ms.filter_origin IS NULL OR c.origin = ms.filter_origin)
+                        AND (ms.filter_marketing_status IS NULL OR c.marketing_status = ms.filter_marketing_status)
+                        AND (ms.filter_registered_after IS NULL OR c.created_at >= ms.filter_registered_after)
+                        AND (ms.filter_registered_before IS NULL OR c.created_at <= ms.filter_registered_before)
+                    )
+            )
+            ORDER BY c.created_at DESC, c.id DESC
             LIMIT :limit OFFSET :offset
             """;
 
-        List<CampaignAudienceMember> content = jdbc.query(contentSql, new MapSqlParameterSource()
+        record Row(CampaignAudienceMember member, long total) {}
+
+        List<Row> rows = jdbc.query(sql, new MapSqlParameterSource()
                 .addValue("campaignId", campaignId)
                 .addValue("companyId", companyId)
                 .addValue("limit", safeSize)
-                .addValue("offset", offset), (rs, rowNum) -> new CampaignAudienceMember(
-                        rs.getLong("customer_id"),
-                        rs.getString("email"),
-                        rs.getString("name"),
-                        rs.getString("status")));
+                .addValue("offset", offset),
+                (rs, rowNum) -> new Row(
+                        new CampaignAudienceMember(
+                                rs.getLong("customer_id"),
+                                rs.getString("email"),
+                                rs.getString("name"),
+                                rs.getString("marketing_status"),
+                                rs.getString("send_status")
+                        ),
+                        rs.getLong("total_elements")
+                )); 
+
+        long totalElements = rows.isEmpty() ? 0 : rows.get(0).total();
+        int totalPages = totalElements == 0 ? 0 : (int) Math.ceil((double) totalElements / safeSize);
 
         return new PageResult<>(
-                content,
+                rows.stream().map(Row::member).toList(),
                 totalElements,
                 totalPages,
                 safePage,
                 safeSize
         );
     }
-
 
     // ==========================================
     // DISTRIBUTED SCHEDULER LOCKING

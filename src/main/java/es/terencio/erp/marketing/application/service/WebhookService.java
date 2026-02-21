@@ -46,24 +46,25 @@ public class WebhookService implements ProcessWebhookUseCase {
             }
 
             // SNS encapsulates SES payload inside 'Message' field
-            if ("Notification".equals(type) && root.has("Message")) {
-                String messageStr = root.path("Message").asText();
-                root = objectMapper.readTree(messageStr);
-            }
+            final JsonNode eventNode = ("Notification".equals(type) && root.has("Message"))
+                    ? objectMapper.readTree(root.path("Message").asText())
+                    : root;
 
-            String messageId = root.path("mail").path("messageId").asText(null);
-            if (messageId == null) messageId = root.path("messageId").asText(null); // fallback direct SES
-            
-            String eventType = root.path("notificationType").asText(null);
-            if (eventType == null) eventType = root.path("eventType").asText(null);
+            final String messageId = eventNode.path("mail").path("messageId").asText(
+                    eventNode.path("messageId").asText(null)
+            );
 
-            JsonNode mailNode = root.has("mail") ? root.get("mail") : root;
+            final String eventType = eventNode.path("notificationType").asText(
+                    eventNode.path("eventType").asText(null)
+            );
+
+            JsonNode mailNode = eventNode.has("mail") ? eventNode.get("mail") : eventNode;
             String email = mailNode.path("destination").path(0).asText(null);
 
             if (messageId == null || eventType == null) return;
 
-            String bounceType = root.path("bounce").path("bounceType").asText(null);
-            String bounceSubtype = root.path("bounce").path("bounceSubType").asText(null);
+            String bounceType = eventNode.path("bounce").path("bounceType").asText(null);
+            String bounceSubtype = eventNode.path("bounce").path("bounceSubType").asText(null);
 
             EmailDeliveryEvent event = new EmailDeliveryEvent(null, messageId, email, eventType, bounceType, bounceSubtype, payload,
                     Instant.now());

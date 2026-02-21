@@ -1,7 +1,6 @@
 package es.terencio.erp.marketing.infrastructure.in.web;
 
 import java.time.Instant;
-import java.util.List;
 import java.util.UUID;
 
 import org.springframework.format.annotation.DateTimeFormat;
@@ -25,6 +24,7 @@ import es.terencio.erp.marketing.application.dto.MarketingDtos.CampaignAudienceM
 import es.terencio.erp.marketing.application.dto.MarketingDtos.CampaignResponse;
 import es.terencio.erp.marketing.application.dto.MarketingDtos.CreateCampaignRequest;
 import es.terencio.erp.marketing.application.port.in.ManageCampaignsUseCase;
+import es.terencio.erp.shared.domain.query.PageResult;
 import es.terencio.erp.shared.presentation.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -66,8 +66,15 @@ public class AdminCampaignController {
     @GetMapping("/{id}/audience")
     @Operation(summary = "Get affected customers for campaign")
     @RequiresPermission(permission = Permission.MARKETING_CAMPAIGN_VIEW, scope = AccessScope.COMPANY, targetIdParam = "companyId")
-    public ResponseEntity<ApiResponse<List<CampaignAudienceMember>>> getAudience(@PathVariable UUID companyId, @PathVariable Long id, @RequestParam(defaultValue = "100") int limit, @RequestParam(defaultValue = "0") int page) {
-        return ResponseEntity.ok(ApiResponse.success(manageCampaignsUseCase.getCampaignAudience(companyId, id, limit, page)));
+    public ResponseEntity<ApiResponse<PageResult<CampaignAudienceMember>>> getAudience(
+            @PathVariable UUID companyId,
+            @PathVariable Long id,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "100") int size
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(
+                manageCampaignsUseCase.getCampaignAudience(companyId, id, page, size)
+        ));
     }
 
     @PostMapping("/{id}/launch")

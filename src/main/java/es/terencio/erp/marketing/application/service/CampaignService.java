@@ -105,12 +105,7 @@ public class CampaignService implements ManageCampaignsUseCase, CampaignTracking
 
     @Override
     @Transactional(readOnly = true)
-    public PageResult<CampaignAudienceMember> getCampaignAudience(
-            UUID companyId,
-            Long campaignId,
-            int page,
-            int size
-    ) {
+    public PageResult<CampaignAudienceMember> getCampaignAudience(UUID companyId, Long campaignId, int page, int size) {
         return campaignRepository.findCampaignAudience(companyId, campaignId, page, size);
     }
 
