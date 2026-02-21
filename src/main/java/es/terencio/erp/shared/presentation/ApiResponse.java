@@ -42,6 +42,11 @@ public class ApiResponse<T> {
         return new ApiResponse<>(false, message, null, error, new Meta(Instant.now()));
     }
 
+    public static <T> ApiResponse<T> error(String message) {
+        ApiError error = new ApiError("UNKNOWN_ERROR", message, null);
+        return new ApiResponse<>(false, message, null, error, new Meta(Instant.now()));
+    }
+
     public boolean isSuccess() {
         return success;
     }
