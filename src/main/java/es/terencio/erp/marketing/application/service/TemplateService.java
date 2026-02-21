@@ -4,7 +4,9 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
+
 import org.springframework.transaction.annotation.Transactional;
+
 import es.terencio.erp.marketing.application.dto.MarketingDtos.TemplateDto;
 import es.terencio.erp.marketing.application.port.in.ManageTemplatesUseCase;
 import es.terencio.erp.marketing.application.port.out.CampaignRepositoryPort;
@@ -27,21 +29,25 @@ public class TemplateService implements ManageTemplatesUseCase {
     @Override
     @Transactional(readOnly = true)
     public TemplateDto getTemplate(Long id) {
-        return repository.findTemplateById(id).map(this::toDto).orElseThrow(() -> new ResourceNotFoundException("Template not found: " + id));
+        return repository.findTemplateById(id).map(this::toDto)
+                .orElseThrow(() -> new ResourceNotFoundException("Template not found: " + id));
     }
 
     @Override
     @Transactional
     public TemplateDto createTemplate(UUID companyId, TemplateDto dto) {
         Instant now = Instant.now();
-        MarketingTemplate template = new MarketingTemplate(null, companyId, dto.code(), dto.name(), dto.subject(), dto.bodyHtml(), true, now, now);
-        return toDto(repository.saveTemplate(template));
+        MarketingTemplate template = new MarketingTemplate(null, companyId, dto.code(), dto.name(), dto.subject(),
+                dto.bodyHtml(), true, now, now);
+        MarketingTemplate t = repository.saveTemplate(template);
+        return toDto(t);
     }
 
     @Override
     @Transactional
     public TemplateDto updateTemplate(Long id, TemplateDto dto) {
-        MarketingTemplate template = repository.findTemplateById(id).orElseThrow(() -> new ResourceNotFoundException("Template not found: " + id));
+        MarketingTemplate template = repository.findTemplateById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Template not found: " + id));
         template.update(dto.name(), dto.code(), dto.subject(), dto.bodyHtml());
         return toDto(repository.saveTemplate(template));
     }
@@ -53,6 +59,7 @@ public class TemplateService implements ManageTemplatesUseCase {
     }
 
     private TemplateDto toDto(MarketingTemplate t) {
-        return new TemplateDto(t.getId(), t.getCode(), t.getName(), t.getSubjectTemplate(), t.getBodyHtml(), t.isActive(), t.getUpdatedAt());
+        return new TemplateDto(t.getId(), t.getCode(), t.getName(), t.getSubjectTemplate(), t.getBodyHtml(),
+                t.isActive(), t.getUpdatedAt());
     }
 }
