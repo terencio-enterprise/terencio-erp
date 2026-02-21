@@ -8,7 +8,6 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -37,6 +36,7 @@ import es.terencio.erp.marketing.domain.model.MarketingCampaign;
 import es.terencio.erp.marketing.domain.model.MarketingTemplate;
 import es.terencio.erp.marketing.infrastructure.config.MarketingProperties;
 import es.terencio.erp.shared.domain.exception.InvariantViolationException;
+import es.terencio.erp.shared.domain.query.PageResult;
 import es.terencio.erp.shared.exception.ResourceNotFoundException;
 
 public class CampaignService implements ManageCampaignsUseCase, CampaignTrackingUseCase {
@@ -104,11 +104,14 @@ public class CampaignService implements ManageCampaignsUseCase, CampaignTracking
     }
 
     @Override
-    public List<CampaignAudienceMember> getCampaignAudience(UUID companyId, Long campaignId, int limit, int page) {
-        List<MarketingCustomer> batch = customerPort.findAudience(campaignId, limit, page);
-        return batch.stream()
-            .map(c -> new CampaignAudienceMember(c.id(), c.email(), c.name(), c.canReceiveMarketing() ? "SUBSCRIBED" : "UNSUBSCRIBED"))
-            .collect(Collectors.toList());
+    @Transactional(readOnly = true)
+    public PageResult<CampaignAudienceMember> getCampaignAudience(
+            UUID companyId,
+            Long campaignId,
+            int page,
+            int size
+    ) {
+        return campaignRepository.findCampaignAudience(companyId, campaignId, page, size);
     }
 
     @Override

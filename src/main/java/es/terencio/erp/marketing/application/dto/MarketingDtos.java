@@ -23,7 +23,13 @@ public final class MarketingDtos {
                                    int metricsTotalRecipients, int metricsSent, int metricsDelivered, 
                                    int metricsOpened, int metricsClicked, int metricsBounced, int metricsUnsubscribed) {}
                                    
-    public record CampaignAudienceMember(Long customerId, String email, String name, String status) {}
+    public record CampaignAudienceMember(
+        Long customerId,
+        String email,
+        String name,
+        String marketingStatus,   // SUBSCRIBED/UNSUBSCRIBED/SNOOZED...
+        String sendStatus         // NOT_SENT / SENT / DELIVERED / OPENED / CLICKED / BOUNCED / FAILED / COMPLAINED
+    ) {}
 
     public record TemplateDto(Long id, String code, String name, String subject, String bodyHtml, boolean active, Instant lastModified) {}
 

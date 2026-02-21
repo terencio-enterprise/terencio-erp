@@ -4,10 +4,13 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+
+import es.terencio.erp.marketing.application.dto.MarketingDtos.CampaignAudienceMember;
 import es.terencio.erp.marketing.domain.model.CampaignLog;
 import es.terencio.erp.marketing.domain.model.EmailDeliveryEvent;
 import es.terencio.erp.marketing.domain.model.MarketingCampaign;
 import es.terencio.erp.marketing.domain.model.MarketingTemplate;
+import es.terencio.erp.shared.domain.query.PageResult;
 
 public interface CampaignRepositoryPort {
     // Lock
@@ -26,6 +29,7 @@ public interface CampaignRepositoryPort {
     MarketingCampaign saveCampaign(MarketingCampaign campaign);
     void incrementCampaignMetric(Long campaignId, String metricType);
     int countDailySendsForCompany(UUID companyId, Instant startOfDay);
+    PageResult<CampaignAudienceMember> findCampaignAudience(UUID companyId, Long campaignId, int page, int size);
 
     // Logs & Events
     CampaignLog saveLog(CampaignLog log);

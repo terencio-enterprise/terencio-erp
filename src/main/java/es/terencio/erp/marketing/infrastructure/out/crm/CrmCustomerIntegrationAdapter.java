@@ -8,7 +8,6 @@ import java.util.UUID;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Component;
 
-import es.terencio.erp.marketing.application.dto.MarketingDtos.AudienceFilter;
 import es.terencio.erp.marketing.application.port.out.CustomerIntegrationPort;
 
 @Component
@@ -22,20 +21,68 @@ public class CrmCustomerIntegrationAdapter implements CustomerIntegrationPort {
 
     @Override
     public List<MarketingCustomer> findAudience(Long campaignId, int limit, int page) {
-        int offset = page * limit;
-        StringBuilder sql = new StringBuilder(
-                "SELECT id, company_id, legal_name, email, unsubscribe_token, marketing_status, marketing_consent " +
-                        "FROM customers " +
-                        "WHERE email IS NOT NULL AND active = true");
 
-        if (filter.customerType() != null) {
-            sql.append(" AND type = '").append(filter.customerType()).append("'");
-        }
+        int safeLimit = Math.min(Math.max(limit, 1), 500);
+        int safePage = Math.max(page, 0);
+        int offset = safePage * safeLimit;
 
-        sql.append(" LIMIT ").append(limit).append(" OFFSET ").append(offset);
+        String sql = """
+            SELECT c.id,
+                c.company_id,
+                c.legal_name,
+                c.email,
+                c.unsubscribe_token,
+                c.marketing_status,
+                c.marketing_consent
+            FROM marketing_campaigns mc
+            JOIN customers c ON c.company_id = mc.company_id
+            LEFT JOIN marketing_segments ms ON mc.segment_id = ms.id
+            WHERE mc.id = :campaignId
+            AND c.email IS NOT NULL
+            AND c.active = true
+            AND c.deleted_at IS NULL
+            
+            -- If campaign has no segment → all customers
+            AND (
+                    mc.segment_id IS NULL
+                    
+                    OR
+                    (
+                        -- Segment filters
+                        (ms.filter_types IS NULL OR c.type = ANY(ms.filter_types))
+                        
+                        AND
+                        (ms.filter_tags IS NULL OR c.tags && ms.filter_tags)
+                        
+                        AND
+                        (ms.filter_city IS NULL OR c.city = ms.filter_city)
+                        
+                        AND
+                        (ms.filter_origin IS NULL OR c.origin = ms.filter_origin)
+                        
+                        AND
+                        (ms.filter_marketing_status IS NULL 
+                            OR c.marketing_status = ms.filter_marketing_status)
+                        
+                        AND
+                        (ms.filter_registered_after IS NULL 
+                            OR c.created_at >= ms.filter_registered_after)
+                        
+                        AND
+                        (ms.filter_registered_before IS NULL 
+                            OR c.created_at <= ms.filter_registered_before)
+                    )
+            )
+            ORDER BY c.created_at DESC
+            LIMIT :limit OFFSET :offset
+            """;
 
-        return jdbcClient.sql(sql.toString())
-                .query((rs, rowNum) -> mapRow(rs)).list();
+        return jdbcClient.sql(sql)
+                .param("campaignId", campaignId)
+                .param("limit", safeLimit)
+                .param("offset", offset)
+                .query((rs, rowNum) -> mapRow(rs))
+                .list();
     }
 
     @Override

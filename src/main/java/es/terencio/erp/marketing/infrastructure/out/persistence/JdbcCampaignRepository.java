@@ -13,6 +13,7 @@ import org.springframework.jdbc.support.GeneratedKeyHolder;
 import org.springframework.jdbc.support.KeyHolder;
 import org.springframework.stereotype.Repository;
 
+import es.terencio.erp.marketing.application.dto.MarketingDtos.CampaignAudienceMember;
 import es.terencio.erp.marketing.application.port.out.CampaignRepositoryPort;
 import es.terencio.erp.marketing.domain.model.CampaignLog;
 import es.terencio.erp.marketing.domain.model.CampaignStatus;
@@ -20,6 +21,7 @@ import es.terencio.erp.marketing.domain.model.DeliveryStatus;
 import es.terencio.erp.marketing.domain.model.EmailDeliveryEvent;
 import es.terencio.erp.marketing.domain.model.MarketingCampaign;
 import es.terencio.erp.marketing.domain.model.MarketingTemplate;
+import es.terencio.erp.shared.domain.query.PageResult;
 
 @Repository
 public class JdbcCampaignRepository implements CampaignRepositoryPort {
@@ -278,6 +280,88 @@ public class JdbcCampaignRepository implements CampaignRepositoryPort {
                 .addValue("since", java.sql.Timestamp.from(since)), Integer.class);
         return count != null ? count : 0;
     }
+
+
+    @Override
+    public PageResult<CampaignAudienceMember> findCampaignAudience(
+            UUID companyId,
+            Long campaignId,
+            int page,
+            int size
+    ) {
+
+        int safeSize = Math.min(Math.max(size, 1), 500);
+        int safePage = Math.max(page, 0);
+        int offset = safePage * safeSize;
+
+        // ---------------------------
+        // 1️⃣ Count query
+        // ---------------------------
+
+        String countSql = """
+            SELECT COUNT(*)
+            FROM marketing_campaigns mc
+            JOIN customers c
+            ON c.company_id = mc.company_id
+            AND c.email IS NOT NULL
+            AND c.active = true
+            WHERE mc.id = :campaignId
+            AND mc.company_id = :companyId
+            """;
+
+        long totalElements = jdbc.queryForObject(countSql, new MapSqlParameterSource()
+                .addValue("campaignId", campaignId)
+                .addValue("companyId", companyId), Long.class);
+
+        int totalPages = (int) Math.ceil((double) totalElements / safeSize);
+
+        if (totalElements == 0) {
+            return new PageResult<>(List.of(), 0, 0, safePage, safeSize);
+        }
+
+        // ---------------------------
+        // 2️⃣ Content query
+        // ---------------------------
+
+        String contentSql = """
+            SELECT
+                c.id AS customer_id,
+                c.email,
+                c.legal_name AS name,
+                COALESCE(cl.status, 'NOT_SENT') AS status
+            FROM marketing_campaigns mc
+            JOIN customers c
+            ON c.company_id = mc.company_id
+            AND c.email IS NOT NULL
+            AND c.active = true
+            LEFT JOIN campaign_logs cl
+            ON cl.campaign_id = mc.id
+            AND cl.customer_id = c.id
+            WHERE mc.id = :campaignId
+            AND mc.company_id = :companyId
+            ORDER BY c.created_at DESC
+            LIMIT :limit OFFSET :offset
+            """;
+
+        List<CampaignAudienceMember> content = jdbc.query(contentSql, new MapSqlParameterSource()
+                .addValue("campaignId", campaignId)
+                .addValue("companyId", companyId)
+                .addValue("limit", safeSize)
+                .addValue("offset", offset), (rs, rowNum) -> new CampaignAudienceMember(
+                        rs.getLong("customer_id"),
+                        rs.getString("email"),
+                        rs.getString("name"),
+                        rs.getString("status")));
+
+        return new PageResult<>(
+                content,
+                totalElements,
+                totalPages,
+                safePage,
+                safeSize
+        );
+    }
+
 
     // ==========================================
     // DISTRIBUTED SCHEDULER LOCKING
