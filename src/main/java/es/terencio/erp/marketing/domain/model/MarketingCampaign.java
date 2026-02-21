@@ -14,7 +14,7 @@ public class MarketingCampaign {
     private UUID companyId;
     private String name;
     private Long templateId;
-    private String status; // DRAFT, SCHEDULED, SENDING, COMPLETED
+    private CampaignStatus status;
     private Instant scheduledAt;
     
     private int metricsTotalRecipients = 0;
@@ -23,7 +23,7 @@ public class MarketingCampaign {
     private int metricsClicked = 0;
     private int metricsBounced = 0;
 
-    public MarketingCampaign(Long id, UUID companyId, String name, Long templateId, String status) {
+    public MarketingCampaign(Long id, UUID companyId, String name, Long templateId, CampaignStatus status) {
         this.id = id;
         this.companyId = companyId;
         this.name = name;

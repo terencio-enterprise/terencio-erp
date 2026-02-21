@@ -208,3 +208,18 @@ CREATE TABLE email_delivery_events (
 );
 CREATE INDEX idx_delivery_events_msg_id ON email_delivery_events(provider_message_id);
 CREATE INDEX idx_delivery_events_processed ON email_delivery_events(processed);
+
+
+-- 1. Index scheduled campaigns for faster scheduler lookups
+CREATE INDEX IF NOT EXISTS idx_marketing_campaigns_scheduled 
+ON marketing_campaigns(status, scheduled_at) 
+WHERE status = 'SCHEDULED';
+
+-- 2. Database level idempotency for campaign logs
+CREATE UNIQUE INDEX IF NOT EXISTS uq_campaign_customer_log 
+ON marketing_email_logs(campaign_id, customer_id) 
+WHERE status != 'FAILED';
+
+-- 3. Token lookup optimization
+CREATE INDEX IF NOT EXISTS idx_customers_unsubscribe_token 
+ON customers(unsubscribe_token);

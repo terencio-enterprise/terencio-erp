@@ -15,6 +15,7 @@ import es.terencio.erp.marketing.domain.model.DeliveryStatus;
 import es.terencio.erp.marketing.domain.model.EmailDeliveryEvent;
 import es.terencio.erp.marketing.domain.model.MarketingCampaign;
 import es.terencio.erp.marketing.domain.model.MarketingTemplate;
+import es.terencio.erp.marketing.domain.model.CampaignStatus;
 
 @Repository
 public class CampaignPersistenceAdapter implements CampaignRepositoryPort {
@@ -35,7 +36,8 @@ public class CampaignPersistenceAdapter implements CampaignRepositoryPort {
 
     private final RowMapper<MarketingCampaign> campaignRowMapper = (rs, rowNum) -> new MarketingCampaign(
         rs.getLong("id"), rs.getObject("company_id", UUID.class), rs.getString("name"),
-        rs.getLong("template_id"), rs.getString("status"),
+        rs.getLong("template_id"), 
+        CampaignStatus.valueOf(rs.getString("status")),
         rs.getTimestamp("scheduled_at") != null ? rs.getTimestamp("scheduled_at").toInstant() : null,
         rs.getInt("metrics_total_recipients"), rs.getInt("metrics_sent"),
         rs.getInt("metrics_opened"), rs.getInt("metrics_clicked"), rs.getInt("metrics_bounced")
@@ -100,13 +102,13 @@ public class CampaignPersistenceAdapter implements CampaignRepositoryPort {
     public MarketingCampaign saveCampaign(MarketingCampaign campaign) {
         if (campaign.getId() == null) {
             Long id = jdbcClient.sql("INSERT INTO marketing_campaigns (company_id, name, template_id, status, scheduled_at, metrics_total_recipients, metrics_sent, metrics_opened, metrics_clicked, metrics_bounced) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id")
-                .params(campaign.getCompanyId(), campaign.getName(), campaign.getTemplateId(), campaign.getStatus(), campaign.getScheduledAt() != null ? java.sql.Timestamp.from(campaign.getScheduledAt()) : null, campaign.getMetricsTotalRecipients(), campaign.getMetricsSent(), campaign.getMetricsOpened(), campaign.getMetricsClicked(), campaign.getMetricsBounced())
+                .params(campaign.getCompanyId(), campaign.getName(), campaign.getTemplateId(), campaign.getStatus().name(), campaign.getScheduledAt() != null ? java.sql.Timestamp.from(campaign.getScheduledAt()) : null, campaign.getMetricsTotalRecipients(), campaign.getMetricsSent(), campaign.getMetricsOpened(), campaign.getMetricsClicked(), campaign.getMetricsBounced())
                 .query(Long.class).single();
             campaign.setId(id);
             return campaign;
         } else {
             jdbcClient.sql("UPDATE marketing_campaigns SET status = ?, scheduled_at = ?, metrics_total_recipients = ?, metrics_sent = ?, metrics_opened = ?, metrics_clicked = ?, metrics_bounced = ? WHERE id = ?")
-                .params(campaign.getStatus(), campaign.getScheduledAt() != null ? java.sql.Timestamp.from(campaign.getScheduledAt()) : null, campaign.getMetricsTotalRecipients(), campaign.getMetricsSent(), campaign.getMetricsOpened(), campaign.getMetricsClicked(), campaign.getMetricsBounced(), campaign.getId())
+                .params(campaign.getStatus().name(), campaign.getScheduledAt() != null ? java.sql.Timestamp.from(campaign.getScheduledAt()) : null, campaign.getMetricsTotalRecipients(), campaign.getMetricsSent(), campaign.getMetricsOpened(), campaign.getMetricsClicked(), campaign.getMetricsBounced(), campaign.getId())
                 .update();
             return campaign;
         }
