@@ -1,4 +1,4 @@
-package es.terencio.erp.marketing.application.dto;
+package es.terencio.erp.marketing.application.dto.campaign;
 
 import es.terencio.erp.marketing.domain.model.DeliveryStatus;
 import es.terencio.erp.marketing.domain.model.MarketingStatus;

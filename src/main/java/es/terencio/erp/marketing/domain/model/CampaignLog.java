@@ -47,7 +47,7 @@ public class CampaignLog {
     }
 
     public void markSent(String messageId) {
-        if (this.status != DeliveryStatus.PENDING && this.status != DeliveryStatus.FAILED) {
+        if (!this.status.canMarkSent()) {
             throw new InvariantViolationException("Only pending or failed logs can be marked as sent");
         }
         if (messageId == null || messageId.isBlank()) {
@@ -59,40 +59,35 @@ public class CampaignLog {
     }
 
     public boolean markDelivered() {
-        if (isTerminal()) return false;
-        if (this.status == DeliveryStatus.DELIVERED || this.status == DeliveryStatus.OPENED || this.status == DeliveryStatus.CLICKED) return false;
+        if (!this.status.canMarkDelivered()) return false;
         this.status = DeliveryStatus.DELIVERED;
         this.deliveredAt = Instant.now();
         return true;
     }
 
     public boolean markOpened() {
-        if (isTerminal()) return false;
-        if (this.status == DeliveryStatus.PENDING || this.status == DeliveryStatus.FAILED) return false;
-        if (this.status == DeliveryStatus.OPENED || this.status == DeliveryStatus.CLICKED) return false;
+        if (!this.status.canMarkOpened()) return false;
         this.status = DeliveryStatus.OPENED;
         this.openedAt = Instant.now();
         return true;
     }
 
     public boolean markClicked() {
-        if (isTerminal()) return false;
-        if (this.status == DeliveryStatus.PENDING || this.status == DeliveryStatus.FAILED) return false;
-        if (this.clickedAt != null) return false;
+        if (!this.status.canMarkClicked()) return false;
         this.status = DeliveryStatus.CLICKED;
         this.clickedAt = Instant.now();
         return true;
     }
 
     public boolean markBounced() {
-        if (isTerminal()) return false;
+        if (this.status.isTerminal()) return false;
         this.status = DeliveryStatus.BOUNCED;
         this.bouncedAt = Instant.now();
         return true;
     }
 
     public boolean markComplained() {
-        if (isTerminal()) return false;
+        if (this.status.isTerminal()) return false;
         this.status = DeliveryStatus.COMPLAINED;
         this.complainedAt = Instant.now();
         return true;
@@ -101,9 +96,5 @@ public class CampaignLog {
     public void markFailed(String error) {
         this.status = DeliveryStatus.FAILED;
         this.errorMessage = error;
-    }
-
-    private boolean isTerminal() {
-        return this.status == DeliveryStatus.BOUNCED || this.status == DeliveryStatus.COMPLAINED || this.status == DeliveryStatus.FAILED;
     }
 }

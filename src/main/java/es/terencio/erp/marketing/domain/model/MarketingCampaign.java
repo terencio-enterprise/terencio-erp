@@ -13,7 +13,7 @@ public class MarketingCampaign {
     private final UUID companyId;
     private String name;
     private Long templateId;
-    private String audienceFilter;
+    private AudienceFilter audienceFilter;
 
     private CampaignStatus status;
     private Instant scheduledAt;
@@ -35,14 +35,14 @@ public class MarketingCampaign {
             UUID companyId,
             String name,
             Long templateId,
-            String audienceFilterJson
+            AudienceFilter audienceFilter
     ) {
         if (companyId == null) throw new InvariantViolationException("Campaign must belong to a company");
         if (name == null || name.isBlank()) throw new InvariantViolationException("Campaign name cannot be blank");
         if (templateId == null) throw new InvariantViolationException("Campaign must have a template");
 
         return new MarketingCampaign(
-                null, companyId, name, templateId, audienceFilterJson,
+                null, companyId, name, templateId, audienceFilter,
                 CampaignStatus.DRAFT, null, null, null,
                 0,0,0,0,0,0,0,
                 Instant.now(), Instant.now()
@@ -50,7 +50,7 @@ public class MarketingCampaign {
     }
 
     private MarketingCampaign(
-            Long id, UUID companyId, String name, Long templateId, String audienceFilter,
+            Long id, UUID companyId, String name, Long templateId, AudienceFilter audienceFilter,
             CampaignStatus status, Instant scheduledAt, Instant startedAt, Instant completedAt,
             int totalRecipients, int sent, int delivered, int opened, int clicked, int bounced, int unsubscribed,
             Instant createdAt, Instant updatedAt
@@ -75,7 +75,7 @@ public class MarketingCampaign {
         this.updatedAt = updatedAt;
     }
     
-    public void updateDraft(String name, Long templateId, String audienceFilter) {
+    public void updateDraft(String name, Long templateId, AudienceFilter audienceFilter) {
         if (status != CampaignStatus.DRAFT) throw new InvariantViolationException("Only DRAFT campaigns can be updated");
         if (name == null || name.isBlank()) throw new InvariantViolationException("Campaign name cannot be blank");
         if (templateId == null) throw new InvariantViolationException("Campaign must have a template");

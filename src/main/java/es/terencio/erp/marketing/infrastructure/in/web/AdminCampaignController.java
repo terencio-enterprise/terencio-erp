@@ -20,10 +20,12 @@ import org.springframework.web.bind.annotation.RestController;
 import es.terencio.erp.auth.domain.model.AccessScope;
 import es.terencio.erp.auth.domain.model.Permission;
 import es.terencio.erp.auth.infrastructure.config.security.aop.RequiresPermission;
-import es.terencio.erp.marketing.application.dto.MarketingDtos.CampaignAudienceMember;
-import es.terencio.erp.marketing.application.dto.MarketingDtos.CampaignResponse;
-import es.terencio.erp.marketing.application.dto.MarketingDtos.CreateCampaignRequest;
-import es.terencio.erp.marketing.application.port.in.ManageCampaignsUseCase;
+import es.terencio.erp.marketing.application.dto.campaign.CampaignAudienceMember;
+import es.terencio.erp.marketing.application.dto.campaign.CampaignResponse;
+import es.terencio.erp.marketing.application.dto.campaign.CreateCampaignRequest;
+import es.terencio.erp.marketing.application.port.in.CampaignLaunchUseCase;
+import es.terencio.erp.marketing.application.port.in.CampaignManagementUseCase;
+import es.terencio.erp.marketing.application.port.in.CampaignQueryUseCase;
 import es.terencio.erp.shared.domain.query.PageResult;
 import es.terencio.erp.shared.presentation.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -36,31 +38,36 @@ import jakarta.validation.Valid;
 @Validated
 public class AdminCampaignController {
 
-    private final ManageCampaignsUseCase manageCampaignsUseCase;
+    private final CampaignManagementUseCase campaignManagementUseCase;
+    private final CampaignQueryUseCase campaignQueryUseCase;
+    private final CampaignLaunchUseCase campaignLaunchUseCase;
 
-    public AdminCampaignController(ManageCampaignsUseCase manageCampaignsUseCase) {
-        this.manageCampaignsUseCase = manageCampaignsUseCase;
+    public AdminCampaignController(CampaignManagementUseCase campaignManagementUseCase,
+            CampaignQueryUseCase campaignQueryUseCase, CampaignLaunchUseCase campaignLaunchUseCase) {
+        this.campaignManagementUseCase = campaignManagementUseCase;
+        this.campaignQueryUseCase = campaignQueryUseCase;
+        this.campaignLaunchUseCase = campaignLaunchUseCase;
     }
 
     @PostMapping("/draft")
     @Operation(summary = "Create Campaign Draft")
     @RequiresPermission(permission = Permission.MARKETING_CAMPAIGN_LAUNCH, scope = AccessScope.COMPANY, targetIdParam = "companyId")
     public ResponseEntity<ApiResponse<CampaignResponse>> createDraft(@PathVariable UUID companyId, @Valid @RequestBody CreateCampaignRequest request) {
-        return ResponseEntity.ok(ApiResponse.success(manageCampaignsUseCase.createDraft(companyId, request)));
+        return ResponseEntity.ok(ApiResponse.success(campaignManagementUseCase.createDraft(companyId, request)));
     }
 
     @PutMapping("/{id}/draft")
     @Operation(summary = "Update Campaign Draft")
     @RequiresPermission(permission = Permission.MARKETING_CAMPAIGN_LAUNCH, scope = AccessScope.COMPANY, targetIdParam = "companyId")
     public ResponseEntity<ApiResponse<CampaignResponse>> updateDraft(@PathVariable UUID companyId, @PathVariable Long id, @Valid @RequestBody CreateCampaignRequest request) {
-        return ResponseEntity.ok(ApiResponse.success(manageCampaignsUseCase.updateDraft(companyId, id, request)));
+        return ResponseEntity.ok(ApiResponse.success(campaignManagementUseCase.updateDraft(companyId, id, request)));
     }
 
     @GetMapping("/{id}")
     @Operation(summary = "Get Campaign details and metrics")
     @RequiresPermission(permission = Permission.MARKETING_CAMPAIGN_VIEW, scope = AccessScope.COMPANY, targetIdParam = "companyId")
     public ResponseEntity<ApiResponse<CampaignResponse>> getCampaign(@PathVariable UUID companyId, @PathVariable Long id) {
-        return ResponseEntity.ok(ApiResponse.success(manageCampaignsUseCase.getCampaign(companyId, id)));
+        return ResponseEntity.ok(ApiResponse.success(campaignQueryUseCase.getCampaign(companyId, id)));
     }
 
     @GetMapping("/{id}/audience")
@@ -73,7 +80,7 @@ public class AdminCampaignController {
             @RequestParam(defaultValue = "100") int size
     ) {
         return ResponseEntity.ok(ApiResponse.success(
-                manageCampaignsUseCase.getCampaignAudience(companyId, id, page, size)
+                campaignQueryUseCase.getCampaignAudience(companyId, id, page, size)
         ));
     }
 
@@ -81,7 +88,7 @@ public class AdminCampaignController {
     @Operation(summary = "Launch campaign asynchronously immediately")
     @RequiresPermission(permission = Permission.MARKETING_CAMPAIGN_LAUNCH, scope = AccessScope.COMPANY, targetIdParam = "companyId")
     public ResponseEntity<ApiResponse<Void>> launchCampaign(@PathVariable UUID companyId, @PathVariable Long id) {
-        manageCampaignsUseCase.launchCampaign(companyId, id);
+        campaignLaunchUseCase.launchCampaign(companyId, id);
         return ResponseEntity.status(HttpStatus.ACCEPTED).body(ApiResponse.success("Campaign enqueued successfully."));
     }
 
@@ -89,7 +96,7 @@ public class AdminCampaignController {
     @Operation(summary = "Schedule campaign for future launch")
     @RequiresPermission(permission = Permission.MARKETING_CAMPAIGN_LAUNCH, scope = AccessScope.COMPANY, targetIdParam = "companyId")
     public ResponseEntity<ApiResponse<Void>> scheduleCampaign(@PathVariable UUID companyId, @PathVariable Long id, @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant scheduledAt) {
-        manageCampaignsUseCase.scheduleCampaign(companyId, id, scheduledAt);
+        campaignManagementUseCase.scheduleCampaign(companyId, id, scheduledAt);
         return ResponseEntity.ok(ApiResponse.success("Campaign scheduled successfully."));
     }
 
@@ -97,7 +104,7 @@ public class AdminCampaignController {
     @Operation(summary = "Cancel a scheduled campaign")
     @RequiresPermission(permission = Permission.MARKETING_CAMPAIGN_LAUNCH, scope = AccessScope.COMPANY, targetIdParam = "companyId")
     public ResponseEntity<ApiResponse<Void>> cancelCampaign(@PathVariable UUID companyId, @PathVariable Long id) {
-        manageCampaignsUseCase.cancelCampaign(companyId, id);
+        campaignManagementUseCase.cancelCampaign(companyId, id);
         return ResponseEntity.ok(ApiResponse.success("Campaign cancelled successfully."));
     }
 
@@ -105,7 +112,7 @@ public class AdminCampaignController {
     @Operation(summary = "Relaunch campaign to un-emailed audience members")
     @RequiresPermission(permission = Permission.MARKETING_CAMPAIGN_LAUNCH, scope = AccessScope.COMPANY, targetIdParam = "companyId")
     public ResponseEntity<ApiResponse<Void>> relaunchCampaign(@PathVariable UUID companyId, @PathVariable Long id) {
-        manageCampaignsUseCase.relaunchCampaign(companyId, id);
+        campaignLaunchUseCase.relaunchCampaign(companyId, id);
         return ResponseEntity.status(HttpStatus.ACCEPTED).body(ApiResponse.success("Campaign relaunch enqueued."));
     }
 
@@ -113,7 +120,7 @@ public class AdminCampaignController {
     @Operation(summary = "Send test email for template")
     @RequiresPermission(permission = Permission.MARKETING_CAMPAIGN_LAUNCH, scope = AccessScope.COMPANY, targetIdParam = "companyId")
     public ResponseEntity<ApiResponse<Void>> dryRun(@PathVariable UUID companyId, @RequestParam Long templateId, @RequestParam String testEmail) {
-        manageCampaignsUseCase.dryRun(companyId, templateId, testEmail);
+        campaignLaunchUseCase.dryRun(companyId, templateId, testEmail);
         return ResponseEntity.ok(ApiResponse.success("Test email dispatched."));
     }
 }

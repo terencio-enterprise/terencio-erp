@@ -16,8 +16,8 @@ import org.springframework.web.multipart.MultipartFile;
 import es.terencio.erp.auth.domain.model.AccessScope;
 import es.terencio.erp.auth.domain.model.Permission;
 import es.terencio.erp.auth.infrastructure.config.security.aop.RequiresPermission;
-import es.terencio.erp.marketing.application.dto.AssetResponse;
-import es.terencio.erp.marketing.application.port.in.ManageAssetsUseCase;
+import es.terencio.erp.marketing.application.dto.asset.AssetResponse;
+import es.terencio.erp.marketing.application.port.in.AssetManagementUseCase;
 import es.terencio.erp.shared.domain.query.PageResult;
 import es.terencio.erp.shared.presentation.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -28,10 +28,10 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 @Tag(name = "Marketing Assets", description = "File uploads and asset management")
 public class AdminAssetController {
 
-    private final ManageAssetsUseCase manageAssetsUseCase;
+    private final AssetManagementUseCase assetManagementUseCase;
 
-    public AdminAssetController(ManageAssetsUseCase manageAssetsUseCase) {
-        this.manageAssetsUseCase = manageAssetsUseCase;
+    public AdminAssetController(AssetManagementUseCase assetManagementUseCase) {
+        this.assetManagementUseCase = assetManagementUseCase;
     }
 
     @GetMapping
@@ -44,7 +44,7 @@ public class AdminAssetController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
 
-        PageResult<AssetResponse> result = manageAssetsUseCase.searchAssets(companyId, search, contentType, page, size);
+        PageResult<AssetResponse> result = assetManagementUseCase.searchAssets(companyId, search, contentType, page, size);
         return ResponseEntity.ok(ApiResponse.success(result));
     }
 
@@ -52,7 +52,7 @@ public class AdminAssetController {
     @Operation(summary = "Get asset metadata by ID")
     @RequiresPermission(permission = Permission.MARKETING_TEMPLATE_VIEW, scope = AccessScope.COMPANY, targetIdParam = "companyId")
     public ResponseEntity<ApiResponse<AssetResponse>> getAsset(@PathVariable UUID companyId, @PathVariable UUID assetId) {
-        return ResponseEntity.ok(ApiResponse.success(manageAssetsUseCase.getAsset(companyId, assetId)));
+        return ResponseEntity.ok(ApiResponse.success(assetManagementUseCase.getAsset(companyId, assetId)));
     }
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -67,7 +67,7 @@ public class AdminAssetController {
             return ResponseEntity.badRequest().body(ApiResponse.error("File is empty or missing"));
         }
         
-        AssetResponse uploaded = manageAssetsUseCase.uploadAsset(
+        AssetResponse uploaded = assetManagementUseCase.uploadAsset(
                 companyId,
                 file.getOriginalFilename(),
                 file.getContentType(),
@@ -81,7 +81,7 @@ public class AdminAssetController {
     @Operation(summary = "Delete an asset")
     @RequiresPermission(permission = Permission.MARKETING_TEMPLATE_DELETE, scope = AccessScope.COMPANY, targetIdParam = "companyId")
     public ResponseEntity<ApiResponse<Void>> deleteAsset(@PathVariable UUID companyId, @PathVariable UUID assetId) {
-        manageAssetsUseCase.deleteAsset(companyId, assetId);
+        assetManagementUseCase.deleteAsset(companyId, assetId);
         return ResponseEntity.ok(ApiResponse.success("Asset deleted successfully"));
     }
 }

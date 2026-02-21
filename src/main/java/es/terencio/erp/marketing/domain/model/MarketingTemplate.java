@@ -4,6 +4,7 @@ import java.time.Instant;
 import java.util.Map;
 import java.util.UUID;
 
+import es.terencio.erp.marketing.application.port.out.TemplateEnginePort;
 import es.terencio.erp.shared.domain.exception.InvariantViolationException;
 
 public class MarketingTemplate {
@@ -35,20 +36,12 @@ public class MarketingTemplate {
         this.updatedAt = updatedAt != null ? updatedAt : Instant.now();
     }
 
-    public String compile(Map<String, String> variables) {
-        String compiledBody = bodyHtml;
-        for (Map.Entry<String, String> entry : variables.entrySet()) {
-            compiledBody = compiledBody.replace("{{" + entry.getKey() + "}}", entry.getValue());
-        }
-        return compiledBody;
+    public String compile(Map<String, String> variables, TemplateEnginePort engine) {
+        return engine.render(this.bodyHtml, variables);
     }
 
-    public String compileSubject(Map<String, String> variables) {
-        String compiledSubject = subjectTemplate;
-        for (Map.Entry<String, String> entry : variables.entrySet()) {
-            compiledSubject = compiledSubject.replace("{{" + entry.getKey() + "}}", entry.getValue());
-        }
-        return compiledSubject;
+    public String compileSubject(Map<String, String> variables, TemplateEnginePort engine) {
+        return engine.render(this.subjectTemplate, variables);
     }
 
     public void update(String name, String code, String subjectTemplate, String bodyHtml) {

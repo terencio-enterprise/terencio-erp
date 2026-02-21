@@ -1,7 +1,5 @@
 package es.terencio.erp.marketing.infrastructure.in.web;
 
-import java.util.Map;
-
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -11,32 +9,34 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import es.terencio.erp.marketing.application.dto.MarketingDtos.UnsubscribeRequest;
-import es.terencio.erp.marketing.application.port.in.ManagePreferencesUseCase;
+import es.terencio.erp.marketing.application.dto.preference.PreferencesResponse;
+import es.terencio.erp.marketing.application.dto.preference.UnsubscribeRequest;
+import es.terencio.erp.marketing.application.port.in.CustomerPreferenceUseCase;
 import es.terencio.erp.shared.presentation.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 
 @RestController
 @RequestMapping("/api/v1/public/marketing")
 @Tag(name = "Public Marketing Preferences", description = "Public endpoints for email preferences")
 public class PublicPreferencesController {
 
-    private final ManagePreferencesUseCase preferencesUseCase;
+    private final CustomerPreferenceUseCase preferencesUseCase;
 
-    public PublicPreferencesController(ManagePreferencesUseCase preferencesUseCase) {
+    public PublicPreferencesController(CustomerPreferenceUseCase preferencesUseCase) {
         this.preferencesUseCase = preferencesUseCase;
     }
 
     @GetMapping("/preferences")
     @Operation(summary = "Get preferences")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> getPreferences(@RequestParam String token) {
+    public ResponseEntity<ApiResponse<PreferencesResponse>> getPreferences(@RequestParam String token) {
         return ResponseEntity.ok(ApiResponse.success(preferencesUseCase.getPreferences(token)));
     }
 
     @PutMapping("/preferences")
     @Operation(summary = "Update preferences")
-    public ResponseEntity<ApiResponse<Void>> updatePreferences(@RequestBody UnsubscribeRequest request) {
+    public ResponseEntity<ApiResponse<Void>> updatePreferences(@Valid @RequestBody UnsubscribeRequest request) {
         preferencesUseCase.updatePreferences(request);
         return ResponseEntity.ok(ApiResponse.success("Preferences updated"));
     }

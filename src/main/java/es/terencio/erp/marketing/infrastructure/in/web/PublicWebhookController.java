@@ -6,7 +6,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import es.terencio.erp.marketing.application.port.in.ProcessWebhookUseCase;
+import es.terencio.erp.marketing.application.port.in.WebhookProcessingUseCase;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
@@ -15,9 +15,9 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 @Tag(name = "Public Webhooks", description = "Provider webhooks (SES, SNS)")
 public class PublicWebhookController {
 
-    private final ProcessWebhookUseCase webhookUseCase;
+    private final WebhookProcessingUseCase webhookUseCase;
 
-    public PublicWebhookController(ProcessWebhookUseCase webhookUseCase) {
+    public PublicWebhookController(WebhookProcessingUseCase webhookUseCase) {
         this.webhookUseCase = webhookUseCase;
     }
 

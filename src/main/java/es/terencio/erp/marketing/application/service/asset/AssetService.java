@@ -1,4 +1,4 @@
-package es.terencio.erp.marketing.application.service;
+package es.terencio.erp.marketing.application.service.asset;
 
 import java.io.InputStream;
 import java.util.List;
@@ -10,7 +10,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.transaction.annotation.Transactional;
 
 import es.terencio.erp.marketing.application.dto.asset.AssetResponse;
-import es.terencio.erp.marketing.application.port.in.ManageAssetsUseCase;
+import es.terencio.erp.marketing.application.port.in.AssetManagementUseCase;
 import es.terencio.erp.marketing.application.port.out.AssetRepositoryPort;
 import es.terencio.erp.marketing.application.port.out.FileStoragePort;
 import es.terencio.erp.marketing.application.port.out.FileStoragePort.StorageResult;
@@ -18,7 +18,7 @@ import es.terencio.erp.marketing.domain.model.CompanyAsset;
 import es.terencio.erp.shared.domain.query.PageResult;
 import es.terencio.erp.shared.exception.ResourceNotFoundException;
 
-public class AssetService implements ManageAssetsUseCase {
+public class AssetService implements AssetManagementUseCase {
 
     private static final Logger log = LoggerFactory.getLogger(AssetService.class);
     private final AssetRepositoryPort assetRepository;
@@ -53,7 +53,7 @@ public class AssetService implements ManageAssetsUseCase {
             CompanyAsset saved = assetRepository.save(asset);
             return toDto(saved);
         } catch (Exception e) {
-            log.error("Database save failed for asset {}, cleaning up storage", filename);
+            log.error("Database save failed for asset {}, cleaning up storage", filename, e);
             fileStoragePort.delete(storageResult.storagePath());
             throw e;
         }
@@ -83,7 +83,7 @@ public class AssetService implements ManageAssetsUseCase {
         List<AssetResponse> content = assets.stream().map(this::toDto).collect(Collectors.toList());
         int totalPages = (int) Math.ceil((double) totalElements / safeSize);
 
-        return new PageResult<AssetResponse>(content, totalElements, totalPages, safePage, safeSize);
+        return new PageResult<>(content, totalElements, totalPages, safePage, safeSize);
     }
 
     @Override

@@ -1,12 +1,9 @@
-package es.terencio.erp.marketing.application.service;
+package es.terencio.erp.marketing.application.service.tracking;
 
 import java.net.URI;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.List;
-
-import javax.crypto.Mac;
-import javax.crypto.spec.SecretKeySpec;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -15,19 +12,24 @@ import org.springframework.transaction.annotation.Transactional;
 
 import es.terencio.erp.marketing.application.port.in.CampaignTrackingUseCase;
 import es.terencio.erp.marketing.application.port.out.CampaignRepositoryPort;
-import es.terencio.erp.marketing.application.service.tracking.CampaignTrackingService;
+import es.terencio.erp.marketing.application.service.campaign.TrackingLinkService;
 import es.terencio.erp.marketing.infrastructure.config.MarketingProperties;
 
 public class CampaignTrackingService implements CampaignTrackingUseCase {
     private static final Logger log = LoggerFactory.getLogger(CampaignTrackingService.class);
     private static final byte[] PIXEL_BYTES = Base64.getDecoder()
             .decode("R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7");
+            
+    private static final String METRIC_OPENED = "opened";
+    private static final String METRIC_CLICKED = "clicked";
 
     private final CampaignRepositoryPort campaignRepository;
+    private final TrackingLinkService trackingLinkService;
     private final MarketingProperties properties;
 
-    public CampaignTrackingService(CampaignRepositoryPort campaignRepository, MarketingProperties properties) {
+    public CampaignTrackingService(CampaignRepositoryPort campaignRepository, TrackingLinkService trackingLinkService, MarketingProperties properties) {
         this.campaignRepository = campaignRepository;
+        this.trackingLinkService = trackingLinkService;
         this.properties = properties;
     }
 
@@ -37,7 +39,7 @@ public class CampaignTrackingService implements CampaignTrackingUseCase {
         campaignRepository.findLogById(logId).ifPresent(entry -> {
             if (entry.markOpened()) {
                 campaignRepository.saveLog(entry);
-                campaignRepository.incrementCampaignMetric(entry.getCampaignId(), "opened");
+                campaignRepository.incrementCampaignMetric(entry.getCampaignId(), METRIC_OPENED);
             }
         });
         return PIXEL_BYTES;
@@ -46,7 +48,7 @@ public class CampaignTrackingService implements CampaignTrackingUseCase {
     @Override
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public String registerClickAndGetRedirectUrl(Long logId, String encodedPayload, String signature) {
-        if (!generateHmac(encodedPayload).equals(signature)) {
+        if (!trackingLinkService.generateHmac(encodedPayload).equals(signature)) {
             log.error("Invalid click signature for log: {}", logId);
             return properties.getPublicBaseUrl();
         }
@@ -62,7 +64,6 @@ public class CampaignTrackingService implements CampaignTrackingUseCase {
                 return properties.getPublicBaseUrl();
             }
 
-            // --- HARDENED CLICK TRACKING SECURITY ---
             List<String> allowedDomains = properties.getAllowedRedirectDomains();
             if (allowedDomains != null && !allowedDomains.isEmpty()) {
                 URI uri = URI.create(originalUrl);
@@ -71,7 +72,6 @@ public class CampaignTrackingService implements CampaignTrackingUseCase {
                     return properties.getPublicBaseUrl();
                 }
             }
-            // -----------------------------------------
 
             if (Instant.now().toEpochMilli() > expiresAt) {
                 log.warn("Expired tracking link: {}", logId);
@@ -81,22 +81,13 @@ public class CampaignTrackingService implements CampaignTrackingUseCase {
             campaignRepository.findLogById(logId).ifPresent(entry -> {
                 if (entry.markClicked()) {
                     campaignRepository.saveLog(entry);
-                    campaignRepository.incrementCampaignMetric(entry.getCampaignId(), "clicked");
+                    campaignRepository.incrementCampaignMetric(entry.getCampaignId(), METRIC_CLICKED);
                 }
             });
             return originalUrl;
         } catch (Exception e) {
+            log.error("Click tracking resolution failed for log {}", logId, e);
             return properties.getPublicBaseUrl();
-        }
-    }
-
-    private String generateHmac(String data) {
-        try {
-            Mac mac = Mac.getInstance("HmacSHA256");
-            mac.init(new SecretKeySpec(properties.getHmacSecret().getBytes(), "HmacSHA256"));
-            return Base64.getUrlEncoder().withoutPadding().encodeToString(mac.doFinal(data.getBytes()));
-        } catch (Exception e) {
-            throw new RuntimeException("HMAC generation failed", e);
         }
     }
 }

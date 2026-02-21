@@ -2,77 +2,96 @@ package es.terencio.erp.marketing.infrastructure.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.web.client.RestTemplate;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import es.terencio.erp.marketing.application.port.in.CampaignTrackingUseCase;
-import es.terencio.erp.marketing.application.port.in.ManageCampaignsUseCase;
-import es.terencio.erp.marketing.application.port.in.ManagePreferencesUseCase;
-import es.terencio.erp.marketing.application.port.in.ManageTemplatesUseCase;
-import es.terencio.erp.marketing.application.port.in.ProcessWebhookUseCase;
 import es.terencio.erp.marketing.application.port.out.CampaignRepositoryPort;
 import es.terencio.erp.marketing.application.port.out.CustomerIntegrationPort;
 import es.terencio.erp.marketing.application.port.out.MailingSystemPort;
-import es.terencio.erp.marketing.application.service.CampaignExecutionWorker;
-import es.terencio.erp.marketing.application.service.CampaignService;
-import es.terencio.erp.marketing.application.service.CampaignTrackingService;
-import es.terencio.erp.marketing.application.service.PreferenceService;
-import es.terencio.erp.marketing.application.service.TemplateService;
-import es.terencio.erp.marketing.application.service.WebhookService;
+import es.terencio.erp.marketing.application.port.out.TemplateEnginePort;
+import es.terencio.erp.marketing.application.service.campaign.CampaignCommandService;
+import es.terencio.erp.marketing.application.service.campaign.CampaignLaunchService;
+import es.terencio.erp.marketing.application.service.campaign.CampaignQueryService;
+import es.terencio.erp.marketing.application.service.campaign.CampaignSender;
+import es.terencio.erp.marketing.application.service.campaign.EmailContentBuilder;
+import es.terencio.erp.marketing.application.service.campaign.TrackingLinkService;
+import es.terencio.erp.marketing.application.service.preference.CustomerPreferenceService;
+import es.terencio.erp.marketing.application.service.template.TemplateService;
+import es.terencio.erp.marketing.application.service.tracking.CampaignTrackingService;
+import es.terencio.erp.marketing.application.service.webhook.SesWebhookService;
+import es.terencio.erp.marketing.infrastructure.out.template.SimpleTemplateEngineAdapter;
 
 @Configuration
 public class MarketingConfig {
 
     @Bean
-    public CampaignExecutionWorker campaignExecutionWorker(
+    public TemplateEnginePort templateEnginePort() {
+        return new SimpleTemplateEngineAdapter();
+    }
+
+    @Bean
+    public TrackingLinkService trackingLinkService(MarketingProperties properties) {
+        return new TrackingLinkService(properties);
+    }
+
+    @Bean
+    public EmailContentBuilder emailContentBuilder(TemplateEnginePort templateEngine, TrackingLinkService trackingLinkService, MarketingProperties properties) {
+        return new EmailContentBuilder(templateEngine, trackingLinkService, properties);
+    }
+
+    @Bean
+    public CampaignSender campaignSender(
             CampaignRepositoryPort campaignRepository,
             MailingSystemPort mailingSystem,
+            EmailContentBuilder contentBuilder,
             MarketingProperties properties
     ) {
-        return new CampaignExecutionWorker(campaignRepository, mailingSystem, properties);
+        return new CampaignSender(campaignRepository, mailingSystem, contentBuilder, properties);
     }
 
     @Bean
     public CampaignTrackingService campaignTrackingService(
             CampaignRepositoryPort campaignRepository,
+            TrackingLinkService trackingLinkService,
             MarketingProperties properties
     ) {
-        return new CampaignTrackingService(campaignRepository, properties);
+        return new CampaignTrackingService(campaignRepository, trackingLinkService, properties);
     }
 
     @Bean
-    public CampaignService campaignService(
+    public CampaignCommandService campaignCommandService(CampaignRepositoryPort campaignRepository) {
+        return new CampaignCommandService(campaignRepository);
+    }
+
+    @Bean
+    public CampaignQueryService campaignQueryService(CampaignRepositoryPort campaignRepository) {
+        return new CampaignQueryService(campaignRepository);
+    }
+
+    @Bean
+    public CampaignLaunchService campaignLaunchService(
+            CampaignSender campaignSender,
             CampaignRepositoryPort campaignRepository,
-            CampaignExecutionWorker executionWorker,
             MailingSystemPort mailingSystem,
-            MarketingProperties properties,
-            ObjectMapper objectMapper
+            TemplateEnginePort templateEngine,
+            MarketingProperties properties
     ) {
-        return new CampaignService(campaignRepository, executionWorker, mailingSystem, properties, objectMapper);
+        return new CampaignLaunchService(campaignSender, campaignRepository, mailingSystem, templateEngine, properties);
     }
 
     @Bean
-    public ManageCampaignsUseCase manageCampaignsUseCase(CampaignService service) {
-        return service;
+    public CustomerPreferenceService customerPreferenceService(CustomerIntegrationPort customerPort) {
+        return new CustomerPreferenceService(customerPort);
     }
 
     @Bean
-    public CampaignTrackingUseCase campaignTrackingUseCase(CampaignTrackingService service) {
-        return service;
-    }
-
-    @Bean
-    public ManagePreferencesUseCase managePreferencesUseCase(CustomerIntegrationPort customerPort) {
-        return new PreferenceService(customerPort);
-    }
-
-    @Bean
-    public ManageTemplatesUseCase manageTemplatesUseCase(CampaignRepositoryPort repository) {
+    public TemplateService templateService(CampaignRepositoryPort repository) {
         return new TemplateService(repository);
     }
 
     @Bean
-    public ProcessWebhookUseCase processWebhookUseCase(CampaignRepositoryPort repository, ObjectMapper objectMapper) {
-        return new WebhookService(repository, objectMapper);
+    public SesWebhookService sesWebhookService(CampaignRepositoryPort repository, ObjectMapper objectMapper, RestTemplate restTemplate) {
+        return new SesWebhookService(repository, objectMapper, restTemplate);
     }
 }
