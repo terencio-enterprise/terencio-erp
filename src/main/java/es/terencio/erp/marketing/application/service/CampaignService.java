@@ -13,6 +13,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import es.terencio.erp.marketing.application.dto.MarketingDtos.CampaignAudienceMember;
 import es.terencio.erp.marketing.application.dto.MarketingDtos.CampaignResponse;
 import es.terencio.erp.marketing.application.dto.MarketingDtos.CreateCampaignRequest;
+import es.terencio.erp.marketing.application.port.in.LaunchCampaignUseCase;
 import es.terencio.erp.marketing.application.port.in.ManageCampaignsUseCase;
 import es.terencio.erp.marketing.application.port.out.CampaignRepositoryPort;
 import es.terencio.erp.marketing.application.port.out.MailingSystemPort;
@@ -24,7 +25,7 @@ import es.terencio.erp.shared.domain.exception.InvariantViolationException;
 import es.terencio.erp.shared.domain.query.PageResult;
 import es.terencio.erp.shared.exception.ResourceNotFoundException;
 
-public class CampaignService implements ManageCampaignsUseCase {
+public class CampaignService implements ManageCampaignsUseCase, LaunchCampaignUseCase {
     private static final Logger log = LoggerFactory.getLogger(CampaignService.class);
 
     private final CampaignRepositoryPort campaignRepository;

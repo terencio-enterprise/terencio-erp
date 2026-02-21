@@ -16,7 +16,7 @@ import org.springframework.web.multipart.MultipartFile;
 import es.terencio.erp.auth.domain.model.AccessScope;
 import es.terencio.erp.auth.domain.model.Permission;
 import es.terencio.erp.auth.infrastructure.config.security.aop.RequiresPermission;
-import es.terencio.erp.marketing.application.dto.AssetDtos.AssetResponse;
+import es.terencio.erp.marketing.application.dto.AssetResponse;
 import es.terencio.erp.marketing.application.port.in.ManageAssetsUseCase;
 import es.terencio.erp.shared.domain.query.PageResult;
 import es.terencio.erp.shared.presentation.ApiResponse;

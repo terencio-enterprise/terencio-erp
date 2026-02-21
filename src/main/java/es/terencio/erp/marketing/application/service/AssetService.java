@@ -9,7 +9,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.transaction.annotation.Transactional;
 
-import es.terencio.erp.marketing.application.dto.AssetDtos.AssetResponse;
+import es.terencio.erp.marketing.application.dto.AssetResponse;
 import es.terencio.erp.marketing.application.port.in.ManageAssetsUseCase;
 import es.terencio.erp.marketing.application.port.out.AssetRepositoryPort;
 import es.terencio.erp.marketing.application.port.out.FileStoragePort;
