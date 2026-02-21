@@ -3,7 +3,6 @@ package es.terencio.erp.marketing.application.service;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Base64;
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.regex.Matcher;
@@ -26,8 +25,6 @@ import es.terencio.erp.marketing.application.dto.MarketingDtos.CreateCampaignReq
 import es.terencio.erp.marketing.application.port.in.CampaignTrackingUseCase;
 import es.terencio.erp.marketing.application.port.in.ManageCampaignsUseCase;
 import es.terencio.erp.marketing.application.port.out.CampaignRepositoryPort;
-import es.terencio.erp.marketing.application.port.out.CustomerIntegrationPort;
-import es.terencio.erp.marketing.application.port.out.CustomerIntegrationPort.MarketingCustomer;
 import es.terencio.erp.marketing.application.port.out.MailingSystemPort;
 import es.terencio.erp.marketing.domain.model.CampaignLog;
 import es.terencio.erp.marketing.domain.model.CampaignStatus;
@@ -45,15 +42,13 @@ public class CampaignService implements ManageCampaignsUseCase, CampaignTracking
             .decode("R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7");
 
     private final CampaignRepositoryPort campaignRepository;
-    private final CustomerIntegrationPort customerPort;
     private final MailingSystemPort mailingSystem;
     private final MarketingProperties properties;
     private final ObjectMapper objectMapper;
 
-    public CampaignService(CampaignRepositoryPort campaignRepository, CustomerIntegrationPort customerPort,
-            MailingSystemPort mailingSystem, MarketingProperties properties, ObjectMapper objectMapper) {
+    public CampaignService(CampaignRepositoryPort campaignRepository, MailingSystemPort mailingSystem,
+                           MarketingProperties properties, ObjectMapper objectMapper) {
         this.campaignRepository = campaignRepository;
-        this.customerPort = customerPort;
         this.mailingSystem = mailingSystem;
         this.properties = properties;
         this.objectMapper = objectMapper;
@@ -137,25 +132,34 @@ public class CampaignService implements ManageCampaignsUseCase, CampaignTracking
             return;
         }
 
-        campaign.startSending();
+        campaign.startSending(isRelaunch);
         campaignRepository.saveCampaign(campaign);
 
         MarketingTemplate tpl = campaignRepository.findTemplateById(campaign.getTemplateId())
                 .orElseThrow(() -> new ResourceNotFoundException("Template not found"));
 
-        int offset = 0;
+        int page = 0;
         int sentInThisSession = 0;
         long delay = 1000 / Math.max(1, properties.getRateLimitPerSecond());
 
         while (true) {
-            List<MarketingCustomer> batch = customerPort.findAudience(campaignId, properties.getBatchSize(), offset);
-            if (batch.isEmpty()) break;
+            PageResult<CampaignAudienceMember> batch = campaignRepository.findCampaignAudience(
+                    campaign.getCompanyId(), campaign.getId(), page, properties.getBatchSize());
+            
+            if (batch.getContent() == null || batch.getContent().isEmpty()) break;
 
-            for (MarketingCustomer customer : batch) {
-                if (!customer.canReceiveMarketing() || campaignRepository.hasLog(campaignId, customer.id()))
+            for (CampaignAudienceMember member : batch.getContent()) {
+                // Unified source-of-truth segment filtering
+                boolean isSubscribed = "SUBSCRIBED".equalsIgnoreCase(member.marketingStatus());
+                boolean isNotSentOrFailed = member.sendStatus() == null || 
+                                            "NOT_SENT".equalsIgnoreCase(member.sendStatus()) || 
+                                            "FAILED".equalsIgnoreCase(member.sendStatus());
+
+                if (!isSubscribed || !isNotSentOrFailed) {
                     continue;
+                }
 
-                boolean success = processSingleCustomer(campaign, tpl, customer);
+                boolean success = processSingleCustomer(campaign, tpl, member);
                 if (success) {
                     sentInThisSession++;
                 }
@@ -165,7 +169,11 @@ public class CampaignService implements ManageCampaignsUseCase, CampaignTracking
                     return;
                 }
             }
-            offset += properties.getBatchSize();
+            
+            page++;
+            if (page >= batch.getTotalPages()) {
+                break;
+            }
         }
 
         campaign.complete();
@@ -173,8 +181,8 @@ public class CampaignService implements ManageCampaignsUseCase, CampaignTracking
         campaignRepository.saveCampaign(campaign);
     }
 
-    private boolean processSingleCustomer(MarketingCampaign campaign, MarketingTemplate tpl, MarketingCustomer customer) {
-        CampaignLog logEntry = CampaignLog.createPending(campaign.getId(), campaign.getCompanyId(), customer.id(), tpl.getId());
+    private boolean processSingleCustomer(MarketingCampaign campaign, MarketingTemplate tpl, CampaignAudienceMember member) {
+        CampaignLog logEntry = CampaignLog.createPending(campaign.getId(), campaign.getCompanyId(), member.customerId(), tpl.getId());
         campaignRepository.saveLog(logEntry);
 
         int attempts = 0;
@@ -182,12 +190,12 @@ public class CampaignService implements ManageCampaignsUseCase, CampaignTracking
         
         while (attempts <= maxRetries) {
             try {
-                sendEmailToCustomer(campaign.getId(), logEntry.getId(), tpl, customer, logEntry);
+                sendEmailToCustomer(campaign.getId(), logEntry.getId(), tpl, member, logEntry);
                 campaignRepository.saveLog(logEntry);
                 return true;
             } catch (Exception e) {
                 attempts++;
-                log.warn("Failed sending to {} (attempt {}): {}", customer.email(), attempts, e.getMessage());
+                log.warn("Failed sending to {} (attempt {}): {}", member.email(), attempts, e.getMessage());
                 if (attempts > maxRetries) {
                     logEntry.markFailed(e.getMessage());
                     campaignRepository.saveLog(logEntry);
@@ -204,10 +212,10 @@ public class CampaignService implements ManageCampaignsUseCase, CampaignTracking
         return false;
     }
 
-    private void sendEmailToCustomer(Long campaignId, Long logId, MarketingTemplate tpl, MarketingCustomer customer, CampaignLog logEntry) {
-        String unsubscribeLink = properties.getPublicBaseUrl() + "/api/v1/public/marketing/preferences?token=" + customer.unsubscribeToken();
+    private void sendEmailToCustomer(Long campaignId, Long logId, MarketingTemplate tpl, CampaignAudienceMember member, CampaignLog logEntry) {
+        String unsubscribeLink = properties.getPublicBaseUrl() + "/api/v1/public/marketing/preferences?token=" + member.unsubscribeToken();
         Map<String, String> vars = Map.of(
-                "name", customer.name() != null ? customer.name() : "Customer",
+                "name", member.name() != null ? member.name() : "Customer",
                 "unsubscribe_link", unsubscribeLink);
 
         String body = tpl.compile(vars);
@@ -216,7 +224,7 @@ public class CampaignService implements ManageCampaignsUseCase, CampaignTracking
         String pixelUrl = properties.getPublicBaseUrl() + "/api/v1/public/marketing/track/open/" + logId + "/pixel.gif";
         body += "<img src=\"" + pixelUrl + "\" width=\"1\" height=\"1\" style=\"display:none;\" />";
 
-        EmailMessage msg = EmailMessage.of(customer.email(), tpl.compileSubject(vars), body, customer.unsubscribeToken());
+        EmailMessage msg = EmailMessage.of(member.email(), tpl.compileSubject(vars), body, member.unsubscribeToken());
         String messageId = mailingSystem.send(msg);
         
         logEntry.markSent(messageId);

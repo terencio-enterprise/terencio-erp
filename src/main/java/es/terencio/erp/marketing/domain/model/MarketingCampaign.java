@@ -99,11 +99,20 @@ public class MarketingCampaign {
     }
 
     public void startSending() {
-        if (status != CampaignStatus.DRAFT && status != CampaignStatus.SCHEDULED)
+        startSending(false);
+    }
+
+    public void startSending(boolean isRelaunch) {
+        if (!isRelaunch && status != CampaignStatus.DRAFT && status != CampaignStatus.SCHEDULED)
             throw new InvariantViolationException("Campaign cannot start from state: " + status);
+            
+        if (isRelaunch && status != CampaignStatus.SENDING && status != CampaignStatus.COMPLETED)
+            throw new InvariantViolationException("Campaign cannot be relaunched from state: " + status);
 
         this.status = CampaignStatus.SENDING;
-        this.startedAt = Instant.now();
+        if (this.startedAt == null) {
+            this.startedAt = Instant.now();
+        }
         touch();
     }
 

@@ -5,6 +5,8 @@ import java.time.Instant;
 import java.util.List;
 
 import es.terencio.erp.marketing.domain.model.CampaignStatus;
+import es.terencio.erp.marketing.domain.model.DeliveryStatus;
+import es.terencio.erp.marketing.domain.model.MarketingStatus;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
@@ -27,15 +29,16 @@ public final class MarketingDtos {
         Long customerId,
         String email,
         String name,
-        String marketingStatus,   // SUBSCRIBED/UNSUBSCRIBED/SNOOZED...
-        String sendStatus         // NOT_SENT / SENT / DELIVERED / OPENED / CLICKED / BOUNCED / FAILED / COMPLAINED
+        MarketingStatus marketingStatus,
+        DeliveryStatus sendStatus,
+        String unsubscribeToken
     ) {}
 
     public record TemplateDto(Long id, String code, String name, String subject, String bodyHtml, boolean active, Instant lastModified) {}
 
     public record UnsubscribeRequest(
         @NotBlank(message = "Token is required") String token, 
-        @NotBlank(message = "Action is required") String action, 
+        @NotNull(message = "Action is required") MarketingStatus action,
         Integer snoozeDays, 
         String reason
     ) {}

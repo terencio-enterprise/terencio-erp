@@ -24,12 +24,11 @@ public class MarketingConfig {
     @Bean
     public CampaignService campaignService(
             CampaignRepositoryPort campaignRepository,
-            CustomerIntegrationPort customerPort,
             MailingSystemPort mailingSystem,
             MarketingProperties properties,
             ObjectMapper objectMapper
     ) {
-        return new CampaignService(campaignRepository, customerPort, mailingSystem, properties, objectMapper);
+        return new CampaignService(campaignRepository, mailingSystem, properties, objectMapper);
     }
 
     @Bean
