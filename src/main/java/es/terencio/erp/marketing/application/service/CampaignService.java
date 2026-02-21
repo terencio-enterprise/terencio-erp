@@ -152,11 +152,17 @@ public class CampaignService implements ManageCampaignsUseCase, CampaignTracking
 
             for (CampaignAudienceMember member : batch.content()) {
                 boolean isSubscribed = member.marketingStatus() == MarketingStatus.SUBSCRIBED;
-                boolean isNotSentOrFailed = member.sendStatus() == null || 
-                                            member.sendStatus() == DeliveryStatus.NOT_SENT || 
-                                            member.sendStatus() == DeliveryStatus.FAILED;
+                boolean shouldSend;
 
-                if (!isSubscribed || !isNotSentOrFailed) {
+                if (isRelaunch) {
+                    shouldSend = member.sendStatus() == DeliveryStatus.NOT_SENT
+                            || member.sendStatus() == DeliveryStatus.FAILED;
+                } else {
+                    shouldSend = member.sendStatus() == null
+                            || member.sendStatus() == DeliveryStatus.NOT_SENT;
+                }
+
+                if (!isSubscribed || !shouldSend) {
                     continue;
                 }
 
