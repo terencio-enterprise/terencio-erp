@@ -21,6 +21,7 @@ public class MarketingCampaign {
     private int metricsSent = 0;
     private int metricsOpened = 0;
     private int metricsClicked = 0;
+    private int metricsBounced = 0;
 
     public MarketingCampaign(Long id, UUID companyId, String name, Long templateId, String status) {
         this.id = id;

@@ -12,7 +12,7 @@ public final class MarketingDtos {
     public record CreateCampaignRequest(String name, Long templateId, AudienceFilter audienceFilter) {}
     
     public record CampaignResponse(Long id, String name, String status, Instant scheduledAt, 
-                                   int metricsTotalRecipients, int metricsSent, int metricsOpened, int metricsClicked) {}
+                                   int metricsTotalRecipients, int metricsSent, int metricsOpened, int metricsClicked, int metricsBounced) {}
                                    
     public record CampaignAudienceMember(Long customerId, String email, String name, String status) {}
 

@@ -1,5 +1,6 @@
 package es.terencio.erp.marketing.infrastructure.in.web;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.http.ResponseEntity;
@@ -46,11 +47,19 @@ public class AdminCampaignController {
     }
 
     @PostMapping("/{id}/launch")
-    @Operation(summary = "Launch campaign asynchronously")
+    @Operation(summary = "Launch campaign asynchronously immediately")
     @RequiresPermission(permission = Permission.MARKETING_CAMPAIGN_LAUNCH, scope = AccessScope.COMPANY, targetIdParam = "companyId")
     public ResponseEntity<ApiResponse<Void>> launchCampaign(@PathVariable UUID companyId, @PathVariable Long id) {
         manageCampaignsUseCase.launchCampaign(id);
         return ResponseEntity.ok(ApiResponse.success("Campaign launched successfully in the background."));
+    }
+
+    @PostMapping("/{id}/schedule")
+    @Operation(summary = "Schedule campaign for future launch")
+    @RequiresPermission(permission = Permission.MARKETING_CAMPAIGN_LAUNCH, scope = AccessScope.COMPANY, targetIdParam = "companyId")
+    public ResponseEntity<ApiResponse<Void>> scheduleCampaign(@PathVariable UUID companyId, @PathVariable Long id, @RequestParam Instant scheduledAt) {
+        manageCampaignsUseCase.scheduleCampaign(id, scheduledAt);
+        return ResponseEntity.ok(ApiResponse.success("Campaign scheduled successfully."));
     }
 
     @PostMapping("/{id}/relaunch")
@@ -59,15 +68,5 @@ public class AdminCampaignController {
     public ResponseEntity<ApiResponse<Void>> relaunchCampaign(@PathVariable UUID companyId, @PathVariable Long id) {
         manageCampaignsUseCase.relaunchCampaign(id);
         return ResponseEntity.ok(ApiResponse.success("Campaign relaunched to remaining audience members."));
-    }
-
-    @PostMapping("/dry-run")
-    @Operation(summary = "Run campaign dry-run")
-    @RequiresPermission(permission = Permission.MARKETING_EMAIL_PREVIEW, scope = AccessScope.COMPANY, targetIdParam = "companyId")
-    public ResponseEntity<ApiResponse<Void>> dryRun(@PathVariable UUID companyId, @RequestBody java.util.Map<String, Object> payload) {
-        Long templateId = ((Number) payload.get("templateId")).longValue();
-        String testEmail = (String) payload.get("testEmail");
-        manageCampaignsUseCase.dryRun(templateId, testEmail);
-        return ResponseEntity.ok(ApiResponse.success("Dry run requested"));
     }
 }

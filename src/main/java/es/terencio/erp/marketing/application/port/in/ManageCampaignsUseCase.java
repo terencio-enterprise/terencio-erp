@@ -10,6 +10,7 @@ public interface ManageCampaignsUseCase {
     List<CampaignAudienceMember> getCampaignAudience(Long campaignId);
     
     void launchCampaign(Long campaignId);
-    void relaunchCampaign(Long campaignId); // Idempotent: Only targets those who haven't received it
+    void relaunchCampaign(Long campaignId); // Idempotent
+    void scheduleCampaign(Long campaignId, java.time.Instant scheduledAt);
     void dryRun(Long templateId, String testEmail);
 }

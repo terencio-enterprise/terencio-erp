@@ -1,9 +1,11 @@
 package es.terencio.erp.marketing.application.port.out;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import es.terencio.erp.marketing.domain.model.CampaignLog;
+import es.terencio.erp.marketing.domain.model.EmailDeliveryEvent;
 import es.terencio.erp.marketing.domain.model.MarketingCampaign;
 import es.terencio.erp.marketing.domain.model.MarketingTemplate;
 
@@ -16,12 +18,18 @@ public interface CampaignRepositoryPort {
 
     // Campaigns
     Optional<MarketingCampaign> findCampaignById(Long id);
+    List<MarketingCampaign> findScheduledCampaignsToLaunch(Instant now);
     MarketingCampaign saveCampaign(MarketingCampaign campaign);
     void incrementCampaignMetric(Long campaignId, String metricType);
 
-    // Logs
+    // Logs & Events
     CampaignLog saveLog(CampaignLog log);
     Optional<CampaignLog> findLogById(Long id);
+    Optional<CampaignLog> findLogByMessageId(String messageId);
     List<CampaignLog> findLogsByStatus(String status);
     boolean hasLog(Long campaignId, Long customerId);
+    
+    // Webhook Support
+    void saveDeliveryEvent(EmailDeliveryEvent event);
+    void markCustomerAsBouncedOrComplained(Long customerId, String status);
 }
