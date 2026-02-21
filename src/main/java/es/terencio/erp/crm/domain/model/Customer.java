@@ -4,12 +4,10 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
-import es.terencio.erp.crm.domain.model.valueobject.CommercialSettings;
-import es.terencio.erp.crm.domain.model.valueobject.ContactInfo;
-import es.terencio.erp.crm.domain.model.valueobject.MarketingProfile;
 import es.terencio.erp.shared.domain.exception.InvariantViolationException;
 import es.terencio.erp.shared.domain.identifier.CompanyId;
 import es.terencio.erp.shared.domain.identifier.CustomerId;
+import es.terencio.erp.shared.domain.utils.SecurityUtils;
 import es.terencio.erp.shared.domain.valueobject.Email;
 import es.terencio.erp.shared.domain.valueobject.TaxId;
 import lombok.AccessLevel;
@@ -33,9 +31,9 @@ public class Customer {
     private CustomerType type;
     private boolean active;
 
-    // Value Objects for specific concerns
+    // Immutable Value Objects
     private ContactInfo contactInfo;
-    private CommercialSettings commercialSettings;
+    private BillingInfo billingInfo;
     private MarketingProfile marketingProfile;
 
     // Metadata
@@ -44,10 +42,32 @@ public class Customer {
     private Instant updatedAt;
     private Instant deletedAt;
 
-    /**
-     * Domain Logic: Create a new Lead
-     */
-    public static Customer createLead(CompanyId companyId, String name, Email email, String origin, List<String> tags) {
+    // --- Domain Value Objects (Java Records for immutability & simplicity) ---
+
+    public record ContactInfo(Email email, String phone, String address, String zipCode, String city, String country) {
+        public static ContactInfo empty() { return new ContactInfo(null, null, null, null, null, "ES"); }
+    }
+
+    public record BillingInfo(Long tariffId, boolean allowCredit, Long creditLimitCents, boolean surchargeApply) {
+        public static BillingInfo defaultSettings() { return new BillingInfo(null, false, 0L, false); }
+    }
+
+    public record MarketingProfile(String origin, List<String> tags, boolean consent, MarketingStatus status, String unsubscribeToken, Instant lastInteractionAt) {
+        public static MarketingProfile createLead(String origin, List<String> tags, boolean consent) {
+            return new MarketingProfile(origin, tags != null ? tags : List.of(), consent, 
+                    consent ? MarketingStatus.SUBSCRIBED : MarketingStatus.UNSUBSCRIBED, 
+                    SecurityUtils.generateSecureToken(), Instant.now());
+        }
+        public static MarketingProfile empty() {
+            return new MarketingProfile(null, List.of(), false, MarketingStatus.UNSUBSCRIBED, SecurityUtils.generateSecureToken(), null);
+        }
+    }
+
+    // --- Domain Behaviors (Factory Methods) ---
+
+    public static Customer newLead(CompanyId companyId, String name, Email email, String phone, String origin, List<String> tags, boolean consent) {
+        if (email == null) throw new InvariantViolationException("Lead must have an email");
+        
         return Customer.builder()
                 .uuid(UUID.randomUUID())
                 .companyId(companyId)
@@ -55,53 +75,56 @@ public class Customer {
                 .commercialName(name)
                 .type(CustomerType.LEAD)
                 .active(true)
-                .contactInfo(ContactInfo.builder().email(email).build())
-                .marketingProfile(MarketingProfile.createDefault(origin, tags))
-                .commercialSettings(CommercialSettings.defaultSettings())
+                .contactInfo(new ContactInfo(email, phone, null, null, null, "ES"))
+                .billingInfo(BillingInfo.defaultSettings())
+                .marketingProfile(MarketingProfile.createLead(origin, tags, consent))
                 .createdAt(Instant.now())
                 .updatedAt(Instant.now())
                 .build();
     }
 
-    /**
-     * Domain Logic: Create a standard Client
-     */
-    public static Customer createClient(CompanyId companyId, String legalName, TaxId taxId) {
-        if (legalName == null || legalName.isBlank())
-            throw new InvariantViolationException("Legal name required");
-
+    public static Customer newClient(CompanyId companyId, String legalName, TaxId taxId, CustomerType type) {
+        if (legalName == null || legalName.isBlank()) throw new InvariantViolationException("Client must have a legal name");
+        
         return Customer.builder()
                 .uuid(UUID.randomUUID())
                 .companyId(companyId)
                 .legalName(legalName)
                 .commercialName(legalName)
                 .taxId(taxId)
-                .type(CustomerType.CLIENT)
+                .type(type != null ? type : CustomerType.CLIENT_RETAIL)
                 .active(true)
                 .contactInfo(ContactInfo.empty())
-                .commercialSettings(CommercialSettings.defaultSettings())
+                .billingInfo(BillingInfo.defaultSettings())
                 .marketingProfile(MarketingProfile.empty())
                 .createdAt(Instant.now())
                 .updatedAt(Instant.now())
                 .build();
     }
 
-    public void updateContact(ContactInfo newInfo) {
-        this.contactInfo = newInfo;
+    // --- Domain Mutations ---
+
+    public void updateDetails(String legalName, String commercialName, TaxId taxId, String notes) {
+        this.legalName = legalName;
+        this.commercialName = commercialName;
+        this.taxId = taxId;
+        this.notes = notes;
         this.updatedAt = Instant.now();
     }
 
-    public void updateCommercialTerms(CommercialSettings settings) {
-        this.commercialSettings = settings;
+    public void updateContactInfo(ContactInfo info) {
+        this.contactInfo = info;
         this.updatedAt = Instant.now();
     }
 
-    public void unsubscribe() {
-        this.marketingProfile = this.marketingProfile.withStatus(MarketingStatus.UNSUBSCRIBED);
+    public void updateBillingInfo(BillingInfo info) {
+        this.billingInfo = info;
         this.updatedAt = Instant.now();
     }
 
-    public boolean canReceiveMarketing() {
-        return active && deletedAt == null && marketingProfile.isEligible();
+    public void markAsDeleted() {
+        this.active = false;
+        this.deletedAt = Instant.now();
+        this.updatedAt = Instant.now();
     }
 }

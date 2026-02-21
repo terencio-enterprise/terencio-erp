@@ -7,6 +7,7 @@ import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 
 public interface IngestLeadUseCase {
+
     void ingest(UUID companyId, LeadCommand command);
 
     record LeadCommand(

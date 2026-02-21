@@ -6,24 +6,23 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import es.terencio.erp.crm.application.port.in.IngestLeadUseCase;
-import es.terencio.erp.crm.application.port.in.UpdateSpecialPricesUseCase;
-import es.terencio.erp.crm.application.port.out.CustomerRepository;
-import es.terencio.erp.crm.application.port.out.SpecialPriceRepository;
+import es.terencio.erp.crm.application.port.in.ManageCustomerUseCase;
+import es.terencio.erp.crm.application.port.out.CustomerRepositoryPort;
 import es.terencio.erp.crm.domain.model.Customer;
-import es.terencio.erp.crm.domain.model.CustomerProductPrice;
 import es.terencio.erp.shared.domain.identifier.CompanyId;
-import es.terencio.erp.shared.domain.identifier.ProductId;
 import es.terencio.erp.shared.domain.valueobject.Email;
-import es.terencio.erp.shared.domain.valueobject.Money;
+import es.terencio.erp.shared.domain.valueobject.TaxId;
+import es.terencio.erp.shared.exception.ResourceNotFoundException;
+import es.terencio.erp.shared.presentation.PageResult;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class CustomerApplicationService implements IngestLeadUseCase {
+public class CustomerApplicationService implements IngestLeadUseCase, ManageCustomerUseCase {
 
-    private final CustomerRepository customerRepository;
+    private final CustomerRepositoryPort customerRepository;
 
     @Override
     @Transactional
@@ -31,38 +30,74 @@ public class CustomerApplicationService implements IngestLeadUseCase {
         CompanyId cid = new CompanyId(companyId);
         Email email = Email.of(command.email());
 
-        if (customerRepository.existsByEmail(cid, email)) {
+        if (customerRepository.existsByEmailAndCompanyId(email, cid)) {
             log.info("Lead {} already exists for company {}", email, companyId);
             return;
         }
 
-        String name = (command.companyName() != null && !command.companyName().isBlank())
+        String targetName = (command.companyName() != null && !command.companyName().isBlank())
                 ? command.companyName()
                 : command.name();
 
-        Customer lead = Customer.createLead(cid, name, email, command.origin(), command.tags());
-
-        // Enrich with phone if provided
-        if (command.phone() != null) {
-            lead.getContactInfo().setPhone(command.phone());
-        }
+        Customer lead = Customer.newLead(cid, targetName, email, command.phone(), command.origin(), command.tags(),
+                command.consent());
 
         customerRepository.save(lead);
-        log.info("Lead ingested: {} (UUID: {})", email, lead.getUuid());
+        log.info("Lead ingested successfully: {} (UUID: {})", email, lead.getUuid());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Customer getByUuid(UUID companyId, UUID customerUuid) {
+        return customerRepository.findByUuidAndCompanyId(customerUuid, new CompanyId(companyId))
+                .orElseThrow(() -> new ResourceNotFoundException("Customer not found"));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PageResult<Customer> search(UUID companyId, CustomerQuery query) {
+        return customerRepository.searchPaginated(new CompanyId(companyId), query);
     }
 
     @Override
     @Transactional
-    public void updatePrices(UUID customerUuid, SpecialPricesCommand command) {
-        Customer customer = customerRepository.findByUuid(customerUuid)
-                .orElseThrow(() -> new IllegalArgumentException("Customer not found"));
+    public Customer create(UUID companyId, CreateCustomerCommand command) {
+        CompanyId cid = new CompanyId(companyId);
+        TaxId taxId = command.taxId() != null ? TaxId.of(command.taxId()) : null;
 
-        for (var entry : command.prices()) {
-            CustomerProductPrice price = CustomerProductPrice.create(
-                    customer.getId(),
-                    new ProductId(entry.productId()),
-                    Money.ofEurosCents(entry.priceCents()));
-            priceRepository.save(price);
+        Customer newCustomer = Customer.newClient(cid, command.legalName(), taxId, command.type());
+
+        if (command.email() != null || command.phone() != null) {
+            newCustomer.updateContactInfo(new Customer.ContactInfo(
+                    command.email() != null ? Email.of(command.email()) : null,
+                    command.phone(), null, null, null, "ES"));
         }
+
+        return customerRepository.save(newCustomer);
+    }
+
+    @Override
+    @Transactional
+    public Customer update(UUID companyId, UUID customerUuid, UpdateCustomerCommand command) {
+        Customer customer = getByUuid(companyId, customerUuid);
+
+        TaxId taxId = command.taxId() != null ? TaxId.of(command.taxId()) : null;
+        customer.updateDetails(command.legalName(), command.commercialName(), taxId, command.notes());
+
+        if (command.contactInfo() != null)
+            customer.updateContactInfo(command.contactInfo());
+        if (command.billingInfo() != null)
+            customer.updateBillingInfo(command.billingInfo());
+
+        return customerRepository.save(customer);
+    }
+
+    @Override
+    @Transactional
+    public void delete(UUID companyId, UUID customerUuid) {
+        Customer customer = getByUuid(companyId, customerUuid);
+        customer.markAsDeleted();
+        customerRepository.save(customer);
+        log.info("Customer {} marked as deleted", customerUuid);
     }
 }
