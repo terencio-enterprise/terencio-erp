@@ -53,14 +53,16 @@ public class AssetService implements ManageAssetsUseCase {
     @Override
     @Transactional(readOnly = true)
     public PageResult<AssetResponse> searchAssets(UUID companyId, String search, String contentType, int page, int size) {
-        int offset = page * size;
+        int safeSize = Math.min(Math.max(size, 1), 200);
+        int safePage = Math.max(page, 0);
+        int offset = safePage * safeSize;
         long totalElements = assetRepository.countByFilters(companyId, search, contentType);
-        List<CompanyAsset> assets = assetRepository.findByFiltersPaginated(companyId, search, contentType, offset, size);
+        List<CompanyAsset> assets = assetRepository.findByFiltersPaginated(companyId, search, contentType, offset, safeSize);
 
         List<AssetResponse> content = assets.stream().map(this::toDto).collect(Collectors.toList());
-        int totalPages = (int) Math.ceil((double) totalElements / size);
+        int totalPages = (int) Math.ceil((double) totalElements / safeSize);
 
-        return new PageResult<AssetResponse>(content, totalElements, totalPages, page, size);
+        return new PageResult<AssetResponse>(content, totalElements, totalPages, safePage, safeSize);
     }
 
     @Override

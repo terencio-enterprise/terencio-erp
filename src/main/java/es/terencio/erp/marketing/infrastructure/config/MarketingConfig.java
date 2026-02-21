@@ -3,6 +3,8 @@ package es.terencio.erp.marketing.infrastructure.config;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import es.terencio.erp.marketing.application.port.in.CampaignTrackingUseCase;
+import es.terencio.erp.marketing.application.port.in.ManageCampaignsUseCase;
 import es.terencio.erp.marketing.application.port.in.ManagePreferencesUseCase;
 import es.terencio.erp.marketing.application.port.in.ManageTemplatesUseCase;
 import es.terencio.erp.marketing.application.port.in.ProcessWebhookUseCase;
@@ -18,11 +20,23 @@ import es.terencio.erp.marketing.application.service.WebhookService;
 public class MarketingConfig {
 
     @Bean
-    public CampaignService campaignService(CampaignRepositoryPort campaignRepository,
+    public CampaignService campaignService(
+            CampaignRepositoryPort campaignRepository,
             CustomerIntegrationPort customerPort,
             MailingSystemPort mailingSystem,
-            MarketingProperties properties) {
+            MarketingProperties properties
+    ) {
         return new CampaignService(campaignRepository, customerPort, mailingSystem, properties);
+    }
+
+    @Bean
+    public ManageCampaignsUseCase manageCampaignsUseCase(CampaignService service) {
+        return service;
+    }
+
+    @Bean
+    public CampaignTrackingUseCase campaignTrackingUseCase(CampaignService service) {
+        return service;
     }
 
     @Bean
