@@ -1,8 +1,10 @@
 package es.terencio.erp.marketing.infrastructure.config;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import es.terencio.erp.marketing.application.port.in.LaunchCampaignUseCase;
+import es.terencio.erp.marketing.application.port.in.ManageCampaignsUseCase;
+import es.terencio.erp.marketing.application.port.in.CampaignTrackingUseCase;
 import es.terencio.erp.marketing.application.port.in.ManagePreferencesUseCase;
 import es.terencio.erp.marketing.application.port.in.ManageTemplatesUseCase;
 import es.terencio.erp.marketing.application.port.out.CampaignRepositoryPort;
@@ -16,8 +18,21 @@ import es.terencio.erp.marketing.application.service.TemplateService;
 public class MarketingConfig {
 
     @Bean
-    public LaunchCampaignUseCase launchCampaignUseCase(CampaignRepositoryPort campaignRepository, CustomerIntegrationPort customerPort, MailingSystemPort mailingSystem) {
-        return new CampaignService(campaignRepository, customerPort, mailingSystem);
+    public CampaignService campaignService(CampaignRepositoryPort campaignRepository, 
+                                           CustomerIntegrationPort customerPort, 
+                                           MailingSystemPort mailingSystem,
+                                           @Value("${app.public-url:https://api.terencio.es}") String publicBaseUrl) {
+        return new CampaignService(campaignRepository, customerPort, mailingSystem, publicBaseUrl);
+    }
+
+    @Bean
+    public ManageCampaignsUseCase manageCampaignsUseCase(CampaignService campaignService) {
+        return campaignService;
+    }
+
+    @Bean
+    public CampaignTrackingUseCase campaignTrackingUseCase(CampaignService campaignService) {
+        return campaignService;
     }
 
     @Bean
