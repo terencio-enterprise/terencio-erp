@@ -101,4 +101,10 @@ public class MarketingConfig {
     public SesWebhookService sesWebhookService(CampaignRepositoryPort repository, ObjectMapper objectMapper, RestTemplate restTemplate) {
         return new SesWebhookService(repository, objectMapper, restTemplate);
     }
+
+    @Bean
+    public MarketingProperties marketingProperties() {
+        return new MarketingProperties();
+    }
+    
 }
