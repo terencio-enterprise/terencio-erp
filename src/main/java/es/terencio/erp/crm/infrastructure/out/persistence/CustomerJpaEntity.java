@@ -72,7 +72,6 @@ public class CustomerJpaEntity {
     @Column(length = 50)
     private String origin;
     
-    // Note: If using hibernate-types/hypersistence-utils, annotate with @Type(ListArrayType.class)
     @Column(columnDefinition = "text[]")
     private List<String> tags;
 

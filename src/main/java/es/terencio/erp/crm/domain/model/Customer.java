@@ -122,7 +122,7 @@ public class Customer {
 
     public void changeTaxId(TaxId newTaxId) {
         if (this.type == CustomerType.LEAD)
-            throw new InvariantViolationException("Leads cannot have taxId");
+            throw new InvariantViolationException("Cannot assign taxId to LEAD. Convert first.");
 
         this.taxId = newTaxId;
         touch();
@@ -162,6 +162,8 @@ public class Customer {
     }
 
     public void deactivate() {
+        if (!this.active) return;
+
         this.active = false;
         this.deletedAt = Instant.now();
         touch();
