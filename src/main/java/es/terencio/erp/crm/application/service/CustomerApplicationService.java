@@ -7,11 +7,14 @@ import org.springframework.transaction.annotation.Transactional;
 
 import es.terencio.erp.crm.application.port.in.IngestLeadUseCase;
 import es.terencio.erp.crm.application.port.in.ManageCustomerUseCase;
+import es.terencio.erp.crm.application.port.in.command.BillingInfoCommand;
+import es.terencio.erp.crm.application.port.in.command.ContactInfoCommand;
 import es.terencio.erp.crm.application.port.in.command.CreateCustomerCommand;
 import es.terencio.erp.crm.application.port.in.command.IngestLeadCommand;
 import es.terencio.erp.crm.application.port.in.command.UpdateCustomerCommand;
 import es.terencio.erp.crm.application.port.in.query.SearchCustomerQuery;
 import es.terencio.erp.crm.application.port.out.CustomerRepositoryPort;
+import es.terencio.erp.crm.domain.model.BillingInfo;
 import es.terencio.erp.crm.domain.model.ContactInfo;
 import es.terencio.erp.crm.domain.model.Customer;
 import es.terencio.erp.shared.domain.identifier.CompanyId;
@@ -44,8 +47,15 @@ public class CustomerApplicationService implements IngestLeadUseCase, ManageCust
                 ? command.companyName()
                 : command.name();
 
-        Customer lead = Customer.newLead(cid, targetName, email, command.phone(), command.origin(), command.tags(),
-                command.consent());
+        Customer lead = Customer.newLead(
+                cid,
+                targetName,
+                email,
+                command.phone(),
+                command.origin(),
+                command.tags(),
+                command.consent()
+        );
 
         customerRepository.save(lead);
         log.info("Lead ingested successfully: {} (UUID: {})", email, lead.getUuid());
@@ -75,7 +85,12 @@ public class CustomerApplicationService implements IngestLeadUseCase, ManageCust
         if (command.email() != null || command.phone() != null) {
             newCustomer.updateContactInfo(new ContactInfo(
                     command.email() != null ? Email.of(command.email()) : null,
-                    command.phone(), null, null, null, "ES"));
+                    command.phone(),
+                    null,
+                    null,
+                    null,
+                    "ES"
+            ));
         }
 
         return customerRepository.save(newCustomer);
@@ -89,12 +104,41 @@ public class CustomerApplicationService implements IngestLeadUseCase, ManageCust
         TaxId taxId = command.taxId() != null ? TaxId.of(command.taxId()) : null;
         customer.updateDetails(command.legalName(), command.commercialName(), taxId, command.notes());
 
-        if (command.contactInfo() != null)
-            customer.updateContactInfo(command.contactInfo());
-        if (command.billingInfo() != null)
-            customer.updateBillingInfo(command.billingInfo());
+        if (command.contactInfo() != null) {
+            customer.updateContactInfo(mapContactInfo(command.contactInfo()));
+        }
+
+        if (command.billingInfo() != null) {
+            customer.updateBillingInfo(mapBillingInfo(customer.getBillingInfo(), command.billingInfo()));
+        }
 
         return customerRepository.save(customer);
+    }
+
+    private ContactInfo mapContactInfo(ContactInfoCommand cmd) {
+        // Keep default ES if null/blank
+        String country = (cmd.country() == null || cmd.country().isBlank()) ? "ES" : cmd.country();
+
+        return new ContactInfo(
+                cmd.email() != null ? Email.of(cmd.email()) : null,
+                cmd.phone(),
+                cmd.address(),
+                cmd.zipCode(),
+                cmd.city(),
+                country
+        );
+    }
+
+    private BillingInfo mapBillingInfo(BillingInfo current, BillingInfoCommand cmd) {
+        BillingInfo base = (current != null) ? current : BillingInfo.defaultSettings();
+
+        // PATCH semantics: if value is null, keep existing
+        Long tariffId = (cmd.tariffId() != null) ? cmd.tariffId() : base.tariffId();
+        boolean allowCredit = (cmd.allowCredit() != null) ? cmd.allowCredit() : base.allowCredit();
+        Long creditLimitCents = (cmd.creditLimitCents() != null) ? cmd.creditLimitCents() : base.creditLimitCents();
+        boolean surchargeApply = (cmd.surchargeApply() != null) ? cmd.surchargeApply() : base.surchargeApply();
+
+        return new BillingInfo(tariffId, allowCredit, creditLimitCents, surchargeApply);
     }
 
     @Override

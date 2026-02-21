@@ -10,10 +10,13 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Component;
 
-import es.terencio.erp.crm.application.port.in.ManageCustomerUseCase.CustomerQuery;
+import es.terencio.erp.crm.application.port.in.query.SearchCustomerQuery;
 import es.terencio.erp.crm.application.port.out.CustomerRepositoryPort;
+import es.terencio.erp.crm.domain.model.BillingInfo;
+import es.terencio.erp.crm.domain.model.ContactInfo;
 import es.terencio.erp.crm.domain.model.Customer;
 import es.terencio.erp.crm.domain.model.CustomerType;
+import es.terencio.erp.crm.domain.model.MarketingProfile;
 import es.terencio.erp.crm.domain.model.MarketingStatus;
 import es.terencio.erp.shared.domain.identifier.CompanyId;
 import es.terencio.erp.shared.domain.identifier.CustomerId;
@@ -49,7 +52,7 @@ public class CustomerPersistenceAdapter implements CustomerRepositoryPort {
     }
 
     @Override
-    public PageResult<Customer> searchPaginated(CompanyId companyId, CustomerQuery query) {
+    public PageResult<Customer> searchPaginated(CompanyId companyId, SearchCustomerQuery query) {
         Specification<CustomerJpaEntity> spec = buildSpecification(companyId.value(), query);
         Page<CustomerJpaEntity> page = repository.findAll(spec, PageRequest.of(query.page(), query.size()));
 
@@ -64,11 +67,11 @@ public class CustomerPersistenceAdapter implements CustomerRepositoryPort {
 
     // --- Private Specification Builder ---
 
-    private Specification<CustomerJpaEntity> buildSpecification(UUID companyId, CustomerQuery query) {
+    private Specification<CustomerJpaEntity> buildSpecification(UUID companyId, SearchCustomerQuery query) {
         return (root, cq, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
             predicates.add(cb.equal(root.get("companyId"), companyId));
-            predicates.add(cb.isNull(root.get("deletedAt"))); // Global filter for active records
+            predicates.add(cb.isNull(root.get("deletedAt"))); // global filter
 
             if (query.search() != null && !query.search().isBlank()) {
                 String searchPattern = "%" + query.search().toLowerCase() + "%";
@@ -82,6 +85,7 @@ public class CustomerPersistenceAdapter implements CustomerRepositoryPort {
             }
 
             if (query.type() != null) {
+                // assuming entity field "type" is stored as String enum name
                 predicates.add(cb.equal(root.get("type"), query.type().name()));
             }
 
@@ -89,9 +93,7 @@ public class CustomerPersistenceAdapter implements CustomerRepositoryPort {
                 predicates.add(cb.equal(root.get("active"), query.active()));
             }
 
-            // Default sorting (newest first)
             cq.orderBy(cb.desc(root.get("createdAt")));
-
             return cb.and(predicates.toArray(new Predicate[0]));
         };
     }
@@ -100,7 +102,11 @@ public class CustomerPersistenceAdapter implements CustomerRepositoryPort {
 
     private CustomerJpaEntity toEntity(Customer domain) {
         if (domain == null) return null;
-        
+
+        ContactInfo ci = domain.getContactInfo() != null ? domain.getContactInfo() : ContactInfo.empty();
+        BillingInfo bi = domain.getBillingInfo() != null ? domain.getBillingInfo() : BillingInfo.defaultSettings();
+        MarketingProfile mp = domain.getMarketingProfile() != null ? domain.getMarketingProfile() : MarketingProfile.empty();
+
         return CustomerJpaEntity.builder()
                 .id(domain.getId() != null ? domain.getId().value() : null)
                 .uuid(domain.getUuid())
@@ -111,28 +117,28 @@ public class CustomerPersistenceAdapter implements CustomerRepositoryPort {
                 .type(domain.getType() != null ? domain.getType().name() : null)
                 .active(domain.isActive())
                 .notes(domain.getNotes())
-                
+
                 // Contact Info
-                .email(domain.getContactInfo().email() != null ? domain.getContactInfo().email().value() : null)
-                .phone(domain.getContactInfo().phone())
-                .address(domain.getContactInfo().address())
-                .zipCode(domain.getContactInfo().zipCode())
-                .city(domain.getContactInfo().city())
-                .country(domain.getContactInfo().country())
+                .email(ci.email() != null ? ci.email().value() : null)
+                .phone(ci.phone())
+                .address(ci.address())
+                .zipCode(ci.zipCode())
+                .city(ci.city())
+                .country(ci.country())
 
                 // Billing Info
-                .tariffId(domain.getBillingInfo().tariffId())
-                .allowCredit(domain.getBillingInfo().allowCredit())
-                .creditLimit(domain.getBillingInfo().creditLimitCents())
-                .surchargeApply(domain.getBillingInfo().surchargeApply())
+                .tariffId(bi.tariffId())
+                .allowCredit(bi.allowCredit())
+                .creditLimit(bi.creditLimitCents())
+                .surchargeApply(bi.surchargeApply())
 
                 // Marketing Info
-                .origin(domain.getMarketingProfile().origin())
-                .tags(domain.getMarketingProfile().tags())
-                .marketingConsent(domain.getMarketingProfile().consent())
-                .marketingStatus(domain.getMarketingProfile().status() != null ? domain.getMarketingProfile().status().name() : null)
-                .unsubscribeToken(domain.getMarketingProfile().unsubscribeToken())
-                .lastInteractionAt(domain.getMarketingProfile().lastInteractionAt())
+                .origin(mp.origin())
+                .tags(mp.tags())
+                .marketingConsent(mp.consent())
+                .marketingStatus(mp.status() != null ? mp.status().name() : null)
+                .unsubscribeToken(mp.unsubscribeToken())
+                .lastInteractionAt(mp.lastInteractionAt())
 
                 // Audit
                 .createdAt(domain.getCreatedAt())
@@ -145,7 +151,7 @@ public class CustomerPersistenceAdapter implements CustomerRepositoryPort {
         if (entity == null) return null;
 
         return Customer.builder()
-                .id(new CustomerId(entity.getId()))
+                .id(entity.getId() != null ? new CustomerId(entity.getId()) : null)
                 .uuid(entity.getUuid())
                 .companyId(new CompanyId(entity.getCompanyId()))
                 .taxId(entity.getTaxId() != null ? TaxId.of(entity.getTaxId()) : null)
@@ -154,25 +160,32 @@ public class CustomerPersistenceAdapter implements CustomerRepositoryPort {
                 .type(entity.getType() != null ? CustomerType.valueOf(entity.getType()) : null)
                 .active(entity.isActive())
                 .notes(entity.getNotes())
-                
-                .contactInfo(new Customer.ContactInfo(
+
+                .contactInfo(new ContactInfo(
                         entity.getEmail() != null ? Email.of(entity.getEmail()) : null,
-                        entity.getPhone(), entity.getAddress(), entity.getZipCode(), 
-                        entity.getCity(), entity.getCountry()
+                        entity.getPhone(),
+                        entity.getAddress(),
+                        entity.getZipCode(),
+                        entity.getCity(),
+                        entity.getCountry() != null ? entity.getCountry() : "ES"
                 ))
-                
-                .billingInfo(new Customer.BillingInfo(
-                        entity.getTariffId(), entity.isAllowCredit(), 
-                        entity.getCreditLimit(), entity.isSurchargeApply()
+
+                .billingInfo(new BillingInfo(
+                        entity.getTariffId(),
+                        entity.isAllowCredit(),
+                        entity.getCreditLimit(),
+                        entity.isSurchargeApply()
                 ))
-                
-                .marketingProfile(new Customer.MarketingProfile(
-                        entity.getOrigin(), entity.getTags() != null ? entity.getTags() : new ArrayList<>(),
-                        entity.isMarketingConsent(), 
+
+                .marketingProfile(new MarketingProfile(
+                        entity.getOrigin(),
+                        entity.getTags() != null ? List.copyOf(entity.getTags()) : List.of(),
+                        entity.isMarketingConsent(),
                         entity.getMarketingStatus() != null ? MarketingStatus.valueOf(entity.getMarketingStatus()) : null,
-                        entity.getUnsubscribeToken(), entity.getLastInteractionAt()
+                        entity.getUnsubscribeToken(),
+                        entity.getLastInteractionAt()
                 ))
-                
+
                 .createdAt(entity.getCreatedAt())
                 .updatedAt(entity.getUpdatedAt())
                 .deletedAt(entity.getDeletedAt())

@@ -43,9 +43,18 @@ public class Customer {
 
     // --- Domain Behaviors (Factory Methods) ---
 
-    public static Customer newLead(CompanyId companyId, String name, Email email, String phone, String origin, List<String> tags, boolean consent) {
+    public static Customer newLead(
+            CompanyId companyId,
+            String name,
+            Email email,
+            String phone,
+            String origin,
+            List<String> tags,
+            boolean consent
+    ) {
         if (email == null) throw new InvariantViolationException("Lead must have an email");
-        
+        if (name == null || name.isBlank()) throw new InvariantViolationException("Lead must have a name");
+
         return Customer.builder()
                 .uuid(UUID.randomUUID())
                 .companyId(companyId)
@@ -62,15 +71,20 @@ public class Customer {
     }
 
     public static Customer newClient(CompanyId companyId, String legalName, TaxId taxId, CustomerType type) {
-        if (legalName == null || legalName.isBlank()) throw new InvariantViolationException("Client must have a legal name");
-        
+        if (legalName == null || legalName.isBlank())
+            throw new InvariantViolationException("Client must have a legal name");
+
+        CustomerType resolved = (type != null) ? type : CustomerType.CLIENT_RETAIL;
+        if (resolved == CustomerType.LEAD)
+            throw new InvariantViolationException("Client cannot be of type LEAD");
+
         return Customer.builder()
                 .uuid(UUID.randomUUID())
                 .companyId(companyId)
                 .legalName(legalName)
                 .commercialName(legalName)
                 .taxId(taxId)
-                .type(type != null ? type : CustomerType.CLIENT_RETAIL)
+                .type(resolved)
                 .active(true)
                 .contactInfo(ContactInfo.empty())
                 .billingInfo(BillingInfo.defaultSettings())
@@ -82,20 +96,36 @@ public class Customer {
 
     // --- Domain Mutations ---
 
+    /**
+     * PATCH semantics:
+     * - If a field is null => keep current value
+     * - If provided, validate key invariants
+     */
     public void updateDetails(String legalName, String commercialName, TaxId taxId, String notes) {
-        this.legalName = legalName;
-        this.commercialName = commercialName;
-        this.taxId = taxId;
-        this.notes = notes;
+        if (legalName != null) {
+            if (legalName.isBlank()) throw new InvariantViolationException("legalName cannot be blank");
+            this.legalName = legalName;
+        }
+        if (commercialName != null) {
+            this.commercialName = commercialName;
+        }
+        if (taxId != null) {
+            this.taxId = taxId;
+        }
+        if (notes != null) {
+            this.notes = notes;
+        }
         this.updatedAt = Instant.now();
     }
 
     public void updateContactInfo(ContactInfo info) {
+        if (info == null) return;
         this.contactInfo = info;
         this.updatedAt = Instant.now();
     }
 
     public void updateBillingInfo(BillingInfo info) {
+        if (info == null) return;
         this.billingInfo = info;
         this.updatedAt = Instant.now();
     }
