@@ -70,10 +70,13 @@ public class CustomerController {
     @Operation(summary = "Create a new customer/client")
     @RequiresPermission(permission = Permission.CUSTOMER_CREATE, scope = AccessScope.COMPANY, targetIdParam = "companyId")
     public ResponseEntity<ApiResponse<CustomerResponse>> createCustomer(
-            @PathVariable UUID companyId, @Valid @RequestBody CreateCustomerRequest request) {
+            @PathVariable UUID companyId,
+            @Valid @RequestBody CreateCustomerRequest request) {
 
         Customer saved = manageCustomerUseCase.create(companyId, request.toCommand());
-        return ResponseEntity.ok(ApiResponse.success("Customer created", CustomerResponse.fromDomain(saved)));
+
+        return ResponseEntity.status(201)
+                .body(ApiResponse.success("Customer created", CustomerResponse.fromDomain(saved)));
     }
 
     @PutMapping("/{customerUuid}")

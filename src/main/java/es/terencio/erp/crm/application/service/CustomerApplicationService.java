@@ -7,8 +7,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import es.terencio.erp.crm.application.port.in.IngestLeadUseCase;
 import es.terencio.erp.crm.application.port.in.ManageCustomerUseCase;
-import es.terencio.erp.crm.application.port.in.command.BillingInfoCommand;
-import es.terencio.erp.crm.application.port.in.command.ContactInfoCommand;
 import es.terencio.erp.crm.application.port.in.command.CreateCustomerCommand;
 import es.terencio.erp.crm.application.port.in.command.IngestLeadCommand;
 import es.terencio.erp.crm.application.port.in.command.UpdateCustomerCommand;
@@ -39,17 +37,17 @@ public class CustomerApplicationService implements IngestLeadUseCase, ManageCust
         Email email = Email.of(command.email());
 
         if (customerRepository.existsByEmailAndCompanyId(email, cid)) {
-            log.info("Lead {} already exists for company {}", email, companyId);
+            log.info("Lead already exists: {}", email);
             return;
         }
 
-        String targetName = (command.companyName() != null && !command.companyName().isBlank())
+        String name = (command.companyName() != null && !command.companyName().isBlank())
                 ? command.companyName()
                 : command.name();
 
         Customer lead = Customer.newLead(
                 cid,
-                targetName,
+                name,
                 email,
                 command.phone(),
                 command.origin(),
@@ -58,7 +56,6 @@ public class CustomerApplicationService implements IngestLeadUseCase, ManageCust
         );
 
         customerRepository.save(lead);
-        log.info("Lead ingested successfully: {} (UUID: {})", email, lead.getUuid());
     }
 
     @Override
@@ -71,19 +68,32 @@ public class CustomerApplicationService implements IngestLeadUseCase, ManageCust
     @Override
     @Transactional(readOnly = true)
     public PageResult<Customer> search(UUID companyId, SearchCustomerQuery query) {
-        return customerRepository.searchPaginated(new CompanyId(companyId), query);
+
+        int safeSize = Math.min(Math.max(query.size(), 1), 100);
+        int safePage = Math.max(query.page(), 0);
+
+        SearchCustomerQuery safeQuery = new SearchCustomerQuery(
+                query.search(),
+                query.type(),
+                query.active(),
+                safePage,
+                safeSize
+        );
+
+        return customerRepository.searchPaginated(new CompanyId(companyId), safeQuery);
     }
 
     @Override
     @Transactional
     public Customer create(UUID companyId, CreateCustomerCommand command) {
+
         CompanyId cid = new CompanyId(companyId);
         TaxId taxId = command.taxId() != null ? TaxId.of(command.taxId()) : null;
 
-        Customer newCustomer = Customer.newClient(cid, command.legalName(), taxId, command.type());
+        Customer customer = Customer.newClient(cid, command.legalName(), taxId, command.type());
 
         if (command.email() != null || command.phone() != null) {
-            newCustomer.updateContactInfo(new ContactInfo(
+            customer.updateContactInfo(new ContactInfo(
                     command.email() != null ? Email.of(command.email()) : null,
                     command.phone(),
                     null,
@@ -93,60 +103,55 @@ public class CustomerApplicationService implements IngestLeadUseCase, ManageCust
             ));
         }
 
-        return customerRepository.save(newCustomer);
+        return customerRepository.save(customer);
     }
 
     @Override
     @Transactional
     public Customer update(UUID companyId, UUID customerUuid, UpdateCustomerCommand command) {
+
         Customer customer = getByUuid(companyId, customerUuid);
 
-        TaxId taxId = command.taxId() != null ? TaxId.of(command.taxId()) : null;
-        customer.updateDetails(command.legalName(), command.commercialName(), taxId, command.notes());
+        customer.rename(command.legalName(), command.commercialName());
+
+        if (command.taxId() != null) {
+            customer.changeTaxId(TaxId.of(command.taxId()));
+        }
+
+        customer.updateNotes(command.notes());
 
         if (command.contactInfo() != null) {
-            customer.updateContactInfo(mapContactInfo(command.contactInfo()));
+            customer.updateContactInfo(new ContactInfo(
+                    command.contactInfo().email() != null ? Email.of(command.contactInfo().email()) : null,
+                    command.contactInfo().phone(),
+                    command.contactInfo().address(),
+                    command.contactInfo().zipCode(),
+                    command.contactInfo().city(),
+                    command.contactInfo().country() != null ? command.contactInfo().country() : "ES"
+            ));
         }
 
         if (command.billingInfo() != null) {
-            customer.updateBillingInfo(mapBillingInfo(customer.getBillingInfo(), command.billingInfo()));
+            BillingInfo base = customer.getBillingInfo() != null
+                    ? customer.getBillingInfo()
+                    : BillingInfo.defaultSettings();
+
+            customer.updateBillingInfo(new BillingInfo(
+                    command.billingInfo().tariffId() != null ? command.billingInfo().tariffId() : base.tariffId(),
+                    command.billingInfo().allowCredit() != null ? command.billingInfo().allowCredit() : base.allowCredit(),
+                    command.billingInfo().creditLimitCents() != null ? command.billingInfo().creditLimitCents() : base.creditLimitCents(),
+                    command.billingInfo().surchargeApply() != null ? command.billingInfo().surchargeApply() : base.surchargeApply()
+            ));
         }
 
         return customerRepository.save(customer);
-    }
-
-    private ContactInfo mapContactInfo(ContactInfoCommand cmd) {
-        // Keep default ES if null/blank
-        String country = (cmd.country() == null || cmd.country().isBlank()) ? "ES" : cmd.country();
-
-        return new ContactInfo(
-                cmd.email() != null ? Email.of(cmd.email()) : null,
-                cmd.phone(),
-                cmd.address(),
-                cmd.zipCode(),
-                cmd.city(),
-                country
-        );
-    }
-
-    private BillingInfo mapBillingInfo(BillingInfo current, BillingInfoCommand cmd) {
-        BillingInfo base = (current != null) ? current : BillingInfo.defaultSettings();
-
-        // PATCH semantics: if value is null, keep existing
-        Long tariffId = (cmd.tariffId() != null) ? cmd.tariffId() : base.tariffId();
-        boolean allowCredit = (cmd.allowCredit() != null) ? cmd.allowCredit() : base.allowCredit();
-        Long creditLimitCents = (cmd.creditLimitCents() != null) ? cmd.creditLimitCents() : base.creditLimitCents();
-        boolean surchargeApply = (cmd.surchargeApply() != null) ? cmd.surchargeApply() : base.surchargeApply();
-
-        return new BillingInfo(tariffId, allowCredit, creditLimitCents, surchargeApply);
     }
 
     @Override
     @Transactional
     public void delete(UUID companyId, UUID customerUuid) {
         Customer customer = getByUuid(companyId, customerUuid);
-        customer.markAsDeleted();
+        customer.deactivate();
         customerRepository.save(customer);
-        log.info("Customer {} marked as deleted", customerUuid);
     }
 }

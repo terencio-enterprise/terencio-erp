@@ -23,25 +23,24 @@ public class Customer {
     private final UUID uuid;
     private final CompanyId companyId;
 
-    // Core Identity
     private TaxId taxId;
     private String legalName;
     private String commercialName;
     private CustomerType type;
     private boolean active;
 
-    // Immutable Value Objects
     private ContactInfo contactInfo;
     private BillingInfo billingInfo;
     private MarketingProfile marketingProfile;
 
-    // Metadata
     private String notes;
     private final Instant createdAt;
     private Instant updatedAt;
     private Instant deletedAt;
 
-    // --- Domain Behaviors (Factory Methods) ---
+    // =========================================================
+    // FACTORIES
+    // =========================================================
 
     public static Customer newLead(
             CompanyId companyId,
@@ -52,8 +51,11 @@ public class Customer {
             List<String> tags,
             boolean consent
     ) {
-        if (email == null) throw new InvariantViolationException("Lead must have an email");
-        if (name == null || name.isBlank()) throw new InvariantViolationException("Lead must have a name");
+        if (email == null)
+            throw new InvariantViolationException("Lead must have an email");
+
+        if (name == null || name.isBlank())
+            throw new InvariantViolationException("Lead must have a name");
 
         return Customer.builder()
                 .uuid(UUID.randomUUID())
@@ -70,13 +72,19 @@ public class Customer {
                 .build();
     }
 
-    public static Customer newClient(CompanyId companyId, String legalName, TaxId taxId, CustomerType type) {
+    public static Customer newClient(
+            CompanyId companyId,
+            String legalName,
+            TaxId taxId,
+            CustomerType type
+    ) {
         if (legalName == null || legalName.isBlank())
-            throw new InvariantViolationException("Client must have a legal name");
+            throw new InvariantViolationException("Client must have legal name");
 
-        CustomerType resolved = (type != null) ? type : CustomerType.CLIENT_RETAIL;
+        CustomerType resolved = type != null ? type : CustomerType.CLIENT_RETAIL;
+
         if (resolved == CustomerType.LEAD)
-            throw new InvariantViolationException("Client cannot be of type LEAD");
+            throw new InvariantViolationException("Client cannot be LEAD");
 
         return Customer.builder()
                 .uuid(UUID.randomUUID())
@@ -94,45 +102,72 @@ public class Customer {
                 .build();
     }
 
-    // --- Domain Mutations ---
+    // =========================================================
+    // DOMAIN BEHAVIORS
+    // =========================================================
 
-    /**
-     * PATCH semantics:
-     * - If a field is null => keep current value
-     * - If provided, validate key invariants
-     */
-    public void updateDetails(String legalName, String commercialName, TaxId taxId, String notes) {
-        if (legalName != null) {
-            if (legalName.isBlank()) throw new InvariantViolationException("legalName cannot be blank");
-            this.legalName = legalName;
+    public void rename(String newLegalName, String newCommercialName) {
+        if (newLegalName != null) {
+            if (newLegalName.isBlank())
+                throw new InvariantViolationException("legalName cannot be blank");
+            this.legalName = newLegalName;
         }
-        if (commercialName != null) {
-            this.commercialName = commercialName;
+
+        if (newCommercialName != null) {
+            this.commercialName = newCommercialName;
         }
-        if (taxId != null) {
-            this.taxId = taxId;
-        }
+
+        touch();
+    }
+
+    public void changeTaxId(TaxId newTaxId) {
+        if (this.type == CustomerType.LEAD)
+            throw new InvariantViolationException("Leads cannot have taxId");
+
+        this.taxId = newTaxId;
+        touch();
+    }
+
+    public void updateNotes(String notes) {
         if (notes != null) {
             this.notes = notes;
+            touch();
         }
-        this.updatedAt = Instant.now();
     }
 
     public void updateContactInfo(ContactInfo info) {
-        if (info == null) return;
-        this.contactInfo = info;
-        this.updatedAt = Instant.now();
+        if (info != null) {
+            this.contactInfo = info;
+            touch();
+        }
     }
 
     public void updateBillingInfo(BillingInfo info) {
-        if (info == null) return;
-        this.billingInfo = info;
-        this.updatedAt = Instant.now();
+        if (info != null) {
+            this.billingInfo = info;
+            touch();
+        }
     }
 
-    public void markAsDeleted() {
+    public void convertToClient(CustomerType newType, TaxId taxId) {
+        if (this.type != CustomerType.LEAD)
+            throw new InvariantViolationException("Only LEAD can be converted");
+
+        if (newType == null || newType == CustomerType.LEAD)
+            throw new InvariantViolationException("Invalid client type");
+
+        this.type = newType;
+        this.taxId = taxId;
+        touch();
+    }
+
+    public void deactivate() {
         this.active = false;
         this.deletedAt = Instant.now();
+        touch();
+    }
+
+    private void touch() {
         this.updatedAt = Instant.now();
     }
 }
