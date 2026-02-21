@@ -12,7 +12,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 
 @RestController
 @RequestMapping("/api/v1/public/marketing/track")
-@Tag(name = "Public Marketing Tracking", description = "Pixel and Link tracking")
+@Tag(name = "Public Marketing Tracking", description = "Secure Pixel and Link tracking")
 public class PublicTrackingController {
 
     private final CampaignTrackingUseCase trackingUseCase;
@@ -33,9 +33,9 @@ public class PublicTrackingController {
     }
 
     @GetMapping("/click/{logId}")
-    @Operation(summary = "Email secure link click tracking")
-    public ResponseEntity<Void> trackClick(@PathVariable Long logId, @RequestParam("u") String encodedUrl, @RequestParam("sig") String signature) {
-        String originalUrl = trackingUseCase.registerClickAndGetRedirectUrl(logId, encodedUrl, signature);
+    @Operation(summary = "Email secure link click tracking with expiration")
+    public ResponseEntity<Void> trackClick(@PathVariable Long logId, @RequestParam("p") String payload, @RequestParam("sig") String signature) {
+        String originalUrl = trackingUseCase.registerClickAndGetRedirectUrl(logId, payload, signature);
         return ResponseEntity.status(HttpStatus.FOUND).location(URI.create(originalUrl)).build();
     }
 }

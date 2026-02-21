@@ -10,6 +10,10 @@ import es.terencio.erp.marketing.domain.model.MarketingCampaign;
 import es.terencio.erp.marketing.domain.model.MarketingTemplate;
 
 public interface CampaignRepositoryPort {
+    // Lock
+    boolean acquireSchedulerLock(String lockName);
+    void releaseSchedulerLock(String lockName);
+
     // Templates
     Optional<MarketingTemplate> findTemplateById(Long id);
     List<MarketingTemplate> findAllTemplates(UUID companyId, String search);
@@ -21,12 +25,12 @@ public interface CampaignRepositoryPort {
     List<MarketingCampaign> findScheduledCampaignsToLaunch(Instant now);
     MarketingCampaign saveCampaign(MarketingCampaign campaign);
     void incrementCampaignMetric(Long campaignId, String metricType);
+    int countDailySendsForCompany(UUID companyId, Instant startOfDay);
 
     // Logs & Events
     CampaignLog saveLog(CampaignLog log);
     Optional<CampaignLog> findLogById(Long id);
     Optional<CampaignLog> findLogByMessageId(String messageId);
-    List<CampaignLog> findLogsByStatus(String status);
     boolean hasLog(Long campaignId, Long customerId);
     
     // Webhook Support

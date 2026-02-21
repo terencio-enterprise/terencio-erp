@@ -2,16 +2,23 @@ package es.terencio.erp.marketing.infrastructure.config;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
+import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 
 @Configuration
 @ConfigurationProperties(prefix = "app.marketing")
 @Data
 public class MarketingProperties {
-    private String publicBaseUrl = "https://api.terencio.es";
-    private String hmacSecret = "ChangeThisSecretInProductionEnvironment123456789!";
+    
+    @NotBlank(message = "Public Base URL is required for tracking links")
+    private String publicBaseUrl;
+    
+    // 🔥 SECURED: No default secret. App will fail to boot if not provided via ENV.
+    @NotBlank(message = "HMAC Secret is required to prevent Open Redirect attacks")
+    private String hmacSecret;
+    
     private int batchSize = 500;
     private int maxRetries = 3;
-    private int rateLimitPerSecond = 14; // AWS SES Default is 14/sec
-    private boolean enforceSnsSignature = false; // Toggle for dev/prod
+    private int rateLimitPerSecond = 14; 
+    private long linkExpirationHours = 168; // 7 days
 }
