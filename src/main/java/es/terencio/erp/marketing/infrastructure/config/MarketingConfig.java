@@ -9,6 +9,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import es.terencio.erp.marketing.application.port.out.CampaignRepositoryPort;
 import es.terencio.erp.marketing.application.port.out.CustomerIntegrationPort;
 import es.terencio.erp.marketing.application.port.out.MailingSystemPort;
+import es.terencio.erp.marketing.application.port.out.MarketingSettingsRepositoryPort;
 import es.terencio.erp.marketing.application.port.out.TemplateEnginePort;
 import es.terencio.erp.marketing.application.service.campaign.CampaignCommandService;
 import es.terencio.erp.marketing.application.service.campaign.CampaignLaunchService;
@@ -17,6 +18,7 @@ import es.terencio.erp.marketing.application.service.campaign.CampaignSender;
 import es.terencio.erp.marketing.application.service.campaign.EmailContentBuilder;
 import es.terencio.erp.marketing.application.service.campaign.TrackingLinkService;
 import es.terencio.erp.marketing.application.service.preference.CustomerPreferenceService;
+import es.terencio.erp.marketing.application.service.settings.MarketingSettingsService;
 import es.terencio.erp.marketing.application.service.template.TemplateService;
 import es.terencio.erp.marketing.application.service.tracking.CampaignTrackingService;
 import es.terencio.erp.marketing.application.service.webhook.SesWebhookService;
@@ -86,8 +88,13 @@ public class MarketingConfig {
     }
 
     @Bean
-    public TemplateService templateService(CampaignRepositoryPort repository) {
-        return new TemplateService(repository);
+    public TemplateService templateService(CampaignRepositoryPort repository, TemplateEnginePort templateEngine) {
+        return new TemplateService(repository, templateEngine);
+    }
+
+    @Bean
+    public MarketingSettingsService marketingSettingsService(MarketingSettingsRepositoryPort repository) {
+        return new MarketingSettingsService(repository);
     }
 
     @Bean

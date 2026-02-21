@@ -1,6 +1,7 @@
 package es.terencio.erp.marketing.infrastructure.in.web;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import org.springframework.http.ResponseEntity;
@@ -18,6 +19,8 @@ import es.terencio.erp.auth.domain.model.AccessScope;
 import es.terencio.erp.auth.domain.model.Permission;
 import es.terencio.erp.auth.infrastructure.config.security.aop.RequiresPermission;
 import es.terencio.erp.marketing.application.dto.template.TemplateDto;
+import es.terencio.erp.marketing.application.dto.template.TemplatePreviewRequest;
+import es.terencio.erp.marketing.application.dto.template.TemplatePreviewResponse;
 import es.terencio.erp.marketing.application.port.in.TemplateManagementUseCase;
 import es.terencio.erp.shared.presentation.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -25,7 +28,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 
 @RestController
 @RequestMapping("/api/v1/companies/{companyId}/marketing/templates")
-@Tag(name = "Marketing Templates", description = "Template CRUD operations")
+@Tag(name = "Marketing Templates", description = "Template CRUD operations and compilation previews")
 public class AdminTemplateController {
 
     private final TemplateManagementUseCase templateManagementUseCase;
@@ -68,5 +71,21 @@ public class AdminTemplateController {
     public ResponseEntity<ApiResponse<Void>> deleteTemplate(@PathVariable UUID companyId, @PathVariable Long id) {
         templateManagementUseCase.deleteTemplate(id);
         return ResponseEntity.ok(ApiResponse.success("Template deleted"));
+    }
+
+    @PostMapping("/{id}/preview")
+    @Operation(summary = "Preview compiled template HTML/Subject")
+    @RequiresPermission(permission = Permission.MARKETING_TEMPLATE_VIEW, scope = AccessScope.COMPANY, targetIdParam = "companyId")
+    public ResponseEntity<ApiResponse<TemplatePreviewResponse>> previewTemplate(
+            @PathVariable UUID companyId,
+            @PathVariable Long id,
+            @RequestBody(required = false) TemplatePreviewRequest request) {
+        
+        Map<String, String> variables = (request != null && request.variables() != null) 
+                                        ? request.variables() 
+                                        : Map.of();
+                                        
+        TemplatePreviewResponse response = templateManagementUseCase.previewTemplate(companyId, id, variables);
+        return ResponseEntity.ok(ApiResponse.success(response));
     }
 }

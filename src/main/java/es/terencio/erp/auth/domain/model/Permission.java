@@ -57,6 +57,8 @@ public enum Permission {
     MARKETING_TEMPLATE_CREATE("marketing:template:create"),
     MARKETING_TEMPLATE_EDIT("marketing:template:edit"),
     MARKETING_TEMPLATE_DELETE("marketing:template:delete"),
+    MARKETING_SETTINGS_VIEW("marketing:settings:view"),
+    MARKETING_SETTINGS_EDIT("marketing:settings:edit"),
 
     // ── Admin ───────────────────────────────────────────────────────────────────
     ADMIN_FULL_ACCESS("admin:full_access");

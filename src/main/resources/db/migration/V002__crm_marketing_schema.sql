@@ -158,6 +158,8 @@ CREATE TABLE marketing_campaigns (
     metrics_bounced INTEGER DEFAULT 0,
     metrics_unsubscribed INTEGER DEFAULT 0,
     
+    audience_filter JSONB, -- Filtro de audiencia serializado
+    
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -185,6 +187,7 @@ CREATE TABLE marketing_email_logs (
     clicked_at TIMESTAMPTZ,
     bounced_at TIMESTAMPTZ,
     unsubscribed_at TIMESTAMPTZ,
+    complained_at TIMESTAMPTZ,
     
     created_at TIMESTAMPTZ DEFAULT NOW()
 );

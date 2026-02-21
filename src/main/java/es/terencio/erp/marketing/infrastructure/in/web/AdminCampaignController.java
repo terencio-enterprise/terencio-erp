@@ -21,6 +21,7 @@ import es.terencio.erp.auth.domain.model.AccessScope;
 import es.terencio.erp.auth.domain.model.Permission;
 import es.terencio.erp.auth.infrastructure.config.security.aop.RequiresPermission;
 import es.terencio.erp.marketing.application.dto.campaign.CampaignAudienceMember;
+import es.terencio.erp.marketing.application.dto.campaign.CampaignLogResponse;
 import es.terencio.erp.marketing.application.dto.campaign.CampaignResponse;
 import es.terencio.erp.marketing.application.dto.campaign.CreateCampaignRequest;
 import es.terencio.erp.marketing.application.port.in.CampaignLaunchUseCase;
@@ -49,18 +50,18 @@ public class AdminCampaignController {
         this.campaignLaunchUseCase = campaignLaunchUseCase;
     }
 
-    @PostMapping("/draft")
-    @Operation(summary = "Create Campaign Draft")
-    @RequiresPermission(permission = Permission.MARKETING_CAMPAIGN_LAUNCH, scope = AccessScope.COMPANY, targetIdParam = "companyId")
-    public ResponseEntity<ApiResponse<CampaignResponse>> createDraft(@PathVariable UUID companyId, @Valid @RequestBody CreateCampaignRequest request) {
-        return ResponseEntity.ok(ApiResponse.success(campaignManagementUseCase.createDraft(companyId, request)));
-    }
-
-    @PutMapping("/{id}/draft")
-    @Operation(summary = "Update Campaign Draft")
-    @RequiresPermission(permission = Permission.MARKETING_CAMPAIGN_LAUNCH, scope = AccessScope.COMPANY, targetIdParam = "companyId")
-    public ResponseEntity<ApiResponse<CampaignResponse>> updateDraft(@PathVariable UUID companyId, @PathVariable Long id, @Valid @RequestBody CreateCampaignRequest request) {
-        return ResponseEntity.ok(ApiResponse.success(campaignManagementUseCase.updateDraft(companyId, id, request)));
+    @GetMapping
+    @Operation(summary = "Search and list campaigns paginated")
+    @RequiresPermission(permission = Permission.MARKETING_CAMPAIGN_VIEW, scope = AccessScope.COMPANY, targetIdParam = "companyId")
+    public ResponseEntity<ApiResponse<PageResult<CampaignResponse>>> listCampaigns(
+            @PathVariable UUID companyId,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) String status,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return ResponseEntity.ok(ApiResponse.success(
+            campaignQueryUseCase.listCampaigns(companyId, search, status, page, size)
+        ));
     }
 
     @GetMapping("/{id}")
@@ -82,6 +83,35 @@ public class AdminCampaignController {
         return ResponseEntity.ok(ApiResponse.success(
                 campaignQueryUseCase.getCampaignAudience(companyId, id, page, size)
         ));
+    }
+
+    @GetMapping("/{id}/logs")
+    @Operation(summary = "Get detailed execution logs per customer for campaign")
+    @RequiresPermission(permission = Permission.MARKETING_CAMPAIGN_VIEW, scope = AccessScope.COMPANY, targetIdParam = "companyId")
+    public ResponseEntity<ApiResponse<PageResult<CampaignLogResponse>>> getCampaignLogs(
+            @PathVariable UUID companyId,
+            @PathVariable Long id,
+            @RequestParam(required = false) String status,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "50") int size
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(
+                campaignQueryUseCase.getCampaignLogs(companyId, id, status, page, size)
+        ));
+    }
+
+    @PostMapping("/draft")
+    @Operation(summary = "Create Campaign Draft")
+    @RequiresPermission(permission = Permission.MARKETING_CAMPAIGN_LAUNCH, scope = AccessScope.COMPANY, targetIdParam = "companyId")
+    public ResponseEntity<ApiResponse<CampaignResponse>> createDraft(@PathVariable UUID companyId, @Valid @RequestBody CreateCampaignRequest request) {
+        return ResponseEntity.ok(ApiResponse.success(campaignManagementUseCase.createDraft(companyId, request)));
+    }
+
+    @PutMapping("/{id}/draft")
+    @Operation(summary = "Update Campaign Draft")
+    @RequiresPermission(permission = Permission.MARKETING_CAMPAIGN_LAUNCH, scope = AccessScope.COMPANY, targetIdParam = "companyId")
+    public ResponseEntity<ApiResponse<CampaignResponse>> updateDraft(@PathVariable UUID companyId, @PathVariable Long id, @Valid @RequestBody CreateCampaignRequest request) {
+        return ResponseEntity.ok(ApiResponse.success(campaignManagementUseCase.updateDraft(companyId, id, request)));
     }
 
     @PostMapping("/{id}/launch")
