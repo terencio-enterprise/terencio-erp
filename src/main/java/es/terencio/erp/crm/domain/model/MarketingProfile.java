@@ -3,7 +3,7 @@ package es.terencio.erp.crm.domain.model;
 import java.time.Instant;
 import java.util.List;
 
-import es.terencio.erp.shared.domain.utils.SecurityUtils;
+import es.terencio.erp.shared.domain.utils.TokenGeneratorUtil;
 
 public record MarketingProfile(
         String origin,
@@ -20,7 +20,7 @@ public record MarketingProfile(
                 tags != null ? List.copyOf(tags) : List.of(),
                 consent,
                 consent ? MarketingStatus.SUBSCRIBED : MarketingStatus.UNSUBSCRIBED,
-                SecurityUtils.generateSecureToken(),
+                TokenGeneratorUtil.generateSecureToken(),
                 Instant.now()
         );
     }
@@ -31,7 +31,7 @@ public record MarketingProfile(
                 List.of(),
                 false,
                 MarketingStatus.UNSUBSCRIBED,
-                SecurityUtils.generateSecureToken(),
+                TokenGeneratorUtil.generateSecureToken(),
                 null
         );
     }
