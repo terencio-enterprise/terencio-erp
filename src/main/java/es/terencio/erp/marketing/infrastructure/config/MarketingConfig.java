@@ -36,8 +36,7 @@ public class MarketingConfig {
     }
 
     @Bean
-    public ProcessWebhookUseCase processWebhookUseCase(CampaignRepositoryPort repository,
-            MarketingProperties properties) {
-        return new WebhookService(repository, properties);
+    public ProcessWebhookUseCase processWebhookUseCase(CampaignRepositoryPort repository) {
+        return new WebhookService(repository);
     }
 }

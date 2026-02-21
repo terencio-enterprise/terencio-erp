@@ -223,3 +223,26 @@ WHERE status != 'FAILED';
 -- 3. Token lookup optimization
 CREATE INDEX IF NOT EXISTS idx_customers_unsubscribe_token 
 ON customers(unsubscribe_token);
+
+-- ==================================================================================
+-- ADD MISSING INDICES AND CONSTRAINTS FOR CRM & MARKETING V1.1
+-- ==================================================================================
+
+-- Optimization: Searching customers by email is case-insensitive in Java, so we do it here too
+CREATE INDEX IF NOT EXISTS idx_customers_email_lower ON customers (LOWER(email));
+
+-- Optimization: Campaign status filtering for the scheduler
+CREATE INDEX IF NOT EXISTS idx_marketing_campaigns_status_scheduled ON marketing_campaigns(status, scheduled_at) 
+WHERE status = 'SCHEDULED';
+
+-- Security: Ensure unique tracking links per campaign-customer (Idempotency)
+-- If a log exists for a campaign/customer, we shouldn't create another unless previous failed
+CREATE UNIQUE INDEX IF NOT EXISTS uq_campaign_customer_log 
+ON marketing_email_logs(campaign_id, customer_id) 
+WHERE status != 'FAILED';
+
+-- Performance: Rapid lookup of customer by token for preferences page
+CREATE INDEX IF NOT EXISTS idx_customers_unsubscribe_token ON customers(unsubscribe_token);
+
+-- Performance: Aggregating logs for campaign metrics
+CREATE INDEX IF NOT EXISTS idx_email_logs_status_metrics ON marketing_email_logs(campaign_id, status);
