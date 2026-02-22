@@ -64,7 +64,6 @@ public class CompanyController {
 
     @GetMapping
     @Operation(summary = "Get user companies")
-    @RequiresPermission(permission = Permission.ORGANIZATION_COMPANY_VIEW, scope = AccessScope.ORGANIZATION)
     public ResponseEntity<ApiResponse<List<CompanyResponse>>> getCompanies(@AuthenticationPrincipal CustomUserDetails userDetails) {
         List<Company> companies = companyRepository.findByEmployeeId(userDetails.getUuid());
         return ResponseEntity.ok(ApiResponse.success("Companies fetched successfully", companies.stream().map(company -> new CompanyResponse(company.id().value(), company.name(), company.taxId().value(), company.currencyCode(), company.fiscalRegime().name(), company.priceIncludesTax(), company.roundingMode().name(), company.isActive())).toList()));
