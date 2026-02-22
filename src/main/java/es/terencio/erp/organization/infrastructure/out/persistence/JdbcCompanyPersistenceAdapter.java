@@ -4,10 +4,13 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.util.Currency;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
+
 import es.terencio.erp.organization.application.port.out.CompanyRepository;
 import es.terencio.erp.organization.domain.model.Company;
 import es.terencio.erp.organization.domain.model.FiscalRegime;
@@ -51,6 +54,14 @@ public class JdbcCompanyPersistenceAdapter implements CompanyRepository {
     public boolean existsByTaxId(String taxId) {
         Integer count = jdbcClient.sql("SELECT COUNT(*) FROM companies WHERE tax_id = :taxId").param("taxId", taxId).query(Integer.class).single();
         return count != null && count > 0;
+    }
+
+    @Override
+    public List<Company> findByEmployeeId(UUID employeeId) {
+        return jdbcClient.sql("SELECT c.* FROM companies c JOIN company_employees ce ON c.id = ce.company_id WHERE ce.employee_id = :employeeId")
+                .param("employeeId", employeeId)
+                .query(this::mapRow)
+                .list();
     }
 
     private Company mapRow(ResultSet rs, int rowNum) throws SQLException {

@@ -1,10 +1,21 @@
 package es.terencio.erp.organization.infrastructure.in.web;
 
+import java.util.List;
 import java.util.UUID;
+
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
 import es.terencio.erp.auth.domain.model.AccessScope;
 import es.terencio.erp.auth.domain.model.Permission;
+import es.terencio.erp.auth.infrastructure.config.security.CustomUserDetails;
 import es.terencio.erp.auth.infrastructure.config.security.aop.RequiresPermission;
 import es.terencio.erp.organization.application.dto.OrganizationCommands.CreateCompanyCommand;
 import es.terencio.erp.organization.application.dto.OrganizationCommands.CreateCompanyResult;
@@ -49,6 +60,14 @@ public class CompanyController {
     public ResponseEntity<ApiResponse<CompanyResponse>> getCompany(@PathVariable UUID id) {
         Company company = companyRepository.findById(new CompanyId(id)).orElseThrow(() -> new RuntimeException("Company not found"));
         return ResponseEntity.ok(ApiResponse.success("Company fetched successfully", new CompanyResponse(company.id().value(), company.name(), company.taxId().value(), company.currencyCode(), company.fiscalRegime().name(), company.priceIncludesTax(), company.roundingMode().name(), company.isActive())));
+    }
+
+    @GetMapping
+    @Operation(summary = "Get user companies")
+    @RequiresPermission(permission = Permission.ORGANIZATION_COMPANY_VIEW, scope = AccessScope.ORGANIZATION)
+    public ResponseEntity<ApiResponse<List<CompanyResponse>>> getCompanies(@AuthenticationPrincipal CustomUserDetails userDetails) {
+        List<Company> companies = companyRepository.findByEmployeeId(userDetails.getUuid());
+        return ResponseEntity.ok(ApiResponse.success("Companies fetched successfully", companies.stream().map(company -> new CompanyResponse(company.id().value(), company.name(), company.taxId().value(), company.currencyCode(), company.fiscalRegime().name(), company.priceIncludesTax(), company.roundingMode().name(), company.isActive())).toList()));
     }
 
     @PutMapping("/{id}/fiscal-settings")
