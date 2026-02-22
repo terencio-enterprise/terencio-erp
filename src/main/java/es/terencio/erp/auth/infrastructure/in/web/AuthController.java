@@ -26,7 +26,7 @@ import es.terencio.erp.auth.infrastructure.config.security.CustomUserDetails;
 import es.terencio.erp.auth.infrastructure.config.security.jwt.JwtTokenProvider;
 import es.terencio.erp.employees.application.dto.EmployeeDto;
 import es.terencio.erp.employees.application.port.out.EmployeePort;
-import es.terencio.erp.organization.application.port.in.OrganizationTreeUseCase;
+import es.terencio.erp.organization.application.port.in.OrganizationUseCase;
 import es.terencio.erp.shared.presentation.ApiError;
 import es.terencio.erp.shared.presentation.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -42,7 +42,7 @@ public class AuthController {
     private final AuthenticationManager authenticationManager;
     private final JwtTokenProvider tokenProvider;
     private final UserDetailsService userDetailsService;
-    private final OrganizationTreeUseCase organizationTreeUseCase;
+    private final OrganizationUseCase organizationUseCase;
     private final EmployeePort employeePort;
     private final PermissionService permissionService;
 
@@ -73,12 +73,12 @@ public class AuthController {
     private long refreshExpirationMs;
 
     public AuthController(AuthenticationManager authenticationManager, JwtTokenProvider tokenProvider,
-            UserDetailsService userDetailsService, OrganizationTreeUseCase organizationTreeUseCase,
+            UserDetailsService userDetailsService, OrganizationUseCase organizationUseCase,
             EmployeePort employeePort, PermissionService permissionService) {
         this.authenticationManager = authenticationManager;
         this.tokenProvider = tokenProvider;
         this.userDetailsService = userDetailsService;
-        this.organizationTreeUseCase = organizationTreeUseCase;
+        this.organizationUseCase = organizationUseCase;
         this.employeePort = employeePort;
         this.permissionService = permissionService;
     }
@@ -159,7 +159,7 @@ public class AuthController {
         EmployeeInfoDto userInfo = new EmployeeInfoDto(
                 userDetails.getId(), userDetails.getUsername(), userDetails.getFullName(), userDetails.isEnabled(),
                 employee.lastActiveCompanyId(), employee.lastActiveStoreId(),
-                organizationTreeUseCase.getCompanyTreeForEmployee(userDetails.getId()),
+                organizationUseCase.getTreeForEmployee(userDetails.getId()),
                 permissionService.getPermissionMatrix(userDetails.getId()));
 
         return ResponseEntity.ok(ApiResponse.success("User info fetched successfully", userInfo));

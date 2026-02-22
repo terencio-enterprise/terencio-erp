@@ -21,11 +21,8 @@ import es.terencio.erp.organization.application.dto.OrganizationCommands.CreateC
 import es.terencio.erp.organization.application.dto.OrganizationCommands.CreateCompanyResult;
 import es.terencio.erp.organization.application.dto.OrganizationCommands.UpdateFiscalSettingsCommand;
 import es.terencio.erp.organization.application.dto.OrganizationCommands.UpdateFiscalSettingsResult;
-import es.terencio.erp.organization.application.port.in.CreateCompanyUseCase;
-import es.terencio.erp.organization.application.port.in.UpdateFiscalSettingsUseCase;
-import es.terencio.erp.organization.application.port.out.CompanyRepository;
+import es.terencio.erp.organization.application.port.in.CompanyUseCase;
 import es.terencio.erp.organization.domain.model.Company;
-import es.terencio.erp.shared.domain.identifier.CompanyId;
 import es.terencio.erp.shared.presentation.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -37,43 +34,47 @@ import jakarta.validation.Valid;
 @Tag(name = "Companies", description = "Company profile and fiscal settings management")
 public class CompanyController {
 
-    private final CreateCompanyUseCase createCompanyUseCase;
-    private final UpdateFiscalSettingsUseCase updateFiscalSettingsUseCase;
-    private final CompanyRepository companyRepository;
+    private final CompanyUseCase companyUseCase;
 
-    public CompanyController(CreateCompanyUseCase createCompanyUseCase, UpdateFiscalSettingsUseCase updateFiscalSettingsUseCase, CompanyRepository companyRepository) {
-        this.createCompanyUseCase = createCompanyUseCase;
-        this.updateFiscalSettingsUseCase = updateFiscalSettingsUseCase;
-        this.companyRepository = companyRepository;
+    public CompanyController(CompanyUseCase companyUseCase) {
+        this.companyUseCase = companyUseCase;
     }
 
     @PostMapping
     @Operation(summary = "Create company")
     @RequiresPermission(permission = Permission.ORGANIZATION_COMPANY_CREATE, scope = AccessScope.ORGANIZATION, targetIdParam = "organizationId")
     public ResponseEntity<ApiResponse<CreateCompanyResult>> createCompany(@Valid @RequestBody CreateCompanyCommand command) {
-        return ResponseEntity.ok(ApiResponse.success("Company created successfully", createCompanyUseCase.execute(command)));
+        return ResponseEntity.ok(ApiResponse.success("Company created successfully", companyUseCase.create(command)));
     }
 
     @GetMapping("/{id}")
     @Operation(summary = "Get company")
     @RequiresPermission(permission = Permission.ORGANIZATION_COMPANY_VIEW, scope = AccessScope.COMPANY, targetIdParam = "id")
     public ResponseEntity<ApiResponse<CompanyResponse>> getCompany(@PathVariable UUID id) {
-        Company company = companyRepository.findById(new CompanyId(id)).orElseThrow(() -> new RuntimeException("Company not found"));
-        return ResponseEntity.ok(ApiResponse.success("Company fetched successfully", new CompanyResponse(company.id().value(), company.name(), company.taxId().value(), company.currencyCode(), company.fiscalRegime().name(), company.priceIncludesTax(), company.roundingMode().name(), company.isActive())));
+        Company company = companyUseCase.getById(id);
+        return ResponseEntity.ok(ApiResponse.success(
+            "Company fetched successfully", 
+            new CompanyResponse(company.id().value(), company.name(), company.taxId().value(), company.currencyCode(), company.fiscalRegime().name(), company.priceIncludesTax(), company.roundingMode().name(), company.isActive())
+        ));
     }
 
     @GetMapping
     @Operation(summary = "Get user companies")
     public ResponseEntity<ApiResponse<List<CompanyResponse>>> getCompanies(@AuthenticationPrincipal CustomUserDetails userDetails) {
-        List<Company> companies = companyRepository.findByEmployeeId(userDetails.getUuid());
-        return ResponseEntity.ok(ApiResponse.success("Companies fetched successfully", companies.stream().map(company -> new CompanyResponse(company.id().value(), company.name(), company.taxId().value(), company.currencyCode(), company.fiscalRegime().name(), company.priceIncludesTax(), company.roundingMode().name(), company.isActive())).toList()));
+        List<Company> companies = companyUseCase.getAllForEmployee(userDetails.getUuid());
+        return ResponseEntity.ok(ApiResponse.success(
+            "Companies fetched successfully", 
+            companies.stream().map(company -> new CompanyResponse(company.id().value(), company.name(), company.taxId().value(), company.currencyCode(), company.fiscalRegime().name(), company.priceIncludesTax(), company.roundingMode().name(), company.isActive())).toList()
+        ));
     }
 
     @PutMapping("/{id}/fiscal-settings")
     @Operation(summary = "Update fiscal settings")
     @RequiresPermission(permission = Permission.ORGANIZATION_COMPANY_UPDATE, scope = AccessScope.COMPANY, targetIdParam = "id")
-    public ResponseEntity<ApiResponse<UpdateFiscalSettingsResult>> updateFiscalSettings(@Parameter(description = "Company identifier") @PathVariable UUID id, @Valid @RequestBody UpdateFiscalSettingsCommand command) {
-        return ResponseEntity.ok(ApiResponse.success("Fiscal settings updated successfully", updateFiscalSettingsUseCase.execute(id, command)));
+    public ResponseEntity<ApiResponse<UpdateFiscalSettingsResult>> updateFiscalSettings(
+            @Parameter(description = "Company identifier") @PathVariable UUID id, 
+            @Valid @RequestBody UpdateFiscalSettingsCommand command) {
+        return ResponseEntity.ok(ApiResponse.success("Fiscal settings updated successfully", companyUseCase.updateFiscalSettings(id, command)));
     }
 
     public record CompanyResponse(UUID id, String name, String taxId, String currencyCode, String fiscalRegime, boolean priceIncludesTax, String roundingMode, boolean active) {}
