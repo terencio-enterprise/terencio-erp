@@ -2,41 +2,36 @@ package es.terencio.erp.organization.infrastructure.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+
 import es.terencio.erp.employees.application.port.out.EmployeePort;
-import es.terencio.erp.organization.application.port.in.*;
-import es.terencio.erp.organization.application.port.out.*;
-import es.terencio.erp.organization.application.service.*;
+import es.terencio.erp.organization.application.port.in.CompanyUseCase;
+import es.terencio.erp.organization.application.port.in.OrganizationUseCase;
+import es.terencio.erp.organization.application.port.in.StoreUseCase;
+import es.terencio.erp.organization.application.port.out.CompanyRepository;
+import es.terencio.erp.organization.application.port.out.OrganizationRepository;
+import es.terencio.erp.organization.application.port.out.StoreRepository;
+import es.terencio.erp.organization.application.port.out.StoreSettingsRepository;
+import es.terencio.erp.organization.application.port.out.WarehouseRepository;
+import es.terencio.erp.organization.application.service.CompanyService;
+import es.terencio.erp.organization.application.service.OrganizationService;
+import es.terencio.erp.organization.application.service.StoreService;
 
 @Configuration
 public class OrganizationConfig {
 
     @Bean
-    public CreateCompanyUseCase createCompanyUseCase(CompanyRepository companyRepository) {
-        return new CreateCompanyService(companyRepository);
+    public CompanyUseCase companyUseCase(CompanyRepository companyRepository) {
+        return new CompanyService(companyRepository);
     }
 
     @Bean
-    public CreateStoreUseCase createStoreUseCase(StoreRepository storeRepository, WarehouseRepository warehouseRepository, StoreSettingsRepository storeSettingsRepository, CompanyRepository companyRepository) {
-        return new CreateStoreService(storeRepository, warehouseRepository, storeSettingsRepository, companyRepository);
+    public StoreUseCase storeUseCase(StoreRepository storeRepository, WarehouseRepository warehouseRepository, 
+                                     StoreSettingsRepository storeSettingsRepository, CompanyRepository companyRepository) {
+        return new StoreService(storeRepository, warehouseRepository, storeSettingsRepository, companyRepository);
     }
 
     @Bean
-    public UpdateStoreSettingsUseCase updateStoreSettingsUseCase(StoreSettingsRepository storeSettingsRepository) {
-        return new UpdateStoreSettingsService(storeSettingsRepository);
-    }
-
-    @Bean
-    public DeleteStoreUseCase deleteStoreUseCase(StoreRepository storeRepository) {
-        return new DeleteStoreService(storeRepository);
-    }
-
-    @Bean
-    public UpdateFiscalSettingsUseCase updateFiscalSettingsUseCase(CompanyRepository companyRepository) {
-        return new UpdateFiscalSettingsService(companyRepository);
-    }
-
-    @Bean
-    public OrganizationTreeUseCase organizationTreeUseCase(EmployeePort employeePort, OrganizationRepository organizationRepository) {
-        return new OrganizationTreeService(employeePort, organizationRepository);
+    public OrganizationUseCase organizationUseCase(EmployeePort employeePort, OrganizationRepository organizationRepository) {
+        return new OrganizationService(employeePort, organizationRepository);
     }
 }
